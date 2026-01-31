@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor Catastral - Catastro</title>
+    <title>Visor Catastral - Index2</title>
     
     <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -15,25 +15,22 @@
     <!-- Omnivore (Para cargar KML/GPX) -->
     <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.2.0/leaflet-omnivore.min.js'></script>
     
-    <!-- FlatGeobuf -->
-    <script src="https://unpkg.com/flatgeobuf@3.22.0/dist/flatgeobuf-geojson.min.js"></script>
-
     <style>
         body {
             margin: 0;
             padding: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #eef2f5;
-            height: 100vh;
+            block-size: 100vh;
             display: flex;
             overflow: hidden;
         }
 
         /* --- COLUMNA IZQUIERDA: MÓDULOS --- */
         .left-panel {
-            width: 320px;
+            inline-size: 320px;
             background: white;
-            border-right: 1px solid #ccc;
+            border-inline-end: 1px solid #ccc;
             padding: 20px;
             display: flex;
             flex-direction: column;
@@ -52,12 +49,12 @@
         }
 
         .module h3 {
-            margin-top: 0;
+            margin-block-start: 0;
             font-size: 1rem;
             color: #2c3e50;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 8px;
-            margin-bottom: 15px;
+            border-block-end: 2px solid #3498db;
+            padding-block-end: 8px;
+            margin-block-end: 15px;
         }
 
         /* --- COLUMNA CENTRAL: MAPA --- */
@@ -72,8 +69,8 @@
         }
 
         #map-container {
-            width: 70vh;  /* Cuadrado relativo a la altura */
-            height: 70vh;
+            inline-size: 70vh;  /* Cuadrado relativo a la altura */
+            block-size: 70vh;
             border: 8px solid white;
             border-radius: 4px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.15);
@@ -81,13 +78,13 @@
         }
 
         #map {
-            width: 100%;
-            height: 100%;
+            inline-size: 100%;
+            block-size: 100%;
             background: #ddd;
         }
 
         .center-btn {
-            margin-top: 20px;
+            margin-block-start: 20px;
             padding: 10px 25px;
             background-color: #2c3e50;
             color: white;
@@ -107,9 +104,9 @@
 
         /* --- COLUMNA DERECHA: CAPAS --- */
         .right-panel {
-            width: 280px; /* Un poco más ancho para las leyendas */
+            inline-size: 250px;
             background: white;
-            border-left: 1px solid #ccc;
+            border-inline-start: 1px solid #ccc;
             padding: 20px;
             overflow-y: auto;
             box-shadow: -2px 0 5px rgba(0,0,0,0.05);
@@ -117,7 +114,7 @@
         }
 
         .layer-group {
-            margin-bottom: 25px;
+            margin-block-end: 25px;
         }
 
         .layer-group h4 {
@@ -129,87 +126,28 @@
 
         .layer-item {
             display: flex;
-            flex-direction: column; /* Cambiado para soportar leyenda debajo */
-            margin-bottom: 12px;
-            cursor: pointer;
-        }
-
-        .layer-header {
-            display: flex;
             align-items: center;
-        }
-
-        .layer-header input {
-            margin-right: 10px;
+            margin-block-end: 8px;
             cursor: pointer;
         }
 
-        .layer-legend {
-            margin-left: 25px;
-            margin-top: 5px;
-            font-size: 0.8rem;
-            color: #666;
-            display: none; /* Oculto por defecto hasta que se activa */
-        }
-
-        .layer-legend img {
-            max-width: 100%;
-            border: 1px solid #eee;
-        }
-
-        /* Acordeón para "Resto de capas" */
-        .accordion {
-            background-color: #f1f1f1;
-            color: #444;
+        .layer-item input {
+            margin-inline-end: 10px;
             cursor: pointer;
-            padding: 10px;
-            width: 100%;
-            border: none;
-            text-align: left;
-            outline: none;
-            font-size: 15px;
-            transition: 0.4s;
-            border-radius: 4px;
-            margin-bottom: 5px;
-        }
-
-        .active, .accordion:hover {
-            background-color: #ddd; 
-        }
-
-        .accordion:after {
-            content: '\002B';
-            color: #777;
-            font-weight: bold;
-            float: right;
-            margin-left: 5px;
-        }
-
-        .active:after {
-            content: "\2212";
-        }
-
-        .panel-collapse {
-            padding: 0 10px;
-            background-color: white;
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.2s ease-out;
-            border-left: 2px solid #ddd;
         }
 
         /* --- UI ELEMENTS --- */
         input[type="text"] {
-            width: 100%;
+            inline-size: 100%;
             padding: 10px;
             border: 1px solid #ccc;
             border-radius: 4px;
             box-sizing: border-box;
-            margin-bottom: 10px;
+            margin-block-end: 10px;
         }
 
         button.action-btn {
-            width: 100%;
+            inline-size: 100%;
             padding: 10px;
             background-color: #3498db;
             color: white;
@@ -217,7 +155,7 @@
             border-radius: 4px;
             cursor: pointer;
             font-weight: 600;
-            margin-top: 5px;
+            margin-block-start: 5px;
             font-size: 0.9rem;
         }
         button.action-btn:hover { background-color: #2980b9; }
@@ -233,7 +171,7 @@
             color: #7f8c8d;
             cursor: pointer;
             font-size: 0.9rem;
-            margin-bottom: 10px;
+            margin-block-end: 10px;
         }
         .file-upload-box:hover {
             border-color: #3498db;
@@ -243,8 +181,8 @@
         /* Panel de herramientas flotante sobre el mapa */
         .tools-panel {
             position: absolute;
-            top: 20px;
-            left: 20px;
+            inset-block-start: 20px;
+            inset-inline-start: 20px;
             z-index: 1000; /* Encima del mapa */
             background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
@@ -252,133 +190,1636 @@
             border-radius: 8px;
             padding: 15px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-            width: 220px;
+            inline-size: 220px;
         }
 
         #medicion-resultado {
-            margin-top: 10px;
+            margin-block-start: 10px;
             padding: 10px;
             background: #e8f4fd;
-            border-left: 4px solid #3498db;
+            border-inline-start: 4px solid #3498db;
             font-size: 0.9rem;
             display: none;
         }
-        
-        /* Loading Overlay */
-        #loading-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.8);
-            z-index: 9999;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-        }
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        /* ESTILOS AUTOCAD TOOLBAR */
+        .autocad-toolbar {
+            position: fixed;
+            inset-block-start: 10px;
+            inset-inline-start: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            border: 2px solid #1a252f;
+            border-radius: 8px;
+            padding: 12px 25px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            z-index: 10000;
+            display: flex;
+            gap: 50px;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .toolbar-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toolbar-section h3 {
+            margin: 0;
+            font-size: 11px;
+            color: #ecf0f1;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-block-end: 1px solid #3498db;
+            padding-block-end: 4px;
+        }
+
+        .toolbar-buttons {
+            display: flex;
+            gap: 15px;
+        }
+
+        .cad-btn {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            border: 1px solid #1f618d;
+            border-radius: 4px;
+            padding: 10px 16px;
+            color: white;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-inline-size: 90px;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .cad-btn:hover {
+            background: linear-gradient(135deg, #2980b9 0%, #1f618d 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .cad-btn.active {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            border-color: #922b21;
+            box-shadow: 0 0 8px rgba(231, 76, 60, 0.5);
+        }
+
+        .cad-btn.danger {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            border-color: #922b21;
+        }
+
+        .cad-btn.danger:hover {
+            background: linear-gradient(135deg, #c0392b 0%, #922b21 100%);
+        }
+
+        .cad-btn i {
+            font-size: 12px;
+        }
+
+        .medicion-display {
+            background: rgba(52, 152, 219, 0.1);
+            border: 1px solid #3498db;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+
+.medicion-label {
+    color: #3498db;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+}
+
+/* Glassmorphism Card */
+.glass-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    color: #ffffff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.glass-title {
+    margin: 0 0 15px 0;
+    color: #ffffff;
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    text-align: center;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.stat-value { 
+    font-size: 1.4em; 
+    font-weight: bold; 
+    display: block; 
+    color: #ffffff;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.stat-label { 
+    font-size: 0.8em; 
+    opacity: 0.8; 
+    text-transform: uppercase; 
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.alerts-box { 
+    margin-block-start: 15px; 
+}
+
+.alert-tag {
+    background: rgba(255, 0, 0, 0.3);
+    border: 1px solid #ff4d4d;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 0.9em;
+    display: inline-block;
+    margin-inline-end: 5px;
+    color: #ffffff;
+}
+
+.glass-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-block-end: 8px;
+    padding: 5px 0;
+    border-block-end: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-metric-label {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.9rem;
+}
+
+.glass-metric-value {
+    color: #ffffff;
+    font-weight: bold;
+    font-size: 1rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.glass-metric-unit {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.8rem;
+    margin-inline-start: 4px;
+}
+
+/* --- NUEVA BARRA DE HERRAMIENTAS FLOTANTE --- */
+.map-toolbar {
+    position: absolute;
+    inset-block-start: 10px;
+    inset-inline-start: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    display: flex;
+    gap: 8px;
+    background: rgba(255,255,255,0.95);
+    padding: 6px 12px;
+    border-radius: 30px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    backdrop-filter: blur(5px);
+}
+.tool-btn {
+    inline-size: 32px; block-size: 32px;
+    border: none; background: white; border-radius: 50%;
+    cursor: pointer; color: #444; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+.tool-btn:hover { background: #3498db; color: white; transform: translateY(-2px); }
+.tool-btn.active { background: #2c3e50; color: white; }
+.tool-btn.danger { color: #e74c3c; }
+.tool-btn.danger:hover { background: #e74c3c; color: white; }
+
+.glass-percentage {
+    color: #4CAF50;
+    font-weight: bold;
+}
     </style>
 </head>
 <body>
-
-    <div id="loading-overlay">
-        <div class="spinner"></div>
-        <p>Cargando visor y capas...</p>
-    </div>
-
-    <!-- COLUMNA IZQUIERDA -->
     <div class="left-panel">
-        <div style="margin-bottom: 20px; text-align: center;">
-            <h2 style="color: #2c3e50; margin: 0;"><i class="fa-solid fa-map-location-dot"></i> Catastro</h2>
-            <p style="color: #7f8c8d; font-size: 0.9rem; margin-top: 5px;">Herramientas de gestión</p>
+        <div class="module">
+            <h3><i class="fa-solid fa-magnifying-glass"></i> Referencia Catastral</h3>
+            <input type="text" id="ref-input" placeholder="Introduce referencia (14 o 20 caracteres)" style="margin-block-end: 8px;">
+            <button class="action-btn" onclick="cargarReferencia()">Buscar Referencia</button>
+            <div id="ref-results-checklist" style="display:none; margin-block-start:10px; font-size:0.85rem; background:#f8f9fa; padding:10px; border-radius:4px;"></div>
         </div>
 
         <div class="module">
-            <h3><i class="fa-solid fa-magnifying-glass"></i> Búsqueda</h3>
-            <input type="text" id="input-ref-catastral" placeholder="Referencia Catastral (14 o 20 dígitos)">
-            <button class="action-btn" onclick="buscarReferencia()">Buscar Parcela</button>
-            <div style="margin-top: 10px; text-align: center; color: #aaa;">- O -</div>
-            <input type="text" id="input-municipio" placeholder="Municipio">
-            <button class="action-btn secondary" onclick="buscarMunicipio()">Ir a Municipio</button>
-        </div>
-
-        <div class="module">
-            <h3><i class="fa-solid fa-file-import"></i> Cargar Datos</h3>
-            <div class="file-upload-box" onclick="document.getElementById('file-input').click()">
-                <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.5rem; margin-bottom: 10px;"></i><br>
-                Arrastra archivos aquí o haz clic<br>
-                <small>(KML, GPX, GeoJSON, SHP)</small>
+            <h3><i class="fa-solid fa-list"></i> Lote de Referencias</h3>
+            <div class="file-upload-box" onclick="document.getElementById('lote-input').click()">
+                <i class="fa-solid fa-file-csv"></i> Cargar TXT / CSV
             </div>
-            <input type="file" id="file-input" style="display: none;" multiple onchange="handleFileSelect(event)">
+            <input type="file" id="lote-input" style="display: none;" accept=".txt,.csv" onchange="handleRefsFile(this)">
+            <div id="refs-file-list"></div>
         </div>
 
         <div class="module">
-            <h3><i class="fa-solid fa-print"></i> Informes</h3>
-            <button class="action-btn" onclick="generarInforme()">Generar Informe Afecciones</button>
+            <h3><i class="fa-solid fa-map-location-dot"></i> Descarga Municipal</h3>
+            <div style="display: flex; gap: 5px;">
+                <input type="text" id="municipio-input" placeholder="Ej: Madrid (o vacío para ver todos)" style="margin-block-end: 0; font-size: 13px;" onkeypress="if(event.key==='Enter') buscarMunicipio()">
+                <button class="action-btn" style="inline-size: auto; margin-block-start: 0; padding: 0 12px;" onclick="buscarMunicipio()"><i class="fa-solid fa-magnifying-glass"></i></button>
+            </div>
+            <div id="municipio-resultados" style="margin-block-start: 10px; font-size: 0.85rem; max-block-size: 150px; overflow-y: auto;"></div>
+            <div style="text-align: end; margin-block-start: 5px;"><small><a href="#" onclick="verLogsServidor(); return false;" style="color: #3498db;">Ver logs del servidor</a></small></div>
         </div>
-        
-        <div style="margin-top: auto;">
-            <a href="/" style="display: block; text-align: center; color: #7f8c8d; text-decoration: none; font-size: 0.9rem;">
-                <i class="fa-solid fa-arrow-left"></i> Volver al Inicio
-            </a>
+
+        <div class="module">
+            <h3><i class="fa-solid fa-city"></i> Análisis Urbanístico</h3>
+            <label style="font-size: 12px; color: #666;">Referencia Catastral:</label>
+            <input type="text" id="ref-urbanismo" placeholder="Referencia Catastral (opcional si hay archivo)" style="inline-size: 100%; margin-block-end: 8px; font-size: 12px;">
+            <label style="font-size: 12px; color: #666;">Cargar geometría (KML/GML/GeoJSON):</label>
+            <input type="file" id="file-urbanismo" accept=".kml,.gml,.geojson,.json" multiple style="inline-size: 100%; margin-block-end: 8px; font-size: 12px;">
+            <button class="action-btn secondary" onclick="analizarUrbanismo()"><i class="fa-solid fa-chart-pie"></i> Analizar Urbanismo</button>
+            <div id="urbanismo-resultados" style="margin-block-start: 10px; font-size: 12px; color: #666; display: none;"></div>
+        </div>
+
+        <div class="module">
+            <h3><i class="fa-solid fa-triangle-exclamation"></i> Análisis Afecciones</h3>
+            <label style="font-size: 12px; color: #666;">Referencia Catastral:</label>
+            <input type="text" id="ref-afecciones" placeholder="Referencia Catastral (opcional si hay archivo)" style="inline-size: 100%; margin-block-end: 8px; font-size: 12px;">
+            <label style="font-size: 12px; color: #666;">Cargar geometría (KML/GML/GeoJSON):</label>
+            <input type="file" id="file-afecciones" accept=".kml,.gml,.geojson,.json" multiple style="inline-size: 100%; margin-block-end: 8px; font-size: 12px;">
+            <button class="action-btn secondary" onclick="analizarAfecciones()"><i class="fa-solid fa-shield-halved"></i> Analizar Afecciones</button>
+            <div id="analisis-resultados" style="margin-block-start: 10px; font-size: 12px; color: #666; display: none;"></div>
+        </div>
+
+        <div class="module">
+            <h3><i class="fa-solid fa-file-pdf"></i> Informes</h3>
+            <button class="action-btn" style="background-color: #e74c3c;" onclick="mostrarDialogoPDF()"><i class="fa-solid fa-print"></i> Generar PDF</button>
         </div>
     </div>
 
-    <!-- COLUMNA CENTRAL -->
+    <!-- CENTRO: MAPA -->
     <div class="center-panel">
         <div id="map-container">
-            <div id="map"></div>
-            
-            <!-- Herramientas flotantes -->
-            <div class="tools-panel">
-                <h4 style="margin-top:0; margin-bottom:10px; font-size:0.9rem;">Herramientas</h4>
-                <div style="display: flex; gap: 5px;">
-                    <button title="Medir Distancia" onclick="toggleMeasure('distancia')" style="flex:1; padding:5px; cursor:pointer;"><i class="fa-solid fa-ruler"></i></button>
-                    <button title="Medir Área" onclick="toggleMeasure('area')" style="flex:1; padding:5px; cursor:pointer;"><i class="fa-solid fa-draw-polygon"></i></button>
-                    <button title="Borrar Medición" onclick="clearMeasure()" style="flex:1; padding:5px; cursor:pointer; color:red;"><i class="fa-solid fa-trash"></i></button>
-                </div>
-                <div id="medicion-resultado"></div>
+            <div class="map-toolbar">
+                <button class="tool-btn" onclick="activarMedicion('distancia')" title="Medir Distancia"><i class="fa-solid fa-ruler"></i></button>
+                <button class="tool-btn" onclick="activarMedicion('area')" title="Medir Área"><i class="fa-solid fa-draw-polygon"></i></button>
+                <button class="tool-btn danger" onclick="limpiarMapa()" title="Limpiar Mapa"><i class="fa-solid fa-trash"></i></button>
+                <div id="medicion-resultado" style="font-size: 12px; font-weight: bold; color: #2c3e50; padding: 0 8px; display: flex; align-items: center;"></div>
             </div>
+            <div id="map"></div>
         </div>
-        
-        <button class="center-btn" onclick="centrarMapa()">
-            <i class="fa-solid fa-crosshairs"></i> Centrar en mi ubicación
-        </button>
+        <button class="center-btn" onclick="centrarMapa()"><i class="fa-solid fa-crosshairs"></i> Centrar Vista</button>
     </div>
 
-    <!-- COLUMNA DERECHA -->
+    <!-- DERECHA: CAPAS -->
     <div class="right-panel">
         <div class="layer-group">
-            <h4><i class="fa-solid fa-layer-group"></i> Mapas Base</h4>
-            <div id="base-layers-list">
-                <!-- Se llenará dinámicamente -->
+            <h4>Mapas Base</h4>
+            <div class="layer-item">
+                <input type="checkbox" checked onchange="toggleBaseLayer('osm', this.checked)"> OSM (Callejero)
+            </div>
+            <div class="layer-item">
+                <input type="checkbox" onchange="toggleBaseLayer('satelite', this.checked)"> Satélite (Google)
             </div>
         </div>
 
         <div class="layer-group">
-            <h4><i class="fa-solid fa-star"></i> Capas Prioritarias</h4>
-            <div id="priority-layers-list">
-                <!-- Se llenará dinámicamente -->
+            <h4>Mezcla de Capas</h4>
+            <div class="layer-item">
+                <input type="checkbox" id="mezclar-capas" onchange="toggleMezclaCapas(this.checked)"> Activar Mezcla
+            </div>
+            <div class="layer-item">
+                <label style="font-size: 0.85rem;">Opacidad Catastro:</label>
+                <input type="range" id="opacidad-catastro" min="0" max="100" value="70" onchange="actualizarOpacidadCatastro(this.value)" style="inline-size: 100%;">
             </div>
         </div>
 
         <div class="layer-group">
-            <button class="accordion"><i class="fa-solid fa-list"></i> Resto de Capas</button>
-            <div class="panel-collapse" id="other-layers-list">
-                <!-- Se llenará dinámicamente -->
+            <h4>Capas Locales (/app/capas)</h4>
+            <div id="dynamic-layers-container">
+                <div style="font-size:0.8rem; color:#666;">Cargando...</div>
+            </div>
+        </div>
+
+        <div class="layer-group">
+            <h4>Superposiciones</h4>
+            <div class="layer-item">
+                <input type="checkbox" checked onchange="toggleLayer('catastro', this.checked)"> Catastro
+            </div>
+            <div class="layer-item">
+                <input type="checkbox" onchange="toggleLayer('inundacion', this.checked)"> Inundabilidad
+            </div>
+            <div class="layer-item">
+                <input type="checkbox" onchange="toggleLayer('siose', this.checked)"> SIOSE (Usos Suelo)
+            </div>
+            <div class="layer-item">
+                <input type="checkbox" onchange="toggleLayer('calificacion', this.checked)"> Calif. Urbanística
+            </div>
+        </div>
+
+        <div class="layer-group">
+            <h4>Riesgos Hídricos</h4>
+            <div class="layer-item"><input type="checkbox" id="layer-t10" onchange="toggleLayer('t10', this.checked)"> T10 (10 años)</div>
+            <div class="layer-item"><input type="checkbox" id="layer-t100" onchange="toggleLayer('t100', this.checked)"> T100 (100 años)</div>
+            <div class="layer-item"><input type="checkbox" id="layer-t500" onchange="toggleLayer('t500', this.checked)"> T500 (500 años)</div>
+        </div>
+
+        <div class="layer-group">
+            <h4>Medio Ambiente</h4>
+            <div class="layer-item"><input type="checkbox" id="layer-natura" onchange="toggleLayer('natura', this.checked)"> Red Natura 2000</div>
+            <div class="layer-item"><input type="checkbox" id="layer-vias" onchange="toggleLayer('vias', this.checked)"> Vías Pecuarias</div>
+        </div>
+
+        <div class="layer-group">
+            <h4>Forestal</h4>
+            <div class="layer-item"><input type="checkbox" id="layer-montes" onchange="toggleLayer('montes', this.checked)"> Montes UP</div>
+        </div>
+    </div>
+
+    <!-- DIÁLOGO MODAL PARA GENERAR PDF -->
+    <div id="pdfDialog" style="display: none; position: fixed; inset-block-start: 0; inset-inline-start: 0; inline-size: 100%; block-size: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center;">
+        <div style="background: white; border-radius: 12px; padding: 25px; max-inline-size: 600px; inline-size: 90%; max-block-size: 80vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-block-end: 20px; border-block-end: 2px solid #e74c3c; padding-block-end: 10px;">
+                <h2 style="margin: 0; color: #e74c3c; font-size: 1.5rem;">
+                    <i class="fa-solid fa-file-pdf"></i> Generar Informe PDF
+                </h2>
+                <button onclick="cerrarDialogoPDF()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666;">&times;</button>
+            </div>
+
+            <!-- Campos de empresa -->
+            <div style="margin-block-end: 25px;">
+                <h3 style="color: #2c3e50; margin-block-end: 15px; font-size: 1.1rem;">
+                    <i class="fa-solid fa-building"></i> Datos del Informe
+                </h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <label style="display: block; margin-block-end: 5px; font-weight: 600; color: #555;">Nombre de Empresa:</label>
+                        <input type="text" id="empresa-nombre" placeholder="Ej: Tasaciones SL" style="inline-size: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-block-end: 5px; font-weight: 600; color: #555;">Número de Colegiado:</label>
+                        <input type="text" id="colegiado-numero" placeholder="Ej: 12345" style="inline-size: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lista de contenidos disponibles -->
+            <div style="margin-block-end: 25px;">
+                <h3 style="color: #2c3e50; margin-block-end: 15px; font-size: 1.1rem;">
+                    <i class="fa-solid fa-list-check"></i> Contenidos a Incluir
+                </h3>
+                <div id="contenidos-disponibles" style="max-block-size: 300px; overflow-y: auto; border: 2px solid #ecf0f1; border-radius: 8px; padding: 15px; background: #f8f9fa;">
+                    <div style="text-align: center; color: #666; padding: 20px;">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Cargando contenidos disponibles...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones de acción -->
+            <div style="display: flex; gap: 10px; justify-content: flex-end; border-block-start: 2px solid #ecf0f1; padding-block-start: 15px;">
+                <button onclick="cerrarDialogoPDF()" style="padding: 12px 24px; border: 2px solid #95a5a6; background: white; color: #7f8c8d; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                    Cancelar
+                </button>
+                <button onclick="generarPDFSeleccionado()" style="padding: 12px 24px; border: none; background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                    <i class="fa-solid fa-file-pdf"></i> Generar PDF
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Lógica del Visor -->
-    <script src="/static/js/catastro_logic.js"></script>
+    <script>
+        // --- INICIALIZACIÓN DEL MAPA ---
+        var savedCenter = localStorage.getItem('visor_map_center');
+        var savedZoom = localStorage.getItem('visor_map_zoom');
+        var initialCenter = savedCenter ? JSON.parse(savedCenter) : [40.4168, -3.7038];
+        var initialZoom = savedZoom ? parseInt(savedZoom) : 6;
+
+        var map = L.map('map', { zoomControl: false }).setView(initialCenter, initialZoom);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        // Capas Base
+        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map);
+        
+        // Satélite (Google Satellite)
+        var satelite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            attribution: 'Google Satellite',
+            maxZoom: 20
+        });
+        
+        // Ortofoto de máxima resolución (CNIG)
+        var pnoa_max = L.tileLayer.wms('https://wms.cnig.es/geoserver/wms', {
+            layers: 'PNOA_MA',
+            format: 'image/png',
+            format: 'image/jpeg',
+            transparent: false,
+            attribution: 'CNIG PNOA Máxima Resolución'
+        });
+        
+        // Ortofoto histórica (2018)
+        var pnoa_2018 = L.tileLayer.wms('https://wms-sig.idee.es/pnoa-ma/wms', {
+            layers: 'OI.OrthoimageCoverage',
+            format: 'image/jpeg',
+            transparent: false,
+            attribution: 'IGN PNOA 2018',
+            version: '1.3.0',
+            time: '2018'
+        });
+        
+        // Ortofoto de Cataluña (ICGC) - muy alta resolución
+        var icgc_orto = L.tileLayer.wms('https://geoserveis.icgc.cat/icc_mapesbase/wms/service', {
+            layers: 'orto25c',
+            attribution: 'ICGC Ortofoto 25cm'
+        });
+        
+        // Google Satellite (alternativa)
+        var google_sat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            attribution: 'Google Satellite'
+        });
+
+        // Capas adicionales de alta calidad
+        var openstreetmap_hot = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+            attribution: 'OpenStreetMap Hot',
+            maxZoom: 19
+        });
+
+        var carto_db_light = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
+            attribution: 'CartoDB Light',
+            maxZoom: 20
+        });
+
+        var esri_world_imagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Esri World Imagery',
+            maxZoom: 20
+        });
+
+        var esri_topo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Esri Topographic',
+            maxZoom: 20
+        });
+
+        // Capas Overlay con calidad dinámica
+        var layers = {
+            catastro: L.tileLayer.wms('https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx', { 
+                layers: 'Catastro', 
+                format: 'image/png', 
+                transparent: true,
+                attribution: 'Catastro'
+            }),
+            siose: L.tileLayer.wms('https://servicios.idee.es/wms-inspire/ocupacion-suelo', {
+                layers: 'LU.ExistingLandUse',
+                format: 'image/png',
+                transparent: true,
+                attribution: 'SIOSE'
+            }),
+            calificacion: L.tileLayer.wms('https://servicios.idee.es/wms-inspire/uso-suelo', {
+                layers: 'EL.LandUse',
+                format: 'image/png',
+                transparent: true,
+                attribution: 'Uso del Suelo'
+            }),
+            catastro_hq: L.tileLayer.wms('https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx', { 
+                layers: 'Catastro', 
+                format: 'image/png', 
+                transparent: true,
+                attribution: 'Catastro Alta Calidad',
+                // Parámetros para mayor calidad
+                version: '1.3.0',
+                dpi: 150,
+                inline-size: 2048,
+                block-size: 2048,
+                format_options: 'dpi:150'
+            }),
+            inundacion: L.tileLayer.wms('https://wms.mapama.gob.es/sig/agua/ZI_LaminasQ100/wms.aspx', { layers: 'NZ.RiskZone', format: 'image/png', transparent: true, opacity: 0.6 }),
+            t10: L.tileLayer.wms('https://wms.mapama.gob.es/sig/agua/ZI_LaminasQ10/wms.aspx', { layers: 'NZ.RiskZone', format: 'image/png', transparent: true, opacity: 0.6 }),
+            t100: L.tileLayer.wms('https://wms.mapama.gob.es/sig/agua/ZI_LaminasQ100/wms.aspx', { layers: 'NZ.RiskZone', format: 'image/png', transparent: true, opacity: 0.6 }),
+            t500: L.tileLayer.wms('https://wms.mapama.gob.es/sig/agua/ZI_LaminasQ500/wms.aspx', { layers: 'NZ.RiskZone', format: 'image/png', transparent: true, opacity: 0.6 }),
+            natura: L.tileLayer.wms('https://wms.mapama.gob.es/sig/Biodiversidad/RedNatura/wms.aspx', { layers: 'PS.ProtectedSite', format: 'image/png', transparent: true, opacity: 0.6 }),
+            vias: L.tileLayer.wms('https://wms.mapama.gob.es/sig/Biodiversidad/ViasPecuarias/wms.aspx', { layers: 'Vias_Pecuarias', format: 'image/png', transparent: true, opacity: 0.6 }),
+            montes: L.tileLayer.wms('https://wms.mapama.gob.es/sig/Biodiversidad/MontesPublicos/wms.aspx', { layers: 'Montes_Publicos', format: 'image/png', transparent: true, opacity: 0.6 })
+        };
+
+        // Variable para rastrear el mapa base actual
+        var currentBaseLayer = 'osm';
+
+        // Añadir catastro por defecto
+        layers.catastro.addTo(map);
+
+        // Grupo para geometrías cargadas (Silueta Roja)
+        var loadedLayer = L.featureGroup().addTo(map);
+        var redStyle = { color: '#ff0000', weight: 3, opacity: 1, fillOpacity: 0.1, fillColor: '#ff0000' };
+
+        // Grupo para mediciones
+        var measureLayer = L.featureGroup().addTo(map);
+        var measurePoints = [];
+        var measureMode = null; // 'distancia' o 'area'
+
+        // --- GESTIÓN DE CAPAS DINÁMICAS (LOCALES) ---
+        var dynamicLayers = {};
+        var layerControl = null;
+        
+        // Inicializar control de capas estándar
+        var baseMaps = {
+            "Mapa Base (OSM)": osm,
+            "Satélite (Google)": satelite
+        };
+        var overlayMaps = {
+            "Catastro": layers.catastro,
+            "Inundabilidad": layers.inundacion
+        };
+        layerControl = L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+        // Evento para sincronizar checkboxes del sidebar y carga lazy
+        map.on('overlayadd', function(e) {
+            if (e.layer && e.layer.options && e.layer.options.isDynamicLayer) {
+                // 1. Sincronizar checkbox del sidebar
+                const id = e.layer.options.layerId || e.layer.options.fileName;
+                const checkbox = document.getElementById(`chk-dyn-${id}`);
+                if (checkbox && !checkbox.checked) {
+                    checkbox.checked = true;
+                }
+
+                // 2. Carga lazy si es necesario
+                if (!e.layer.hasLoadedData) {
+                    cargarDatosCapaDinamica(e.layer);
+                }
+            }
+        });
+
+        // Evento para sincronizar desmarcado del sidebar
+        map.on('overlayremove', function(e) {
+            if (e.layer && e.layer.options && e.layer.options.isDynamicLayer) {
+                const id = e.layer.options.layerId || e.layer.options.fileName;
+                const checkbox = document.getElementById(`chk-dyn-${id}`);
+                if (checkbox && checkbox.checked) {
+                    checkbox.checked = false;
+                }
+            }
+        });
+
+        // Cargar capas al inicio
+        cargarCapasDinamicas();
+
+        function cargarCapasDinamicas() {
+            const container = document.getElementById('dynamic-layers-container');
+            if (container) container.innerHTML = '<div style="font-size:0.8rem; color:#666;">Cargando...</div>';
+
+            fetch('/api/v1/capas/list')
+                .then(r => r.json())
+                .then(data => {
+                    if (container) container.innerHTML = '';
+                    
+                    if (data.status === 'success' && data.files.length > 0) {
+                        data.files.forEach(file => {
+                            var group = L.featureGroup();
+                            group.options.isDynamicLayer = true;
+                            group.options.fileName = file.name;
+                            group.options.layerId = file.id || file.name; // Fallback to name if id missing
+                            group.hasLoadedData = false;
+                            
+                            let iconChar = '📄';
+                            if (file.type.includes('shp')) iconChar = '🗺️';
+                            if (file.type.includes('kml')) iconChar = '🌏';
+                            if (file.type.includes('gpkg')) iconChar = '📦';
+                            if (file.type.includes('fgb')) iconChar = '🚀';
+
+                            var label = `${iconChar} ${file.name}`;
+                            
+                            // 1. Añadir al control de capas estándar (Leaflet)
+                            if (layerControl) {
+                                layerControl.addOverlay(group, label);
+                            }
+                            
+                            // 2. Añadir al panel lateral (HTML)
+                            if (container) {
+                                const div = document.createElement('div');
+                                div.className = 'layer-item';
+                                // Use ID for DOM elements to handle special characters in filenames safely
+                                const safeId = file.id || file.name;
+                                div.innerHTML = `
+                                    <label style="display:flex; align-items:center; cursor:pointer; inline-size:100%;">
+                                        <input type="checkbox" id="chk-dyn-${safeId}" onchange="toggleDynamicLayer('${safeId}', this.checked)" style="margin-inline-end:8px;">
+                                        <span style="margin-inline-end:5px;">${iconChar}</span>
+                                        <span id="lbl-dyn-${safeId}" style="font-size:0.9rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${file.name}">${file.name}</span>
+                                    </label>
+                                `;
+                                container.appendChild(div);
+                            }
+
+                            dynamicLayers[file.id || file.name] = group;
+                        });
+                    } else {
+                        if (container) container.innerHTML = '<div style="font-size:0.8rem; color:#999; padding:5px;">No se encontraron capas locales.</div>';
+                    }
+                })
+                .catch(e => {
+                    console.error(e);
+                    if (container) container.innerHTML = '<div style="color:red; font-size:0.8rem;">Error cargando capas.</div>';
+                });
+        }
+
+        function toggleDynamicLayer(id, checked) {
+            var group = dynamicLayers[id];
+            if (!group) return;
+
+            if (checked) {
+                map.addLayer(group);
+                if (!group.hasLoadedData && !group.isLoading) {
+                     cargarDatosCapaDinamica(group);
+                }
+            } else {
+                map.removeLayer(group);
+            }
+        }
+
+        function cargarDatosCapaDinamica(layerGroup) {
+            if (layerGroup.hasLoadedData || layerGroup.isLoading) return;
+
+            layerGroup.isLoading = true;
+            const originalCursor = map.getContainer().style.cursor;
+            map.getContainer().style.cursor = 'wait';
+            
+            const layerName = layerGroup.options.fileName;
+            const layerId = layerGroup.options.layerId || layerName;
+
+            // Actualizar UI
+            const labelSpan = document.getElementById(`lbl-dyn-${layerId}`);
+            const checkbox = document.getElementById(`chk-dyn-${layerId}`);
+            const originalText = labelSpan ? labelSpan.innerText : layerName;
+            if (labelSpan) labelSpan.innerText = `${originalText} (Cargando...)`;
+
+            fetch('/api/v1/capas/geojson/' + encodeURIComponent(layerName))
+                .then(r => r.json())
+                .then(data => {
+                    layerGroup.isLoading = false;
+                    map.getContainer().style.cursor = originalCursor;
+                    if (labelSpan) labelSpan.innerText = originalText.replace(' (Cargando...)', '');
+
+                    if (data.type && data.features && data.features.length > 0) {
+                        // Generar color aleatorio
+                        let hash = 0;
+                        for (let i = 0; i < layerName.length; i++) {
+                            hash = layerName.charCodeAt(i) + ((hash << 5) - hash);
+                        }
+                        const color = '#' + ((hash & 0x00FFFFFF).toString(16)).padStart(6, '0');
+                        
+                        var geo = L.geoJSON(data, {
+                            style: { color: color, weight: 2, opacity: 1, fillOpacity: 0.2 },
+                            onEachFeature: function(feature, layer) {
+                                if (feature.properties) {
+                                    let popupContent = '<div style="max-block-size:200px;overflow:auto;font-family:sans-serif;font-size:12px;">';
+                                    popupContent += '<h4 style="margin:0 0 5px 0;border-block-end:1px solid #ccc;">' + layerName + '</h4><table>';
+                                    for (let k in feature.properties) {
+                                        popupContent += `<tr><td style="font-weight:bold;padding-inline-end:5px;">${k}:</td><td>${feature.properties[k]}</td></tr>`;
+                                    }
+                                    popupContent += '</table></div>';
+                                    layer.bindPopup(popupContent);
+                                }
+                            }
+                        });
+                        
+                        layerGroup.addLayer(geo);
+                        layerGroup.hasLoadedData = true;
+                        
+                        try {
+                            map.fitBounds(geo.getBounds());
+                        } catch(e) {}
+                    } else {
+                        alert('La capa ' + layerName + ' está vacía o no es válida.');
+                        map.removeLayer(layerGroup);
+                        if (checkbox) checkbox.checked = false;
+                    }
+                })
+                .catch(e => {
+                    console.error(e);
+                    layerGroup.isLoading = false;
+                    map.getContainer().style.cursor = originalCursor;
+                    if (labelSpan) labelSpan.innerText = originalText.replace(' (Cargando...)', '');
+                    alert('Error cargando capa ' + layerName);
+                    map.removeLayer(layerGroup);
+                    if (checkbox) checkbox.checked = false;
+                });
+        }
+
+        // --- LÓGICA DE CAPAS DEPENDIENTES DEL ZOOM ---
+        const WMS_ZOOM_THRESHOLD = 14; // Nivel de zoom a partir del cual se muestran las capas
+        const ZOOM_DEPENDENT_LAYERS = ['inundacion', 't10', 't100', 't500', 'natura', 'vias', 'montes'];
+
+        function updateLayersVisibility() {
+            const currentZoom = map.getZoom();
+
+            for (const name in layers) {
+                const checkbox = document.getElementById(`layer-${name}`);
+                if (!checkbox) continue; // Saltar si no hay checkbox para esta capa
+
+                const layer = layers[name];
+                const isChecked = checkbox.checked;
+                const isZoomDependent = ZOOM_DEPENDENT_LAYERS.includes(name);
+
+                // Determinar si la capa debería estar visible
+                const shouldBeVisible = isChecked && (!isZoomDependent || currentZoom >= WMS_ZOOM_THRESHOLD);
+
+                if (shouldBeVisible && !map.hasLayer(layer)) {
+                    map.addLayer(layer);
+                } else if (!shouldBeVisible && map.hasLayer(layer)) {
+                    map.removeLayer(layer);
+                }
+            }
+        }
+
+        // --- FUNCIONES ---
+        function toggleBaseLayer(type, checked) {
+            // Manejar capas base con checkboxes (permitir múltiples selecciones)
+            if (type === 'osm') {
+                if (checked) {
+                    map.addLayer(osm);
+                } else {
+                    map.removeLayer(osm);
+                }
+            } else if (type === 'satelite') {
+                if (checked) {
+                    map.addLayer(satelite);
+                } else {
+                    map.removeLayer(satelite);
+                }
+            }
+        }
+
+        function toggleLayer(name, checked) {
+            // La capa 'catastro' no depende del zoom, se gestiona directamente.
+            if (name === 'catastro') {
+                checked ? map.addLayer(layers.catastro) : map.removeLayer(layers.catastro);
+            }
+            // Para el resto de capas, la visibilidad depende del zoom y el checkbox.
+            updateLayersVisibility();
+        }
+
+        function centrarMapa() {
+            if (loadedLayer.getLayers().length > 0) map.fitBounds(loadedLayer.getBounds());
+            else alert("No hay geometría cargada para centrar.");
+        }
+
+        async function cargarReferencia() {
+            var ref = document.getElementById('ref-input').value.trim().toUpperCase();
+            if(!ref) return alert("Introduce una referencia");
+            
+            const resultsEl = document.getElementById('ref-results-checklist');
+            resultsEl.style.display = 'block';
+            resultsEl.innerHTML = 'Cargando contorno...';
+
+            // 1. Cargar contorno
+            try {
+                var res = await fetch(`/api/v1/referencia/${ref}/geojson`);
+                var data = await res.json();
+
+                // Verificar si hay error en la respuesta
+                if (data.status === 'error') {
+                    throw new Error(data.error);
+                }
+
+                loadedLayer.clearLayers();
+                var layer = L.geoJSON(data, { style: redStyle }).addTo(loadedLayer);
+                
+                if (layer.getBounds().isValid()) {
+                    map.fitBounds(layer.getBounds());
+                }
+                resultsEl.innerHTML = '✅ Contorno cargado.<br>Iniciando proceso completo...';
+            } catch(e) { 
+                resultsEl.innerHTML = `<span style="color:red;">Error cargando contorno: ${e.message}</span>`;
+                return; // Detener si no se puede cargar el contorno
+            }
+
+            // 2. Iniciar proceso completo
+            try {
+                const processRes = await fetch('/api/v1/procesar-completo', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ referencia: ref })
+                });
+
+                if (!processRes.ok) {
+                    const errorData = await processRes.json();
+                    throw new Error(errorData.error || 'Error en el servidor');
+                }
+
+                const processData = await processRes.json();
+                
+                if (processData.status === 'success') {
+                    // Generar lista de verificación
+                    let checklist = '<ul style="list-style:none; padding:0; margin:10px 0; font-size:0.85rem; color:#333;">';
+                    const items = [
+                        { k: 'coordenadas', l: 'Coordenadas' },
+                        { k: 'parcela_gml', l: 'Parcela GML' },
+                        { k: 'edificio_gml', l: 'Edificio GML' },
+                        { k: 'plano_ortofoto', l: 'Plano catastral' },
+                        { k: 'pdf_oficial', l: 'PDF oficial' },
+                        { k: 'kml', l: 'Archivo KML' },
+                        { k: 'capas_afecciones', l: 'Capas afecciones' },
+                        { k: 'informe_pdf', l: 'Informe PDF' },
+                        { k: 'contorno_superpuesto', l: 'Contorno superpuesto' }
+                    ];
+                    
+                    const res = processData.resultados || {};
+                    items.forEach(i => checklist += `<li>${res[i.k] ? '✅' : '❌'} ${i.l}</li>`);
+                    checklist += '</ul>';
+
+                    resultsEl.innerHTML = `<strong>Proceso finalizado:</strong><br>${checklist}
+                        <a href="${processData.zip_path}" download>
+                            <button class="action-btn" style="margin-block-start:10px;">Descargar ZIP</button>
+                        </a>`;
+                } else {
+                    throw new Error(processData.error || 'Fallo en el proceso');
+                }
+
+            } catch (e) {
+                resultsEl.innerHTML = `<span style="color:red;">Error: ${e.message}</span>`;
+            }
+        }
+
+        async function analizarUrbanismo() {
+            // Verificar si hay archivo cargado
+            const fileInput = document.getElementById('file-urbanismo');
+            var refInput = document.getElementById('ref-urbanismo');
+            var ref = refInput ? refInput.value.trim().toUpperCase() : '';
+            if (!ref) {
+                 ref = document.getElementById('ref-input').value.trim().toUpperCase();
+            }
+            
+            if (fileInput.files.length > 0) {
+                // Prioridad al archivo
+                handleFileUpload(fileInput); // Cargar visualmente
+            }
+            
+            if(!ref && fileInput.files.length === 0) {
+                alert("Introduce una referencia catastral o carga un archivo");
+                return;
+            }
+            
+            const resultadosEl = document.getElementById('urbanismo-resultados');
+            resultadosEl.style.display = 'block';
+            resultadosEl.innerHTML = '⏳ Analizando urbanismo...';
+            
+            try {
+                const res = await fetch('/api/v1/analizar-urbanismo', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ referencia: ref || "Archivo cargado" })
+                });
+                
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    const u = data.data.analisis_urbanistico;
+                    let html = '<div style="background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #e9ecef; margin-block-start: 5px;">';
+                    html += '<strong>🏙️ Datos Urbanísticos (Simulados):</strong><hr style="margin: 5px 0; border-block-start: 1px solid #ddd;">';
+                    html += `<b>Clasificación:</b> ${u.suelo || 'N/D'}<br>`;
+                    html += `<b>Uso:</b> ${u.calificacion || 'N/D'}<br>`;
+                    html += `<b>Edificabilidad:</b> ${u.edificabilidad || 'N/D'}<br>`;
+                    html += `<b>Ocupación:</b> ${u.ocupacion || 'N/D'}</div>`;
+                    
+                    resultadosEl.innerHTML = html;
+                } else {
+                    throw new Error(data.message || 'Error en el análisis');
+                }
+                
+            } catch (e) {
+                console.error('Error analizando urbanismo:', e);
+                resultadosEl.innerHTML = `<span style="color:red;">❌ Error: ${e.message}</span>`;
+            }
+        }
+
+        async function analizarAfecciones() {
+            // Verificar si hay archivo cargado
+            const fileInput = document.getElementById('file-afecciones');
+            var refInput = document.getElementById('ref-afecciones');
+            var ref = refInput ? refInput.value.trim().toUpperCase() : '';
+            if (!ref) {
+                 ref = document.getElementById('ref-input').value.trim().toUpperCase();
+            }
+            
+            if (fileInput.files.length > 0) {
+                // Prioridad al archivo
+                handleFileUpload(fileInput); // Cargar visualmente
+            }
+            
+            if(!ref) {
+                if (fileInput.files.length === 0) alert("Introduce una referencia catastral o carga un archivo");
+                return;
+            }
+            
+            const resultadosEl = document.getElementById('analisis-resultados');
+            resultadosEl.style.display = 'block';
+            resultadosEl.innerHTML = '⏳ Analizando afecciones...';
+            
+            try {
+                const res = await fetch('/api/v1/analizar-afecciones', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ referencia: ref })
+                });
+                
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    const afecciones = data.data.afecciones;
+                    let html = '<strong>⚠️ Análisis de Afecciones:</strong><br><br>';
+                    
+                    afecciones.forEach((afeccion, index) => {
+                        html += `<div style="margin-block-end: 10px; padding: 8px; border-inline-start: 3px solid #e74c3c; background: #fef2f2;">`;
+                        html += `<strong>Capa: ${afeccion.tipo}</strong><br>`;
+                        html += `<em>${afeccion.descripcion}</em><br>`;
+                        html += `<strong>Afectación:</strong> ${afeccion.afectacion}`;
+                        html += `</div>`;
+                    });
+                    
+                    resultadosEl.innerHTML = html;
+                } else {
+                    const errorDetail = data.detail || (data.error || 'Error en el análisis');
+                    throw new Error(errorDetail);
+                }
+                
+            } catch (e) {
+                console.error('Error analizando afecciones:', e);
+                resultadosEl.innerHTML = `<span style="color:red;">❌ Error: ${e.message}</span>`;
+            }
+        }
+
+        function handleRefsFile(input) {
+            var file = input.files[0];
+            if(!file) return;
+            
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    var content = e.target.result;
+                    var extension = file.name.split('.').pop().toLowerCase();
+                    
+                    var referencias = [];
+                    
+                    if (extension === 'csv') {
+                        // Procesar CSV
+                        var lines = content.split('\n').filter(line => line.trim());
+                        referencias = lines.map(function(line) {
+                            var cols = line.split(',');
+                            return cols[0].trim().replace(/["']/g, ''); // Quitar comillas
+                        }).filter(function(ref) { return ref.length > 0; });
+                    } else if (extension === 'txt') {
+                        // Procesar TXT (una referencia por línea)
+                        referencias = content.split('\n')
+                            .map(function(line) { return line.trim(); })
+                            .filter(function(line) { return line.length > 0; });
+                    }
+                    
+                    // Mostrar resultados
+                    var refsFileList = document.getElementById('refs-file-list');
+                    refsFileList.innerHTML = '<strong>📋 ' + referencias.length + ' referencias encontradas:</strong><br>';
+                    
+                    // Mostrar primeras 5 como preview
+                    var preview = referencias.slice(0, 5).join('<br>');
+                    refsFileList.innerHTML += preview;
+                    
+                    if (referencias.length > 5) {
+                        refsFileList.innerHTML += '<br>... y ' + (referencias.length - 5) + ' más';
+                    }
+                    
+                    // Botón para cargar todas
+                    refsFileList.innerHTML += '<br><br><button class="action-btn" style="font-size:12px; padding:6px 12px;" onclick="cargarLoteReferencias(' + JSON.stringify(referencias) + ')">🚀 Cargar todas las referencias</button>';
+                    
+                } catch (error) {
+                    console.error('Error procesando archivo de referencias:', error);
+                    var refsFileList = document.getElementById('refs-file-list');
+                    refsFileList.innerHTML = '❌ Error al procesar el archivo: ' + error.message;
+                }
+            };
+            
+            reader.readAsText(file);
+        }
+
+        function cargarLoteReferencias(referencias) {
+            if (!referencias || referencias.length === 0) {
+                alert('No hay referencias para cargar');
+                return;
+            }
+            
+            var refsFileList = document.getElementById('refs-file-list');
+            refsFileList.innerHTML = '⏳ Cargando ' + referencias.length + ' referencias...';
+            
+            // Cargar referencias en lotes para no sobrecargar
+            var cargadas = 0;
+            var errores = 0;
+            
+            function cargarSiguiente() {
+                if (cargadas < referencias.length) {
+                    var ref = referencias[cargadas];
+                    cargarReferenciaIndividual(ref, function(success) {
+                        if (success) {
+                            cargadas++;
+                        } else {
+                            errores++;
+                        }
+                        
+                        // Actualizar progreso
+                        var progress = Math.round((cargadas + errores) / referencias.length * 100);
+                        refsFileList.innerHTML = '⏳ Progreso: ' + progress + '% (' + (cargadas + errores) + '/' + referencias.length + ')<br>✅ Cargadas: ' + cargadas + ' | ❌ Errores: ' + errores;
+                        
+                        // Siguiente referencia
+                        setTimeout(cargarSiguiente, 100); // Pequeña pausa para no sobrecargar
+                    });
+                } else {
+                    // Finalizado
+                    refsFileList.innerHTML = '🎉 ¡Completado!<br>✅ Cargadas: ' + cargadas + '<br>❌ Errores: ' + errores + '<br><small>Revisa el mapa para ver los resultados</small>';
+                }
+            }
+            
+            // Iniciar carga
+            cargarSiguiente();
+        }
+
+        async function cargarReferenciaIndividual(ref, callback) {
+            try {
+                // 1. Primero intentar con catastro4 para obtener geometría real
+                var res = await fetch(`/api/v1/referencia/${ref}/geojson`);
+                var data = await res.json();
+
+                if (data.status === 'error') {
+                    if (callback) callback(false);
+                    return;
+                }
+
+                var layer = L.geoJSON(data, { style: redStyle }).addTo(loadedLayer);
+                
+                if (layer.getBounds().isValid()) {
+                    // Solo centrar en la primera referencia
+                    if (loadedLayer.getLayers().length === 1) {
+                        map.fitBounds(layer.getBounds());
+                    }
+                }
+                
+                // 2. Ejecutar proceso completo de catastro4 si la geometría se cargó
+                try {
+                    const processRes = await fetch('/api/v1/procesar-completo', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ referencia: ref })
+                    });
+
+                    if (processRes.ok) {
+                        const processData = await processRes.json();
+                        console.log(`✅ Proceso catastro completado para ${ref}:`, processData);
+                        
+                        // Mostrar notificación de éxito
+                        if (processData.status === 'success' && processData.zip_path) {
+                            console.log(`📦 ZIP generado: ${processData.zip_path}`);
+                        }
+                    } else {
+                        console.warn(`⚠️ Proceso catastro falló para ${ref}`);
+                    }
+                } catch (processError) {
+                    console.warn(`⚠️ Error en proceso catastro para ${ref}:`, processError);
+                    // No fallar la carga de geometría si el proceso completo falla
+                }
+                
+                if (callback) callback(true);
+            } catch(e) { 
+                console.error(`❌ Error cargando referencia ${ref}:`, e);
+                if (callback) callback(false);
+            }
+        }
+
+        function handleFileUpload(input) {
+            var files = input.files;
+            if(!files || files.length === 0) return;
+            
+            // Buscar o crear contenedor de lista específico para este input
+            var listId = input.id + '-list';
+            var fileList = document.getElementById(listId);
+            if (!fileList) {
+                fileList = document.createElement('div');
+                fileList.id = listId;
+                fileList.style.marginTop = '10px';
+                fileList.style.fontSize = '12px';
+                fileList.style.color = '#666';
+                input.parentNode.insertBefore(fileList, input.nextSibling);
+            }
+            
+            fileList.innerHTML = '<strong>Archivos seleccionados:</strong><br>';
+            
+            // Procesar cada archivo
+            for (var i = 0; i < files.length; i++) {
+                var file = files[i];
+                fileList.innerHTML += `📄 ${file.name} (${(file.size/1024).toFixed(1)}KB)<br>`;
+                
+                // Leer y procesar el archivo
+                (function(currentFile) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            var content = e.target.result;
+                            
+                            if(currentFile.name.endsWith('.kml')) {
+                                var layer = omnivore.kml.parse(content).setStyle(redStyle).addTo(loadedLayer);
+                                setTimeout(() => {
+                                    if (loadedLayer.getLayers().length === 1) {
+                                        map.fitBounds(layer.getBounds());
+                                    }
+                                }, 100);
+                            } else if(currentFile.name.endsWith('.gml')) {
+                                // Para GML, mostrar mensaje de conversión necesaria
+                                console.log('🔄 GML detectado - conversión necesaria:', currentFile.name);
+                                // Aquí se podría añadir lógica de conversión GML a GeoJSON
+                            } else {
+                                // Asumimos GeoJSON
+                                var layer = L.geoJSON(JSON.parse(content), { style: redStyle }).addTo(loadedLayer);
+                                if (loadedLayer.getLayers().length === 1) {
+                                    map.fitBounds(layer.getBounds());
+                                }
+                            }
+                        } catch(error) {
+                            console.error('Error procesando archivo:', currentFile.name, error);
+                            fileList.innerHTML += `❌ Error con ${currentFile.name}: ${error.message}<br>`;
+                        }
+                    };
+                    reader.readAsText(currentFile);
+                })(file);
+            }
+            
+            // Ajustar vista si hay múltiples capas
+            setTimeout(() => {
+                if (loadedLayer.getLayers().length > 0) {
+                    map.fitBounds(loadedLayer.getBounds().pad(0.1));
+                }
+            }, 500);
+        }
+
+        // --- HERRAMIENTAS DE MEDICIÓN ---
+        map.on('zoomend', updateLayersVisibility); // Actualizar capas al cambiar el zoom
+        updateLayersVisibility(); // Llamada inicial para el estado correcto
+
+        // Actualizar botones CAD
+        function updateCadButtons() {
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            if (measureMode === 'distancia') document.querySelector('.tool-btn[onclick*="distancia"]').classList.add('active');
+            if (measureMode === 'area') document.querySelector('.tool-btn[onclick*="area"]').classList.add('active');
+        }
+
+        function activarMedicion(modo) {
+            measureMode = modo;
+            measurePoints = [];
+            measureLayer.clearLayers();
+            
+            // Actualizar display
+            const displayEl = document.getElementById('medicion-resultado');
+            displayEl.style.display = 'flex';
+            displayEl.innerHTML = `MODO: ${modo.toUpperCase()}`;
+            
+            map.getContainer().style.cursor = 'crosshair';
+            updateCadButtons();
+        }
+
+        function limpiarMapa() {
+            measureMode = null;
+            measurePoints = [];
+            measureLayer.clearLayers();
+            loadedLayer.clearLayers();
+            map.getContainer().style.cursor = '';
+            document.getElementById('ref-input').value = '';
+            
+            // Reset display
+            const displayEl = document.getElementById('medicion-resultado');
+            displayEl.innerHTML = '';
+            
+            updateCadButtons();
+        }
+
+        map.on('click', function(e) {
+            if (!measureMode) {
+                // Si no estamos midiendo, intentar obtener información de la capa
+                identificarMetadatos(e.latlng);
+                return;
+            }
+
+            measurePoints.push(e.latlng);
+            
+            // Dibujar punto
+            L.circleMarker(e.latlng, { radius: 5, color: 'blue' }).addTo(measureLayer);
+
+            if (measureMode === 'distancia' && measurePoints.length > 1) {
+                // Dibujar línea
+                L.polyline(measurePoints, { color: 'blue' }).addTo(measureLayer);
+                
+                // Calcular distancia total
+                var dist = 0;
+                for(var i=0; i<measurePoints.length-1; i++) {
+                    dist += measurePoints[i].distanceTo(measurePoints[i+1]);
+                }
+                document.getElementById('medicion-resultado').innerHTML = 
+                    `DIST: ${(dist).toFixed(1)}m`;
+            }
+            else if (measureMode === 'area' && measurePoints.length > 2) {
+                // Dibujar polígono temporal
+                measureLayer.eachLayer(l => { if(l instanceof L.Polygon) measureLayer.removeLayer(l); });
+                L.polygon(measurePoints, { color: 'blue', fillOpacity: 0.3 }).addTo(measureLayer);
+                
+                // Calcular área (aproximada)
+                var area = calcularArea(measurePoints);
+                var areaStr = area > 10000 ? (area/10000).toFixed(2) + ' ha' : area.toFixed(1) + ' m²';
+                
+                document.getElementById('medicion-resultado').innerHTML = 
+                    `ÁREA: ${areaStr}`;
+            }
+        });
+
+        map.on('dblclick', function(e) {
+            if (measureMode) {
+                measureMode = null;
+                map.getContainer().style.cursor = '';
+                // Completar polígono visualmente si es área
+                if (measurePoints.length > 2) {
+                    L.polygon(measurePoints, { color: 'blue', fillOpacity: 0.3 }).addTo(measureLayer);
+                }
+                updateCadButtons();
+            }
+        });
+
+        // Cálculo simple de área esférica (Shoelace formula simplificada para Leaflet)
+        function calcularArea(latLngs) {
+            var pointsCount = latLngs.length,
+                area = 0.0,
+                d2r = Math.PI / 180,
+                p1, p2;
+
+            if (pointsCount > 2) {
+                for (var i = 0; i < pointsCount; i++) {
+                    p1 = latLngs[i];
+                    p2 = latLngs[(i + 1) % pointsCount];
+                    area += ((p2.lng - p1.lng) * d2r) *
+                            (2 + Math.sin(p1.lat * d2r) + Math.sin(p2.lat * d2r));
+                }
+                area = area * 6378137.0 * 6378137.0 / 2.0;
+            }
+            return Math.abs(area);
+        }
+
+        // --- FUNCIONES DE MEZCLA DE CAPAS ---
+        function toggleMezclaCapas(activar) {
+            // Variable global para controlar la mezcla
+            window.mezclaActivada = activar;
+            actualizarMezclaCapas();
+        }
+
+        function actualizarMezclaCapas() {
+            if (!window.mezclaActivada) {
+                // Si no hay mezcla, usar comportamiento normal
+                if (map.hasLayer(layers.catastro_hq)) {
+                    map.removeLayer(layers.catastro_hq);
+                    map.addLayer(layers.catastro);
+                }
+                return;
+            }
+
+            // Obtener capa base actual
+            const baseLayers = ['osm', 'satelite', 'pnoa_max', 'pnoa_2018', 'icgc_orto', 'google_sat', 'osm_hot', 'carto_light', 'esri_world_imagery', 'esri_topo'];
+            const currentBase = baseLayers.find(layer => map.hasLayer(eval(layer)));
+            
+            if (!currentBase) return;
+
+            // Determinar si es una capa de satélite/ortofoto
+            const esCapaSatelite = ['satelite', 'pnoa_max', 'pnoa_2018', 'icgc_orto', 'google_sat', 'osm_hot', 'esri_world_imagery', 'esri_topo'].includes(currentBase);
+            
+            if (esCapaSatelite) {
+                // Usar capa de catastro de alta calidad
+                if (map.hasLayer(layers.catastro)) {
+                    map.removeLayer(layers.catastro);
+                    map.addLayer(layers.catastro_hq);
+                }
+            } else {
+                // Usar capa de catastro normal para capas base callejeras
+                if (map.hasLayer(layers.catastro_hq)) {
+                    map.removeLayer(layers.catastro_hq);
+                    map.addLayer(layers.catastro);
+                }
+            }
+        }
+
+        function actualizarOpacidadCatastro(valor) {
+            const opacidad = valor / 100;
+            
+            // Determinar qué capa de catastro está activa
+            if (map.hasLayer(layers.catastro_hq)) {
+                layers.catastro_hq.setOpacity(opacidad);
+            } else if (map.hasLayer(layers.catastro)) {
+                layers.catastro.setOpacity(opacidad);
+            }
+        }
+
+        // --- FUNCIONES DE PDF (MODIFICADAS) ---
+        function mostrarDialogoPDF() {
+            document.getElementById('pdfDialog').style.display = 'flex';
+            cargarContenidosDisponibles();
+        }
+
+        function cerrarDialogoPDF() {
+            document.getElementById('pdfDialog').style.display = 'none';
+        }
+
+        async function cargarContenidosDisponibles() {
+            const contenedor = document.getElementById('contenidos-disponibles');
+            contenedor.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> Cargando contenidos disponibles...</div>'; // Muestra spinner
+            
+            try {
+                const ref = document.getElementById('ref-input').value.trim().toUpperCase();
+                if (!ref) {
+                    contenedor.innerHTML = '<div style="text-align: center; color: #e74c3c; padding: 20px;"><i class="fa-solid fa-exclamation-triangle"></i> Introduce una referencia catastral primero</div>';
+                    return;
+                }
+                
+                // Obtener resultados del proceso completo
+                const res = await fetch('/api/v1/procesar-completo', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ referencia: ref })
+                });
+                
+                if (!res.ok) {
+                    throw new Error('Error obteniendo datos del proceso');
+                }
+                
+                const processData = await res.json();
+                datosProceso = processData.resultados || {}; // Guardar los resultados para usar en generarPDFSeleccionado
+                
+                // Generar lista de contenidos con checkboxes
+                let html = '<div style="display: grid; gap: 10px;">';
+                
+                const items = [
+                    { k: 'datos_descriptivos', l: 'Datos Descriptivos (XML)', icon: '📝', desc: 'Usos, superficies, año construcción (XML Catastro)' },
+                    { k: 'coordenadas', l: 'Coordenadas', icon: '📍', desc: 'Coordenadas UTM y geográficas de la parcela' },
+                    { k: 'parcela_gml', l: 'Parcela GML', icon: '📄', desc: 'Archivo GML con la geometría de la parcela' },
+                    { k: 'edificio_gml', l: 'Edificio GML', icon: '🏢', desc: 'Archivo GML con la geometría del edificio' },
+                    { k: 'plano_ortofoto', l: 'Plano catastral', icon: '🗺️', desc: 'Plano con ortofoto y contorno de la parcela' },
+                    { k: 'pdf_oficial', l: 'PDF oficial', icon: '📋', desc: 'PDF oficial del catastro' },
+                    { k: 'kml', l: 'Archivo KML', icon: '📍', desc: 'Archivo KML para Google Earth' },
+                    { k: 'capas_afecciones', l: 'Capas afecciones', icon: '⚠️', desc: 'Análisis de afecciones urbanísticas' },
+                    { k: 'informe_pdf', l: 'Informe PDF', icon: '📊', desc: 'Informe técnico completo de la parcela' },
+                    { k: 'contorno_superpuesto', l: 'Contorno superpuesto', icon: '🖼️', desc: 'Contorno sobre ortofoto de alta resolución' }
+                ];
+                
+                items.forEach(item => {
+                    // Datos descriptivos siempre disponibles si la referencia es válida
+                    const disponible = item.k === 'datos_descriptivos' ? true : datosProceso[item.k];
+                    const checked = disponible ? 'checked' : '';
+                    const disabled = disponible ? '' : 'disabled style="opacity: 0.5;"';
+                    
+                    html += `
+                        <div style="display: flex; align-items: center; padding: 8px; border-radius: 6px; ${disponible ? 'background: #f8f9fa;' : 'background: #e9ecef;'}">
+                            <input type="checkbox" id="pdf-${item.k}" value="${item.k}" ${checked} ${disabled} style="margin-inline-end: 10px;">
+                            <span style="flex: 1;">
+                                <span style="margin-inline-end: 8px;">${item.icon}</span>
+                                <strong>${item.l}</strong>
+                                <div style="font-size: 0.8em; color: #666;">${item.desc}</div>
+                                ${disponible ? '<span style="color: #28a745; margin-inline-start: 8px;">✅ Disponible</span>' : '<span style="color: #dc3545; margin-inline-start: 8px;">❌ No disponible</span>'}
+                            </label>
+                        </div>
+                    `;
+                });
+                contenedor.innerHTML = html;
+                
+            } catch (e) {
+                contenedor.innerHTML = `<div style="text-align: center; color: #dc3545; padding: 20px;">❌ Error cargando contenidos: ${e.message}</div>`;
+            }
+        }
+
+        async function generarPDFSeleccionado() {
+            const ref = document.getElementById('ref-input').value.trim();
+            const empresa = document.getElementById('empresa-nombre').value.trim();
+            const colegiado = document.getElementById('colegiado-numero').value.trim();
+            
+            if (!ref) {
+                alert('Introduce una referencia catastral primero');
+                return;
+            }
+
+            // Obtener contenidos seleccionados
+            const contenidosSeleccionados = [];
+            const items = [
+                'datos_descriptivos', 'coordenadas', 'parcela_gml', 'edificio_gml', 'plano_ortofoto',
+                'pdf_oficial', 'kml', 'capas_afecciones', 'informe_pdf', 'contorno_superpuesto'
+            ];
+            
+            items.forEach(item => { if (document.getElementById(`pdf-${item}`).checked) contenidosSeleccionados.push(item); });
+            // Mostrar indicador de progreso
+            const boton = event.target;
+            const textoOriginal = boton.innerHTML;
+            boton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generando PDF...';
+            boton.disabled = true;
+
+            try {
+                const res = await fetch('/api/v1/generar-pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        referencia: ref,
+                        contenidos: contenidosSeleccionados,
+                        empresa: empresa,
+                        colegiado: colegiado
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.status === 'error') throw new Error(data.error);
+                    
+                    // Descargar usando la URL devuelta
+                    const a = document.createElement('a');
+                    a.href = data.url;
+                    a.download = `informe_${ref}_${new Date().toISOString().slice(0, 10)}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    cerrarDialogoPDF();
+                } else {
+                    const errorData = await res.json();
+                    throw new Error(errorData.error || 'Error generando PDF');
+                }
+            } catch (e) {
+                alert(`Error generando PDF: ${e.message}`);
+            } finally {
+                boton.innerHTML = textoOriginal;
+                boton.disabled = false;
+            }
+        }
+
+        async function buscarMunicipio() {
+            const query = document.getElementById('municipio-input').value.trim();
+            const resDiv = document.getElementById('municipio-resultados');
+            
+            resDiv.innerHTML = '<div style="text-align:center; color:#666;"><i class="fa-solid fa-spinner fa-spin"></i> Buscando...</div>';
+            
+            try {
+                const res = await fetch(`/api/v1/buscar-municipio?q=${encodeURIComponent(query)}`);
+                const data = await res.json();
+                
+                if (data.municipios && data.municipios.length > 0) {
+                    let html = '<div style="display:grid; gap:5px;">';
+                    data.municipios.forEach(m => {
+                        html += `
+                            <div style="padding:8px; background:#f8f9fa; border:1px solid #eee; border-radius:4px; cursor:pointer;" onclick="window.open('${m.url}', '_blank')">
+                                <strong>${m.nombre}</strong> (${m.codigo})<br>
+                                <span style="color:#3498db; font-size:0.8em;"><i class="fa-solid fa-download"></i> Descargar ZIP INSPIRE</span>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    resDiv.innerHTML = html;
+                } else {
+                    resDiv.innerHTML = '<div style="color:#e74c3c; padding:5px;">No se encontraron municipios.</div>';
+                }
+            } catch (e) {
+                resDiv.innerHTML = `<div style="color:#e74c3c;">Error: ${e.message}</div>`;
+            }
+        }
+
+
+
+        /*
+        // Inicializar control de opacidad
+        document.addEventListener('DOMContentLoaded', function() {
+            const opacidadSlider = document.getElementById('opacidad-catastro');
+            if (opacidadSlider) {
+                opacidadSlider.addEventListener('input', function() {
+                    actualizarOpacidadCatastro(this.value);
+                });
+            }
+        });
+
+        // --- CAMBIO DE TEMA DINÁMICO ---
+        const AVAILABLE_THEMES = [
+            { name: 'Estándar', url: '/static/index2.html', icon: 'fa-desktop' },
+            { name: 'Dark Pro', url: '/static/index_modern_dark.html', icon: 'fa-moon' },
+            { name: 'Corporate', url: '/static/index_top_nav.html', icon: 'fa-building' },
+            { name: 'Split View', url: '/static/index_split_right.html', icon: 'fa-columns' }
+        ];
+
+        function injectThemeSwitcher() {
+            if (document.getElementById('theme-switcher')) return;
+
+            const switcher = document.createElement('div');
+            switcher.id = 'theme-switcher';
+            switcher.style.cssText = 'position:fixed; inset-block-end:20px; inset-inline-start:20px; z-index:9999; font-family:sans-serif;';
+            
+            const btn = document.createElement('button');
+            btn.innerHTML = '<i class="fa-solid fa-palette"></i>';
+            btn.title = "Cambiar Tema";
+            btn.style.cssText = 'inline-size:40px; block-size:40px; border-radius:50%; border:none; background:#2c3e50; color:white; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.3); font-size:16px; transition:transform 0.2s;';
+            btn.onmouseover = () => btn.style.transform = 'scale(1.1)';
+            btn.onmouseout = () => btn.style.transform = 'scale(1)';
+            btn.onclick = () => {
+                const menu = document.getElementById('theme-menu');
+                menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+            };
+            
+            const menu = document.createElement('div');
+            menu.id = 'theme-menu';
+            menu.style.cssText = 'display:none; position:absolute; inset-block-end:50px; inset-inline-start:0; background:white; padding:5px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2); inline-size:160px; overflow:hidden;';
+            
+            AVAILABLE_THEMES.forEach(theme => {
+                const item = document.createElement('div');
+                item.style.cssText = 'padding:10px; cursor:pointer; border-block-end:1px solid #eee; font-size:13px; color:#333; display:flex; align-items:center; gap:10px; transition:background 0.2s;';
+                item.innerHTML = `<i class="fa-solid ${theme.icon}" style="inline-size:15px; text-align:center;"></i> ${theme.name}`;
+                item.onclick = () => { 
+                    if (typeof map !== 'undefined') {
+                        localStorage.setItem('visor_map_center', JSON.stringify(map.getCenter()));
+                        localStorage.setItem('visor_map_zoom', map.getZoom());
+                    }
+                    localStorage.setItem('visor_theme', theme.url); 
+                    window.location.href = theme.url; 
+                };
+                item.onmouseover = () => item.style.background = '#f8f9fa';
+                item.onmouseout = () => item.style.background = 'white';
+                menu.appendChild(item);
+            });
+            
+            if(menu.lastChild) menu.lastChild.style.borderBottom = 'none';
+            switcher.appendChild(menu);
+            switcher.appendChild(btn);
+            document.body.appendChild(switcher);
+        }
+        // Inyectar botón al cargar
+        injectThemeSwitcher();
+        */
+        
+        function getWMSGetFeatureInfoUrl(layer, latlng) {
+            const point = map.latLngToContainerPoint(latlng, map.getZoom());
+            const size = map.getSize();
+
+            const params = {
+                request: 'GetFeatureInfo',
+                service: 'WMS',
+                srs: 'EPSG:3857',
+                styles: '',
+                transparent: true,
+                version: layer.wmsParams.version,
+                format: layer.wmsParams.format,
+                bbox: map.getBounds().toBBoxString(),
+                block-size: size.y,
+                inline-size: size.x,
+                layers: layer.wmsParams.layers,
+                query_layers: layer.wmsParams.layers,
+                info_format: 'text/html'
+            };
+
+            params[params.version === '1.3.0' ? 'i' : 'x'] = Math.round(point.x);
+            params[params.version === '1.3.0' ? 'j' : 'y'] = Math.round(point.y);
+
+            return layer._url + L.Util.getParamString(params, layer._url, true);
+        }
+        
+        function identificarMetadatos(latlng) {
+            const catastroLayer = layers.catastro;
+            if (catastroLayer) {
+                const url = getWMSGetFeatureInfoUrl(catastroLayer, latlng);
+                if (url) {
+                    const popup = L.popup()
+                        .setLatLng(latlng)
+                        .setContent('<div style="text-align:center; padding:10px;"><i class="fa-solid fa-spinner fa-spin"></i> Consultando Catastro...</div>')
+                        .openOn(map);
+
+                    fetch(`/api/v1/proxy?url=${encodeURIComponent(url)}`)
+                        .then(r => r.text())
+                        .then(html => {
+                            popup.setContent(`<div style="max-inline-size:400px; max-block-size:300px; overflow:auto; font-size:12px;">${html}</div>`);
+                        })
+                        .catch(e => {
+                            popup.setContent('<div style="color:red; padding:10px;">Error obteniendo información.</div>');
+                        });
+                }
+            }
+        }
+    </script>
 </body>
 </html>

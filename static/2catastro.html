@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor Catastral - Catastro</title>
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Omnivore (Para cargar KML/GPX) -->
+    <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.2.0/leaflet-omnivore.min.js'></script>
+    
+    <!-- FlatGeobuf -->
+    <script src="https://unpkg.com/flatgeobuf@3.22.0/dist/flatgeobuf-geojson.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #eef2f5;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* --- COLUMNA IZQUIERDA: MÓDULOS --- */
+        .left-panel {
+            width: 320px;
+            background: white;
+            border-right: 1px solid #ccc;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+
+        .module {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+        }
+
+        .module h3 {
+            margin-top: 0;
+            font-size: 1rem;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+
+        /* --- COLUMNA CENTRAL: MAPA --- */
+        .center-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background-color: #eef2f5;
+        }
+
+        #map-container {
+            width: 70vh;  /* Cuadrado relativo a la altura */
+            height: 70vh;
+            border: 8px solid white;
+            border-radius: 4px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #ddd;
+        }
+
+        .center-btn {
+            margin-top: 20px;
+            padding: 10px 25px;
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: transform 0.2s, background 0.2s;
+            font-size: 1rem;
+        }
+
+        .center-btn:hover {
+            background-color: #34495e;
+            transform: scale(1.05);
+        }
+
+        /* --- COLUMNA DERECHA: CAPAS --- */
+        .right-panel {
+            width: 280px; /* Un poco más ancho para las leyendas */
+            background: white;
+            border-left: 1px solid #ccc;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+
+        .layer-group {
+            margin-bottom: 25px;
+        }
+
+        .layer-group h4 {
+            margin: 0 0 10px 0;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        .layer-item {
+            display: flex;
+            flex-direction: column; /* Cambiado para soportar leyenda debajo */
+            margin-bottom: 12px;
+            cursor: pointer;
+        }
+
+        .layer-header {
+            display: flex;
+            align-items: center;
+        }
+
+        .layer-header input {
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        .layer-legend {
+            margin-left: 25px;
+            margin-top: 5px;
+            font-size: 0.8rem;
+            color: #666;
+            display: none; /* Oculto por defecto hasta que se activa */
+        }
+
+        .layer-legend img {
+            max-width: 100%;
+            border: 1px solid #eee;
+        }
+
+        /* Acordeón para "Resto de capas" */
+        .accordion {
+            background-color: #f1f1f1;
+            color: #444;
+            cursor: pointer;
+            padding: 10px;
+            width: 100%;
+            border: none;
+            text-align: left;
+            outline: none;
+            font-size: 15px;
+            transition: 0.4s;
+            border-radius: 4px;
+            margin-bottom: 5px;
+        }
+
+        .active, .accordion:hover {
+            background-color: #ddd; 
+        }
+
+        .accordion:after {
+            content: '\002B';
+            color: #777;
+            font-weight: bold;
+            float: right;
+            margin-left: 5px;
+        }
+
+        .active:after {
+            content: "\2212";
+        }
+
+        .panel-collapse {
+            padding: 0 10px;
+            background-color: white;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.2s ease-out;
+            border-left: 2px solid #ddd;
+        }
+
+        /* --- UI ELEMENTS --- */
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+
+        button.action-btn {
+            width: 100%;
+            padding: 10px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 5px;
+            font-size: 0.9rem;
+        }
+        button.action-btn:hover { background-color: #2980b9; }
+        
+        button.secondary { background-color: #95a5a6; }
+        button.secondary:hover { background-color: #7f8c8d; }
+
+        .file-upload-box {
+            border: 2px dashed #bdc3c7;
+            padding: 15px;
+            text-align: center;
+            border-radius: 6px;
+            color: #7f8c8d;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+        .file-upload-box:hover {
+            border-color: #3498db;
+            color: #3498db;
+        }
+
+        /* Panel de herramientas flotante sobre el mapa */
+        .tools-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000; /* Encima del mapa */
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            width: 220px;
+        }
+
+        #medicion-resultado {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e8f4fd;
+            border-left: 4px solid #3498db;
+            font-size: 0.9rem;
+            display: none;
+        }
+        
+        /* Loading Overlay */
+        #loading-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    </style>
+</head>
+<body>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <p>Cargando visor y capas...</p>
+    </div>
+
+    <!-- COLUMNA IZQUIERDA -->
+    <div class="left-panel">
+        <div style="margin-bottom: 20px; text-align: center;">
+            <h2 style="color: #2c3e50; margin: 0;"><i class="fa-solid fa-map-location-dot"></i> Catastro</h2>
+            <p style="color: #7f8c8d; font-size: 0.9rem; margin-top: 5px;">Herramientas de gestión</p>
+        </div>
+
+        <div class="module">
+            <h3><i class="fa-solid fa-magnifying-glass"></i> Búsqueda</h3>
+            <input type="text" id="input-ref-catastral" placeholder="Referencia Catastral (14 o 20 dígitos)">
+            <button class="action-btn" onclick="buscarReferencia()">Buscar Parcela</button>
+            <div style="margin-top: 10px; text-align: center; color: #aaa;">- O -</div>
+            <input type="text" id="input-municipio" placeholder="Municipio">
+            <button class="action-btn secondary" onclick="buscarMunicipio()">Ir a Municipio</button>
+        </div>
+
+        <div class="module">
+            <h3><i class="fa-solid fa-file-import"></i> Cargar Datos</h3>
+            <div class="file-upload-box" onclick="document.getElementById('file-input').click()">
+                <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.5rem; margin-bottom: 10px;"></i><br>
+                Arrastra archivos aquí o haz clic<br>
+                <small>(KML, GPX, GeoJSON, SHP)</small>
+            </div>
+            <input type="file" id="file-input" style="display: none;" multiple onchange="handleFileSelect(event)">
+        </div>
+
+        <div class="module">
+            <h3><i class="fa-solid fa-print"></i> Informes</h3>
+            <button class="action-btn" onclick="generarInforme()">Generar Informe Afecciones</button>
+        </div>
+        
+        <div style="margin-top: auto;">
+            <a href="/" style="display: block; text-align: center; color: #7f8c8d; text-decoration: none; font-size: 0.9rem;">
+                <i class="fa-solid fa-arrow-left"></i> Volver al Inicio
+            </a>
+        </div>
+    </div>
+
+    <!-- COLUMNA CENTRAL -->
+    <div class="center-panel">
+        <div id="map-container">
+            <div id="map"></div>
+            
+            <!-- Herramientas flotantes -->
+            <div class="tools-panel">
+                <h4 style="margin-top:0; margin-bottom:10px; font-size:0.9rem;">Herramientas</h4>
+                <div style="display: flex; gap: 5px;">
+                    <button title="Medir Distancia" onclick="toggleMeasure('distancia')" style="flex:1; padding:5px; cursor:pointer;"><i class="fa-solid fa-ruler"></i></button>
+                    <button title="Medir Área" onclick="toggleMeasure('area')" style="flex:1; padding:5px; cursor:pointer;"><i class="fa-solid fa-draw-polygon"></i></button>
+                    <button title="Borrar Medición" onclick="clearMeasure()" style="flex:1; padding:5px; cursor:pointer; color:red;"><i class="fa-solid fa-trash"></i></button>
+                </div>
+                <div id="medicion-resultado"></div>
+            </div>
+        </div>
+        
+        <button class="center-btn" onclick="centrarMapa()">
+            <i class="fa-solid fa-crosshairs"></i> Centrar en mi ubicación
+        </button>
+    </div>
+
+    <!-- COLUMNA DERECHA -->
+    <div class="right-panel">
+        <div class="layer-group">
+            <h4><i class="fa-solid fa-layer-group"></i> Mapas Base</h4>
+            <div id="base-layers-list">
+                <!-- Se llenará dinámicamente -->
+            </div>
+        </div>
+
+        <div class="layer-group">
+            <h4><i class="fa-solid fa-star"></i> Capas Prioritarias</h4>
+            <div id="priority-layers-list">
+                <!-- Se llenará dinámicamente -->
+            </div>
+        </div>
+
+        <div class="layer-group">
+            <button class="accordion"><i class="fa-solid fa-list"></i> Resto de Capas</button>
+            <div class="panel-collapse" id="other-layers-list">
+                <!-- Se llenará dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Lógica del Visor -->
+    <script src="/static/js/catastro_logic.js"></script>
+</body>
+</html>
