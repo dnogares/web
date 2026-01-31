@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informes Urbanísticos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            padding: 2rem;
+            margin: 2rem auto;
+            max-width: 1200px;
+        }
+        .header-title {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: bold;
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .form-section {
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .btn-generate {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .btn-generate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+        .results-section {
+            display: none;
+            margin-top: 2rem;
+        }
+        .info-card {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid #667eea;
+        }
+        .afeccion-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+        .afeccion-item:last-child {
+            border-bottom: none;
+        }
+        .status-yes {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .status-no {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            color: #667eea;
+            transition: all 0.3s ease;
+        }
+        .back-btn:hover {
+            background: white;
+            transform: scale(1.1);
+            color: #764ba2;
+        }
+    </style>
+</head>
+<body>
+    <a href="/static/index.html" class="back-btn">
+        <i class="fas fa-arrow-left fa-lg"></i>
+    </a>
+
+    <div class="container">
+        <div class="glass-card">
+            <h1 class="header-title">
+                <i class="fas fa-city"></i> Informes Urbanísticos
+            </h1>
+
+            <div class="form-section">
+                <h4 class="mb-3">
+                    <i class="fas fa-search"></i> Datos de la Parcela
+                </h4>
+                <form id="informeForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="ref_catastral" class="form-label">Referencia Catastral</label>
+                            <input type="text" class="form-control" id="ref_catastral" placeholder="Ej: 1234567YH1234N0001ZZ">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="provincia" class="form-label">Provincia</label>
+                            <input type="text" class="form-control" id="provincia" placeholder="Ej: Málaga">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="municipio" class="form-label">Municipio</label>
+                            <input type="text" class="form-control" id="municipio" placeholder="Ej: Málaga">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="via" class="form-label">Vía</label>
+                            <input type="text" class="form-control" id="via" placeholder="Ej: Calle Larios">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label for="numero" class="form-label">Número</label>
+                            <input type="text" class="form-control" id="numero" placeholder="Ej: 15">
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-generate">
+                            <i class="fas fa-file-alt"></i> Generar Informe
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="loading-spinner" id="loadingSpinner">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Generando informe...</span>
+                </div>
+                <p class="mt-3">Generando informe urbanístico...</p>
+            </div>
+
+            <div class="results-section" id="resultsSection">
+                <!-- Los resultados se cargarán aquí dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('informeForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                ref_catastral: document.getElementById('ref_catastral').value,
+                provincia: document.getElementById('provincia').value,
+                municipio: document.getElementById('municipio').value,
+                via: document.getElementById('via').value,
+                numero: document.getElementById('numero').value
+            };
+
+            // Mostrar loading
+            document.getElementById('loadingSpinner').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'none';
+
+            try {
+                const response = await fetch('/api/v1/urbanismo/generar-informe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // Mostrar resultados
+                mostrarResultados(data);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error generando el informe: ' + error.message);
+            } finally {
+                // Ocultar loading
+                document.getElementById('loadingSpinner').style.display = 'none';
+            }
+        });
+
+        function mostrarResultados(data) {
+            const resultsSection = document.getElementById('resultsSection');
+            
+            let html = `
+                <div class="info-card">
+                    <h5><i class="fas fa-info-circle"></i> Información General</h5>
+                    <p><strong>Referencia Catastral:</strong> ${data.referencia_catastral || 'No especificada'}</p>
+                    <p><strong>Dirección:</strong> ${data.direccion}</p>
+                    <p><strong>Fecha del Informe:</strong> ${data.fecha_informe}</p>
+                </div>
+            `;
+
+            if (data.clasificacion_suelo) {
+                html += `
+                    <div class="info-card">
+                        <h5><i class="fas fa-map"></i> Clasificación de Suelo</h5>
+                        <p><strong>Clasificación:</strong> ${data.clasificacion_suelo.clasificacion}</p>
+                        <p><strong>Calificación:</strong> ${data.clasificacion_suelo.calificacion}</p>
+                        <p><strong>Uso Principal:</strong> ${data.clasificacion_suelo.uso_principal}</p>
+                        <p><strong>Densidad Edificatoria:</strong> ${data.clasificacion_suelo.densidad_edificatoria}</p>
+                        <p><strong>Ordenanza:</strong> ${data.clasificacion_suelo.ordenanza}</p>
+                        <p><strong>Zona:</strong> ${data.clasificacion_suelo.zona}</p>
+                    </div>
+                `;
+            }
+
+            if (data.analisis_tecnico) {
+                html += `
+                    <div class="info-card">
+                        <h5><i class="fas fa-calculator"></i> Análisis Técnico</h5>
+                        <p><strong>Superficie Terreno:</strong> ${data.analisis_tecnico.superficie_terreno_m2} m²</p>
+                        <p><strong>Superficie Construida:</strong> ${data.analisis_tecnico.superficie_construida_m2} m²</p>
+                        <p><strong>Edificabilidad Máxima:</strong> ${data.analisis_tecnico.edificabilidad_maxima_m2} m²</p>
+                        <p><strong>Edificabilidad Actual:</strong> ${data.analisis_tecnico.edificabilidad_actual_m2} m²</p>
+                        <p><strong>Edificabilidad Disponible:</strong> ${data.analisis_tecnico.edificabilidad_disponible_m2} m²</p>
+                        <p><strong>Coeficiente Edificabilidad:</strong> ${data.analisis_tecnico.coeficiente_edificabilidad}</p>
+                        <p><strong>Porcentaje Ocupación:</strong> ${data.analisis_tecnico.porcentaje_ocupacion}%</p>
+                    </div>
+                `;
+            }
+
+            if (data.afecciones_territoriales) {
+                html += `
+                    <div class="info-card">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Afecciones Territoriales</h5>
+                        <div class="afecciones-list">
+                `;
+                
+                for (const [afeccion, afectado] of Object.entries(data.afecciones_territoriales)) {
+                    const statusClass = afectado ? 'status-yes' : 'status-no';
+                    const statusIcon = afectado ? '✅ SÍ' : '❌ NO';
+                    html += `
+                        <div class="afeccion-item">
+                            <span>${afeccion}</span>
+                            <span class="${statusClass}">${statusIcon}</span>
+                        </div>
+                    `;
+                }
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            resultsSection.innerHTML = html;
+            resultsSection.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

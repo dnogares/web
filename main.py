@@ -118,6 +118,21 @@ except ImportError as e:
     VISOR_FUNCTIONS_AVAILABLE = False
     print(f"⚠️ visor_functions_integrated no disponible: {e}")
 
+# Intentar importar servicio de informes urbanísticos
+try:
+    from backend.services.informes_urbanisticos_service import InformeUrbanistico
+    INFORME_URBANISTICO_AVAILABLE = True
+    print("✅ InformeUrbanistico disponible")
+except ImportError:
+    try:
+        # Intentar importar desde raíz si no está en backend/services
+        from informes_urbanisticos_service import InformeUrbanistico
+        INFORME_URBANISTICO_AVAILABLE = True
+        print("✅ InformeUrbanistico disponible (desde raíz)")
+    except ImportError:
+        INFORME_URBANISTICO_AVAILABLE = False
+        print("⚠️ InformeUrbanistico no disponible")
+
 # Intentar importar GISDatabase
 try:
     from gis_db import GISDatabase
@@ -143,6 +158,13 @@ class GenerarPDFRequest(BaseModel):
     contenidos: List[str] = []
     empresa: Optional[str] = ""
     colegiado: Optional[str] = ""
+
+class InformeUrbanisticoRequest(BaseModel):
+    ref_catastral: Optional[str] = None
+    provincia: Optional[str] = None
+    municipio: Optional[str] = None
+    via: Optional[str] = None
+    numero: Optional[str] = None
 
 # --- NUEVOS MODELOS PARA INFORME URBANÍSTICO ---
 class ReferenciaData(BaseModel):
@@ -1127,6 +1149,61 @@ async def analizar_urbanismo(request: UrbanismoRequest):
         }
     except Exception as e:
         return {"status": "error", "message": str(e), "data": None}
+
+@app.post("/api/v1/urbanismo/generar-informe")
+async def generar_informe_urbanistico(request: InformeUrbanisticoRequest):
+    """Generar informe urbanístico completo"""
+    try:
+        if not INFORME_URBANISTICO_AVAILABLE:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "error",
+                    "message": "Servicio de informes urbanísticos no disponible",
+                    "data": None
+                }
+            )
+        
+        # Instanciar el generador con el archivo de configuración
+        generador = InformeUrbanistico("urbanismo_config.json")
+        
+        # Generar informe completo
+        informe = generador.generar_informe_completo(
+            ref_catastral=request.ref_catastral,
+            provincia=request.provincia,
+            municipio=request.municipio,
+            via=request.via,
+            numero=request.numero
+        )
+        
+        if "error" in informe:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "message": informe["error"],
+                    "data": None
+                }
+            )
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "message": "Informe urbanístico generado correctamente",
+                "data": informe
+            }
+        )
+        
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Error generando informe: {str(e)}",
+                "data": None
+            }
+        )
 
 @app.post("/api/v1/analizar-afecciones")
 async def analizar_afecciones(request: AfeccionesRequest):
