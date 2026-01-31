@@ -1776,6 +1776,12 @@
         function getWMSGetFeatureInfoUrl(layer, latlng) {
             const point = map.latLngToContainerPoint(latlng, map.getZoom());
             const size = map.getSize();
+            
+            // Proyectar límites a EPSG:3857 para consistencia
+            const bounds = map.getBounds();
+            const sw = L.CRS.EPSG3857.project(bounds.getSouthWest());
+            const ne = L.CRS.EPSG3857.project(bounds.getNorthEast());
+            const bbox = `${sw.x},${sw.y},${ne.x},${ne.y}`;
 
             const params = {
                 request: 'GetFeatureInfo',
@@ -1785,7 +1791,7 @@
                 transparent: true,
                 version: layer.wmsParams.version,
                 format: layer.wmsParams.format,
-                bbox: map.getBounds().toBBoxString(),
+                bbox: bbox,
                 block-size: size.y,
                 inline-size: size.x,
                 layers: layer.wmsParams.layers,
