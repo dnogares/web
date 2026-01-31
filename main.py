@@ -328,7 +328,7 @@ async def root():
 @app.get("/catastro")
 async def visor_catastro():
     """Visor Catastral"""
-    return FileResponse("static/index5 - copia.html")
+    return FileResponse("static/visor_catastro.html")
 
 @app.get("/urbanismo")
 async def visor_urbanismo():
