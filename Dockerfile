@@ -28,8 +28,8 @@ COPY . .
 # Crear directorio para capas (punto de montaje para volumen)
 RUN mkdir -p /app/capas
 
-# Exponer el puerto 8000
-EXPOSE 8000
+# Exponer el puerto 80 (HTTP estándar)
+EXPOSE 80
 
-# Comando de inicio
-CMD ["python", "main.py"]
+# Comando de inicio optimizado para FastAPI
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]

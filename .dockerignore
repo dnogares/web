@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+
+# Data and Outputs (Large files)
+capas/
+outputs/
+outputs_sim/
+outputs_single/
+descargas/
+descargas_catastro/
+catastro_cache.sqlite
+*.zip
+*.pdf
+*.png
+*.jpg
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# IDE
+.vscode
+.idea
