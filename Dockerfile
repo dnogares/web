@@ -1,36 +1,30 @@
 FROM python:3.10-slim
 
-# Instalar dependencias del sistema mínimas necesarias
-# libgl1: necesario para matplotlib/plots
-# gdal-bin: útil para herramientas de línea de comandos si se necesitan
+# Instalar dependencias del sistema necesarias para GeoPandas y GDAL
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    libgl1 \
-    libgdal-dev \
     gdal-bin \
+    libgdal-dev \
+    libspatialindex-dev \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Configurar directorio de trabajo
+# Configurar variables de entorno para GDAL
+ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
+ENV C_INCLUDE_PATH=/usr/include/gdal
+
+# Directorio de trabajo
 WORKDIR /app
 
-# Actualizar pip
-RUN pip install --upgrade pip
-
-# Copiar requirements
+# Copiar requirements e instalar dependencias
 COPY requirements.txt .
-
-# Instalar dependencias de Python
-# --prefer-binary intenta usar wheels precompilados para evitar errores de compilación de GDAL/GEOS
-RUN pip install --no-cache-dir --prefer-binary -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar el resto del código
 COPY . .
 
-# Crear directorio para capas
-RUN mkdir -p /app/capas
-
-# Exponer el puerto 80
+# Exponer el puerto (EasyPanel usa 80 por defecto internamente)
+ENV PORT=80
 EXPOSE 80
 
 # Comando de inicio
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["python", "main.py"]

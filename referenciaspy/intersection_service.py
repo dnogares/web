@@ -19,7 +19,7 @@ class IntersectionService:
     def listar_capas_configuradas(self) -> List[Dict]:
         """Lee el archivo capas_wms.csv que creaste por consola"""
         if not self.wms_config_path.exists():
-            logger.error(f"Archivo de configuraciÃ³n no encontrado: {self.wms_config_path}")
+            logger.error(f"Archivo de configuración no encontrado: {self.wms_config_path}")
             return []
         df = pd.read_csv(self.wms_config_path)
         return df.to_dict(orient='records')
@@ -47,7 +47,7 @@ class IntersectionService:
                     if gdf_capa.crs != geometria_parcela_gdf.crs:
                         gdf_capa = gdf_capa.to_crs(geometria_parcela_gdf.crs)
                     
-                    # IntersecciÃ³n espacial
+                    # Intersección espacial
                     interseccion = gpd.sjoin(geometria_parcela_gdf, gdf_capa, how="inner", predicate="intersects")
                     
                     if not interseccion.empty:

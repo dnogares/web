@@ -1606,7 +1606,7 @@ if __name__ == "__main__":
     print(f"📁 Visor Local: http://localhost:{PORT}/catastro")
     print(f"🌍 Visor LAN:   http://{local_ip}:{PORT}/catastro")
     print(f"🔗 API Docs:    http://localhost:{PORT}/docs")
-    print("�� Diseño: Glassmorphism")
+    print("🎨 Diseño: Glassmorphism")
     print(f"📂 referenciaspy: {REFERENCIASPY_PATH}")
     
     # DESHABILITADO: ngrok causaba bloqueos al arrancar

@@ -19,6 +19,7 @@ ESSENCIALES = {
     'config_web.json',
     'mapa_municipios.json',
     'requirements.txt',
+    'Dockerfile',
     
     # Frontend
     'static/visor.html',
