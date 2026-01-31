@@ -325,10 +325,10 @@ async def root():
     """Página principal - Dashboard"""
     return FileResponse("static/index.html")
 
-@app.get("/catastro")
-async def visor_catastro():
-    """Visor Catastral"""
-    return FileResponse("static/visor_catastro.html")
+@app.get("/catastro_fin")
+async def visor_catastro_fin():
+    """Visor Catastral Final"""
+    return FileResponse("static/catastro_fin.html")
 
 @app.get("/urbanismo")
 async def visor_urbanismo():
