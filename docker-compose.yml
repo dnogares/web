@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./capas:/app/capas
+      - ./outputs:/app/outputs
+      - ./catastro_cache.sqlite:/app/catastro_cache.sqlite
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
