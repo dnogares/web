@@ -1,0 +1,124 @@
+# Configuración para integración MAPAMA OGC Features
+# Copiar a config/mapama.yaml y ajustar valores
+
+database:
+  url: "postgresql://manuel:Aa123456@localhost:5432/GIS"
+  pool_size: 20
+  max_overflow: 30
+  pool_pre_ping: true
+  echo: false  # Set to true for SQL logging
+
+mapama:
+  base_url: "https://wmts.mapama.gob.es/sig-api/ogc/features/v1"
+  default_crs: "EPSG:25830"  # ETRS89 UTM 30N para España peninsular
+  batch_size: 5000
+  timeout: 60
+  retry_attempts: 3
+  retry_delay: 1.0
+  
+# Colecciones prioritarias para sincronización inicial
+colecciones_prioritarias:
+  # Biodiversidad
+  - "biodiversidad:Habitat_Art17_D2013"
+  - "biodiversidad:RedNatura2000_ZEPA"
+  - "biodiversidad:RedNatura2000_LIC"
+  - "biodiversidad:MontesPublicos"
+  
+  # Alimentación
+  - "alimentacion:CDZ_Aceites"
+  - "alimentacion:CDZ_Vinos"
+  - "alimentacion:CDZ_Cereales"
+  - "alimentacion:IndustriasAlimentarias"
+  
+  # AEMET (Meteorología)
+  - "aemet:estaciones_auto"
+  - "aemet:red_sinoptica"
+  - "aemet:radar_meteorologico"
+  
+  # Desarrollo Rural
+  - "desarrollorural:GruposAccionLocal"
+  - "desarrollorural:ZonasRurales"
+  - "desarrollorural:ProgramasDesarrolloRural"
+  
+  # Agricultura
+  - "agricultura:Regadios"
+  - "agricultura:Secano"
+  - "agricultura:UsosSuelo"
+  
+  # Medio Ambiente
+  - "medioambiente:CalidadAire"
+  - "medioambiente:MasasAgua"
+  - "medioambiente:Vertidos"
+
+# Configuración de sincronización
+sync:
+  default_strategy: "replace"  # replace, append, upsert
+  auto_optimize: true
+  create_indexes: true
+  vacuum_analyze: true
+  
+  # Límites para evitar sobrecarga
+  max_features_per_collection: 100000
+  max_download_time_minutes: 60
+  
+  # Bounding boxes por región (minx, miny, maxx, maxy)
+  regiones:
+    andalucia:
+      bbox: [-7.5, 35.5, -1.0, 38.5]
+      description: "Andalucía completa"
+      
+    murcia:
+      bbox: [-2.5, 37.0, -0.5, 38.5]
+      description: "Región de Murcia"
+      
+    valencia:
+      bbox: [-1.5, 38.0, 0.5, 40.5]
+      description: "Comunidad Valenciana"
+      
+    espana_peninsular:
+      bbox: [-10.0, 35.5, 4.0, 44.0]
+      description: "España peninsular"
+
+# Configuración de API
+api:
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://localhost:8080"
+    - "https://catastro.local"
+  
+  # Límites de consulta
+  max_referencias_por_request: 1000
+  max_capas_por_request: 50
+  default_buffer_meters: 0
+  max_buffer_meters: 10000
+
+# Configuración de logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/mapama.log"
+  max_size_mb: 100
+  backup_count: 5
+
+# Configuración de caché
+cache:
+  enabled: true
+  ttl_seconds: 3600  # 1 hora
+  max_size: 1000
+  
+# Configuración de monitoreo
+monitoring:
+  enabled: true
+  metrics_endpoint: "/metrics"
+  health_check_interval: 60
+  
+# Configuración de seguridad
+security:
+  api_key_required: false
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 100
+    burst_size: 20

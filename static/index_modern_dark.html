@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Visor Catastral - Dark Pro</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.2.0/leaflet-omnivore.min.js'></script>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            font-family: 'Segoe UI', sans-serif;
+            background: #1a1a1a;
+            color: #eee;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 300px;
+            background: #2d2d2d;
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .sidebar h2 {
+            color: #4CAF50;
+            margin-top: 0;
+            font-size: 1.2rem;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+
+        /* Modules */
+        .module {
+            background: #383838;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+
+        .module h3 {
+            margin: 0 0 10px 0;
+            font-size: 0.9rem;
+            color: #aaa;
+            text-transform: uppercase;
+        }
+
+        /* Inputs & Buttons */
+        input[type="text"],
+        input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            background: #222;
+            border: 1px solid #555;
+            color: white;
+            border-radius: 4px;
+            box-sizing: border-box;
+            margin-bottom: 5px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #4CAF50;
+            border: none;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        button.secondary {
+            background: #555;
+        }
+
+        button.danger {
+            background: #e74c3c;
+        }
+
+        /* Map Area */
+        .main-content {
+            flex: 1;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Floating Toolbar */
+        .toolbar {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(45, 45, 45, 0.9);
+            padding: 10px;
+            border-radius: 30px;
+            display: flex;
+            gap: 10px;
+            border: 1px solid #555;
+        }
+
+        .tool-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: #444;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tool-btn:hover {
+            background: #4CAF50;
+        }
+
+        /* Right Panel (Layers) */
+        .layers-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 200px;
+            background: rgba(45, 45, 45, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 1000;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid #555;
+        }
+
+        .layer-item {
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Results */
+        .result-box {
+            margin-top: 10px;
+            font-size: 0.85rem;
+            color: #ccc;
+            display: none;
+        }
+
+        #medicion-resultado {
+            color: white;
+            font-weight: bold;
+            margin-left: 10px;
+            align-self: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="sidebar">
+        <h2><i class="fa-solid fa-map"></i> VISOR PRO</h2>
+
+        <div class="module">
+            <h3>Referencia</h3>
+            <input type="text" id="ref-input" placeholder="Ref. Catastral">
+            <button onclick="cargarReferencia()">Buscar</button>
+            <div id="ref-results-checklist" class="result-box"></div>
+        </div>
+
+        <div class="module">
+            <h3>Municipios</h3>
+            <input type="text" id="municipio-input" placeholder="Nombre municipio">
+            <button class="secondary" onclick="buscarMunicipio()">Buscar Descarga</button>
+            <div id="municipio-resultados" class="result-box" style="display:block"></div>
+        </div>
+
+        <div class="module">
+            <h3>Análisis</h3>
+            <input type="file" id="file-urbanismo" class="secondary">
+            <button class="secondary" onclick="analizarUrbanismo()">Urbanismo</button>
+            <div id="urbanismo-resultados" class="result-box"></div>
+            <div style="height:10px"></div>
+            <button class="secondary" onclick="analizarAfecciones()">Afecciones</button>
+            <div id="analisis-resultados" class="result-box"></div>
+        </div>
+
+        <button class="danger" onclick="mostrarDialogoPDF()"><i class="fa-solid fa-file-pdf"></i> Informe PDF</button>
+    </div>
+
+    <div class="main-content">
+        <div class="toolbar">
+            <button class="tool-btn" onclick="activarMedicion('distancia')"><i class="fa-solid fa-ruler"></i></button>
+            <button class="tool-btn" onclick="activarMedicion('area')"><i class="fa-solid fa-draw-polygon"></i></button>
+            <button class="tool-btn" style="background:#e74c3c" onclick="limpiarMapa()"><i
+                    class="fa-solid fa-trash"></i></button>
+            <div id="medicion-resultado"></div>
+        </div>
+
+        <div class="layers-panel">
+            <h3>Capas</h3>
+            <div class="layer-item"><input type="checkbox" checked onchange="toggleBaseLayer('osm', this.checked)"> OSM
+            </div>
+            <div class="layer-item"><input type="checkbox" onchange="toggleBaseLayer('satelite', this.checked)">
+                Satélite</div>
+            <hr style="border-color:#555">
+            <div class="layer-item"><input type="checkbox" checked onchange="toggleLayer('catastro', this.checked)">
+                Catastro</div>
+            <!-- <div class="layer-item"><input type="checkbox" onchange="toggleLayer('inundacion', this.checked)"> Inundación</div> -->
+            <div class="layer-item"><input type="checkbox" onchange="toggleLayer('siose', this.checked)"> SIOSE</div>
+            <div class="layer-item">Opacidad: <input type="range" id="opacidad-catastro" min="0" max="100" value="100">
+            </div>
+        </div>
+
+        <div id="map"></div>
+    </div>
+
+    <!-- Modal PDF (Oculto) -->
+    <div id="pdfDialog"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2000; justify-content:center; align-items:center;">
+        <div style="background:#333; padding:20px; border-radius:8px; width:400px;">
+            <h3>Generar PDF</h3>
+            <input type="text" id="empresa-nombre" placeholder="Empresa">
+            <input type="text" id="colegiado-numero" placeholder="Colegiado">
+            <div id="contenidos-disponibles" style="margin:10px 0; color:#aaa">...</div>
+            <div style="display:flex; gap:10px">
+                <button onclick="cerrarDialogoPDF()" class="secondary">Cancelar</button>
+                <button onclick="generarPDFSeleccionado()">Generar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/visor_logic.js"></script>
+    <script src="/static/js/visor_logic.js"></script>
+</body>
+
+</html>

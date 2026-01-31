@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suite Tasación - Visor Modular</title>
+    
+    <!-- Librerías -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Estilos Propios -->
+    <link rel="stylesheet" href="/static/style_v2.css">
+</head>
+<body>
+
+    <div class="app-layout">
+        <!-- BARRA LATERAL -->
+        <aside class="sidebar">
+            <div class="brand">
+                <i class="fa-solid fa-map-location-dot"></i>
+                <span>Suite <b>Tasación</b></span>
+            </div>
+
+            <!-- NAVEGACIÓN DE MÓDULOS (TABS) -->
+            <div class="tabs">
+                <button class="tab-btn active" data-target="catastro">
+                    <i class="fa-solid fa-magnifying-glass"></i> Catastro
+                </button>
+                <button class="tab-btn" data-target="capas">
+                    <i class="fa-solid fa-layer-group"></i> Capas
+                </button>
+                <button class="tab-btn" data-target="herramientas">
+                    <i class="fa-solid fa-toolbox"></i> Útiles
+                </button>
+                <button class="tab-btn" data-target="analisis">
+                    <i class="fa-solid fa-chart-pie"></i> Análisis
+                </button>
+            </div>
+
+            <!-- CONTENIDO DE PANELES -->
+            <div class="panel-content">
+                
+                <!-- MÓDULO 1: CATASTRO -->
+                <div id="panel-catastro" class="panel active">
+                    <div class="input-section">
+                        <label>Referencia Catastral:</label>
+                        <div class="input-group">
+                            <input type="text" id="catastro-ref" placeholder="Ej: 9872303VH5797S0001WX">
+                            <button class="btn-icon" onclick="app.buscarReferencia()"><i class="fa-solid fa-search"></i></button>
+                        </div>
+                        
+                        <div class="divider"><span>O carga masiva</span></div>
+                        
+                        <label class="file-upload">
+                            <input type="file" id="catastro-file" accept=".txt,.csv">
+                            <i class="fa-solid fa-upload"></i> Cargar archivo de referencias
+                        </label>
+                    </div>
+
+                    <button class="btn-primary" onclick="app.procesarCatastro()">
+                        <i class="fa-solid fa-bolt"></i> Obtener Documentación
+                    </button>
+
+                    <div id="catastro-results" class="results-area hidden">
+                        <h4><i class="fa-solid fa-check-circle"></i> Documentación Generada</h4>
+                        <ul class="file-list">
+                            <!-- Se llena dinámicamente -->
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- MÓDULO 2: CAPAS -->
+                <div id="panel-capas" class="panel">
+                    <div class="layer-control">
+                        <h4>Mapas Base</h4>
+                        <label class="layer-item"><input type="radio" name="baseLayer" value="osm" checked onchange="app.setBaseLayer('osm')"> Mapa Mundial (OSM)</label>
+                        <label class="layer-item"><input type="radio" name="baseLayer" value="catastro" onchange="app.setBaseLayer('catastro')"> Catastro</label>
+                        <label class="layer-item"><input type="radio" name="baseLayer" value="pnoa" onchange="app.setBaseLayer('pnoa')"> Satélite (PNOA)</label>
+                        
+                        <h4 style="margin-top:20px;">Superposiciones</h4>
+                        <label class="layer-item">
+                            <input type="checkbox" id="layer-caminos" onchange="app.toggleLayer('caminos', this.checked)"> 
+                            <span class="color-dot" style="background:#8e44ad"></span> Caminos / Vías
+                        </label>
+                        <label class="layer-item">
+                            <input type="checkbox" id="layer-natura" onchange="app.toggleLayer('natura', this.checked)"> 
+                            <span class="color-dot" style="background:#27ae60"></span> Red Natura 2000
+                        </label>
+                        <label class="layer-item">
+                            <input type="checkbox" id="layer-montes" onchange="app.toggleLayer('montes', this.checked)"> 
+                            <span class="color-dot" style="background:#2c3e50"></span> Montes Públicos
+                        </label>
+                    </div>
+                </div>
+
+                <!-- MÓDULO 3: HERRAMIENTAS -->
+                <div id="panel-herramientas" class="panel">
+                    <button class="tool-btn" onclick="app.activarMedicion('distancia')"><i class="fa-solid fa-ruler"></i> Medir Distancia</button>
+                    <button class="tool-btn" onclick="app.activarMedicion('area')"><i class="fa-solid fa-draw-polygon"></i> Medir Área</button>
+                    <button class="tool-btn danger" onclick="app.limpiarMapa()"><i class="fa-solid fa-trash"></i> Limpiar Mapa</button>
+                    
+                    <div id="medicion-resultado" class="result-card hidden" style="margin-top:15px; font-weight:bold; color:#2563eb;"></div>
+                </div>
+
+                <!-- MÓDULO 4: ANÁLISIS -->
+                <div id="panel-analisis" class="panel">
+                    <h4>Urbanismo</h4>
+                    <div class="input-section">
+                        <input type="text" id="urbanismo-ref" placeholder="Referencia Catastral">
+                        <button class="btn-primary" onclick="app.analizarUrbanismo()" style="margin-top:5px;">
+                            <i class="fa-solid fa-city"></i> Analizar Urbanismo
+                        </button>
+                    </div>
+                    <div id="urbanismo-results" class="results-area hidden">
+                        <!-- Resultados -->
+                    </div>
+
+                    <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
+                    
+                    <h4>Afecciones</h4>
+                    <button class="btn-primary warning" onclick="app.calcularAfecciones()" style="margin-top:5px;">
+                        <i class="fa-solid fa-calculator"></i> Calcular Afecciones
+                    </button>
+                    <div id="afecciones-results" class="results-area hidden">
+                        <!-- Resultados -->
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- MAPA -->
+        <main id="map"></main>
+    </div>
+
+    <!-- Indicador de Carga Flotante -->
+    <div id="loading-toast" class="loading-toast hidden">
+        <i class="fa-solid fa-circle-notch fa-spin"></i>
+        <span id="loading-text">Procesando...</span>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-geometryutil@0.10.3/src/leaflet.geometryutil.js"></script>
+    <script src="/static/js/app_v2.js"></script>
+</body>
+</html>

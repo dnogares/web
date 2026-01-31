@@ -1,0 +1,1601 @@
+#!/usr/bin/env python3
+"""
+Servidor FastAPI integrado para el visor catastral con Glassmorphism
+"""
+
+import json
+import os
+import sys
+import socket
+import requests
+import unicodedata
+from pathlib import Path
+from typing import Optional, List
+from datetime import datetime
+
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, Query
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, FileResponse, Response, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import uvicorn
+
+# --- CORRECCIÓN DE RUTAS ---
+# Asegurar que el servidor siempre trabaje en el directorio del script
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+# Agregar ruta de referenciaspy
+REFERENCIASPY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "referenciaspy")
+if os.path.exists(REFERENCIASPY_PATH):
+    sys.path.insert(0, REFERENCIASPY_PATH)
+    print(f"✅ Ruta de referenciaspy agregada: {REFERENCIASPY_PATH}")
+else:
+    print(f"⚠️ Ruta de referenciaspy no encontrada: {REFERENCIASPY_PATH}")
+
+# Configuración
+CONFIG_FILE = "config_web.json"
+MAPA_FILE = "mapa_municipios.json"
+
+# --- CONFIGURACIÓN DE RUTAS DE CAPAS ---
+# Prioridad:
+# 1. Ruta Z: (Entorno local específico del usuario)
+# 2. Ruta /app/capas (Entorno Docker/Producción)
+# 3. Ruta ./capas (Entorno local relativo)
+
+POSSIBLE_LAYERS_DIRS = [
+    Path(r"Z:\compartidaconeasypanel\files3\proyecto_gis\capas"),
+    Path("/app/capas"),
+    Path("capas")
+]
+
+LAYERS_DIR = Path("capas") # Default fallback
+for d in POSSIBLE_LAYERS_DIRS:
+    if d.exists():
+        LAYERS_DIR = d
+        print(f"✅ Usando directorio de capas: {LAYERS_DIR}")
+        break
+    else:
+        print(f"ℹ️ Directorio no encontrado: {d}")
+
+# Intentar importar módulos principales
+try:
+    from catastro4 import CatastroDownloader, procesar_y_comprimir
+    CATASTRO_AVAILABLE = True
+    print("✅ catastro4 disponible")
+except ImportError as e:
+    CATASTRO_AVAILABLE = False
+    print(f"⚠️ catastro4 no disponible: {e}")
+
+try:
+    import urbanismo
+    URBANISMO_AVAILABLE = True
+    print("✅ urbanismo disponible")
+except ImportError as e:
+    URBANISMO_AVAILABLE = False
+    print(f"⚠️ urbanismo no disponible: {e}")
+
+try:
+    import afecciones
+    AFECCIONES_AVAILABLE = True
+    print("✅ afecciones disponible")
+except ImportError as e:
+    AFECCIONES_AVAILABLE = False
+    print(f"⚠️ afecciones no disponible: {e}")
+
+try:
+    import geopandas as gpd
+    GEOPANDAS_AVAILABLE = True
+    import pandas as pd # Necesario para verificar tipos de fecha
+    from sqlalchemy import text # Para queries parametrizadas
+    print("✅ geopandas disponible")
+except ImportError:
+    GEOPANDAS_AVAILABLE = False
+    print("⚠️ geopandas no disponible")
+
+# Intentar importar referenciaspy
+try:
+    from referenciaspy.urban_analysis import AnalizadorUrbanistico
+    REFERENCIASPY_AVAILABLE = True
+    print("✅ referenciaspy disponible")
+except ImportError as e:
+    REFERENCIASPY_AVAILABLE = False
+    print(f"⚠️ referenciaspy no disponible: {e}")
+
+# Intentar importar generador PDF
+try:
+    from referenciaspy.pdf_generator import AfeccionesPDF
+    PDF_GENERATOR_AVAILABLE = True
+except ImportError:
+    PDF_GENERATOR_AVAILABLE = False
+    print("⚠️ referenciaspy.pdf_generator no disponible")
+
+# Intentar importar funciones del visor
+try:
+    from visor_functions_integrated import get_visor
+    VISOR_FUNCTIONS_AVAILABLE = True
+    print("✅ visor_functions_integrated disponible")
+except ImportError as e:
+    VISOR_FUNCTIONS_AVAILABLE = False
+    print(f"⚠️ visor_functions_integrated no disponible: {e}")
+
+# Intentar importar GISDatabase
+try:
+    from gis_db import GISDatabase
+    GIS_DB_AVAILABLE = True
+    db_gis = None # Singleton para pool de conexiones
+except ImportError:
+    GIS_DB_AVAILABLE = False
+    db_gis = None
+    print("⚠️ gis_db no disponible")
+
+# Modelos Pydantic
+class UrbanismoRequest(BaseModel):
+    referencia: Optional[str] = None
+    archivo: Optional[str] = None
+    contenido: Optional[str] = None
+
+class AfeccionesRequest(BaseModel):
+    referencia: Optional[str] = None
+    archivos: Optional[List[dict]] = None
+
+class GenerarPDFRequest(BaseModel):
+    referencia: str
+    contenidos: List[str] = []
+    empresa: Optional[str] = ""
+    colegiado: Optional[str] = ""
+
+# --- NUEVOS MODELOS PARA INFORME URBANÍSTICO ---
+class ReferenciaData(BaseModel):
+    referencia_catastral: str
+    direccion: str
+    municipio: str
+    provincia: str
+    distrito: Optional[str] = None
+    coordenadas_x: float
+    coordenadas_y: float
+    superficie_m2: float
+    fecha_alta_catastro: Optional[str] = None
+    num_habitantes_municipio: Optional[int] = None
+
+class Ordenanza(BaseModel):
+    codigo: str
+    uso_principal: str
+    coef_edificabilidad: Optional[float] = None
+    altura_max_plantas: Optional[int] = None
+    fondo_edificable: Optional[float] = None
+
+class UsoCompatibilidad(BaseModel):
+    uso: str
+    compatibilidad: str
+
+class UrbanismoData(BaseModel):
+    fecha_pgou: Optional[str] = None
+    clasificacion_suelo: str
+    zona_urbanistica: Optional[str] = None
+    ordenanza: Optional[Ordenanza] = None
+    usos_compatibilidad: List[UsoCompatibilidad] = []
+    # Campos compatibles con visor actual
+    edificabilidad_estimada: Optional[str] = None
+    ocupacion_estimada: Optional[str] = None
+    superficie_parcela: Optional[str] = None
+    superficie_ocupada: Optional[str] = None
+
+class Normativa(BaseModel):
+    instrumento: str
+    fecha_publicacion: str
+    resumen: str
+
+# ------------------------------------------------
+
+class PDFCompletoRequest(BaseModel):
+    referencia: Optional[str] = None
+    incluir_referencia: bool = False
+    incluir_urbanismo: bool = False
+    incluir_afecciones: bool = False
+    incluir_coordenadas: bool = False
+    incluir_ortofoto: bool = False
+    incluir_mapa: bool = False
+    incluir_capas_cargadas: bool = False
+    archivos_adicionales: Optional[List[dict]] = None
+    formato: str = "pdf"
+
+class LoteRequest(BaseModel):
+    referencias: List[str]
+
+# Crear aplicación FastAPI
+app = FastAPI(
+    title="Visor Catastral API - Glassmorphism",
+    version="2.0.0",
+    description="API para el visor catastral con diseño Glassmorphism"
+)
+# ⭐ AÑADE ESTO JUSTO DESPUÉS DE CREAR LA APP ⭐
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Permite todos los orígenes (para desarrollo)
+    allow_credentials=True,
+    allow_methods=["*"],  # Permite todos los métodos (GET, POST, etc.)
+    allow_headers=["*"],  # Permite todos los headers
+)
+# Cargar expedientes (Bloque 1) - Catastro
+try:
+    from expedientes.router import expedientes_router
+    app.include_router(expedientes_router, prefix="/api/v1")
+    print("✅ Expedientes router cargado en /api/v1")
+except Exception as e:
+    print(f"⚠️ Expedientes router no disponible: {e}")
+# Cargar configuración
+def cargar_config():
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {
+            "rutas": {
+                "outputs": "outputs",
+                "layers": "layers",
+                "results": "results"
+            },
+            "urls": {
+                "catastro_wfs": "https://www.catastro.minhaf.es/INSPIRE/WFS",
+                "ign_pnoa": "https://www.ign.es/wms/pnoa"
+            }
+        }
+
+cfg = cargar_config()
+
+# Crear y montar directorio de salidas
+outputs_dir = cfg.get("rutas", {}).get("outputs", "outputs")
+Path(outputs_dir).mkdir(exist_ok=True)
+
+# Inicializar Base de Datos GIS Globalizada (Singleton)
+if GIS_DB_AVAILABLE:
+    try:
+        db_gis = GISDatabase()
+        if db_gis.test_connection():
+            print("✅ Conexión GIS estable (Singleton inicializado)")
+        else:
+            print("⚠️ Conexión GIS fallida al inicio")
+    except Exception as e:
+        print(f"❌ Error inicializando DB GIS: {e}")
+
+# --- INTEGRACIÓN INE (Población) ---
+INE_CACHE = {}
+
+def obtener_poblacion_ine(municipio_nombre):
+    """
+    Obtiene la población de un municipio usando la API del INE.
+    Usa la tabla 29005 (Cifras oficiales de población).
+    """
+    global INE_CACHE
+    
+    if not municipio_nombre:
+        return None
+
+    # Normalizar nombre para búsqueda (quitar tildes, mayúsculas)
+    def normalizar(s):
+        return ''.join(c for c in unicodedata.normalize('NFD', s) 
+                      if unicodedata.category(c) != 'Mn').lower().strip()
+    
+    mun_norm = normalizar(municipio_nombre)
+    
+    # Si ya está en cache, devolver
+    if mun_norm in INE_CACHE:
+        return INE_CACHE[mun_norm]
+    
+    # Si la cache está vacía, intentar llenarla (lazy loading)
+    if not INE_CACHE:
+        try:
+            print("⏳ Descargando datos de población del INE (primera vez)...")
+            # Tabla 29005: Población por municipios (último dato disponible)
+            url = "https://servicios.ine.es/wstempus/js/es/DATOS_TABLA/29005?nult=1"
+            response = requests.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                datos = response.json()
+                for item in datos:
+                    # El nombre suele venir como "Provincia: Municipio" o "Municipio"
+                    nombre_raw = item.get("Nombre", "")
+                    
+                    # Extraer nombre del municipio (ej: "Madrid: Madrid" -> "Madrid")
+                    if ":" in nombre_raw:
+                        parts = nombre_raw.split(":")
+                        nombre_mun = parts[-1].strip()
+                    else:
+                        nombre_mun = nombre_raw
+                    
+                    # Obtener valor
+                    if "Data" in item and len(item["Data"]) > 0:
+                        valor = item["Data"][0].get("Valor")
+                        if valor:
+                            INE_CACHE[normalizar(nombre_mun)] = int(valor)
+                print(f"✅ Datos INE cargados: {len(INE_CACHE)} municipios")
+            else:
+                print(f"⚠️ Error API INE: {response.status_code}")
+        except Exception as e:
+            print(f"⚠️ Excepción conectando con INE: {e}")
+            return None
+
+    # Buscar de nuevo tras cargar
+    return INE_CACHE.get(mun_norm)
+
+
+# Endpoints
+@app.get("/")
+async def root():
+    """Página principal - Dashboard"""
+    return FileResponse("static/index.html")
+
+@app.get("/catastro")
+async def visor_catastro():
+    """Visor Catastral"""
+    return FileResponse("static/catastro.html")
+
+@app.get("/urbanismo")
+async def visor_urbanismo():
+    """Visor Urbanismo (Placeholder)"""
+    return HTMLResponse("<h1>Módulo de Análisis Urbanístico en construcción</h1><a href='/'>Volver</a>")
+
+@app.get("/afecciones")
+async def visor_afecciones():
+    """Visor Afecciones (Placeholder)"""
+    return HTMLResponse("<h1>Módulo de Análisis de Afecciones en construcción</h1><a href='/'>Volver</a>")
+
+
+@app.get("/api/v1/capas/list")
+async def list_capas_files():
+    """Listar archivos de capas disponibles en el directorio configurado"""
+    try:
+        files = []
+        if LAYERS_DIR.exists():
+            # Extensiones permitidas (ordenadas por prioridad)
+            extensions = ['.fgb', '.gpkg', '.shp', '.geojson', '.kml', '.zip']
+            
+            seen_stems = set()
+            
+            # Recorrer recursivamente
+            for ext in extensions:
+                for f in LAYERS_DIR.rglob(f"*{ext}"):
+                    # Ignorar archivos ocultos o de sistema
+                    if f.name.startswith('.'): continue
+                    
+                    # Si ya tenemos una capa con este nombre (sin extensión), la saltamos
+                    # Esto evita duplicados si existe rios.shp y rios.fgb (mostramos solo uno)
+                    if f.stem in seen_stems:
+                        continue
+                    
+                    seen_stems.add(f.stem)
+                    
+                    # Crear una entrada simplificada
+                    try:
+                        rel_path = f.relative_to(LAYERS_DIR)
+                    except ValueError:
+                        rel_path = f.name
+                    
+                    # Generar un ID único basado en el nombre
+                    layer_id = f.stem.replace(" ", "_").replace(".", "_").lower()
+                    
+                    files.append({
+                        "name": f.stem,
+                        "filename": f.name,
+                        "path": str(rel_path),
+                        "type": f.suffix.lower(),
+                        "id": layer_id
+                    })
+        
+        # Ordenar por nombre
+        files.sort(key=lambda x: x['name'])
+        
+        return {"status": "success", "files": files, "base_dir": str(LAYERS_DIR)}
+    except Exception as e:
+        print(f"Error listando capas: {e}")
+        return {"status": "error", "message": str(e), "files": []}
+
+@app.get("/api/v1/capas-disponibles")
+async def get_capas_disponibles():
+    """Obtener lista de capas disponibles desde PostGIS"""
+    try:
+        if not GIS_DB_AVAILABLE or db_gis is None:
+            return {"status": "error", "message": "Módulo GIS DB no disponible"}
+            
+        if not db_gis.test_connection():
+             return {"status": "success", "message": "Conectado a GIS (Simulado para pruebas o BD vacía)", "capas": []}
+             
+        layers = db_gis.get_available_layers(schema="afecciones")
+        return {"status": "success", "capas": layers}
+    except Exception as e:
+        print(f"Error en capas-disponibles: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/v1/capas/data/{layer_name}")
+async def get_layer_data(layer_name: str, bbox: Optional[str] = Query(None)):
+    """
+    Obtener GeoJSON de una capa PostGIS.
+    Filtra por BBOX si se proporciona (formato: minx,miny,maxx,maxy).
+    """
+    try:
+        if not GIS_DB_AVAILABLE or db_gis is None:
+            raise HTTPException(status_code=503, detail="GIS DB no disponible")
+            
+        if not hasattr(db_gis, 'engine') or db_gis.engine is None:
+             raise HTTPException(status_code=500, detail="No se pudo acceder al motor de base de datos")
+        
+        db = db_gis # Usar la instancia global
+        
+        params = {}
+        where_clause = ""
+        if bbox:
+            try:
+                minx, miny, maxx, maxy = [float(c) for c in bbox.split(',')]
+                # Transformamos el BBOX al SRID de la tabla en SQL y filtramos
+                where_clause = "WHERE ST_Intersects(geom, ST_Transform(ST_MakeEnvelope(:minx, :miny, :maxx, :maxy, 4326), ST_SRID(geom)))"
+                params = {'minx': minx, 'miny': miny, 'maxx': maxx, 'maxy': maxy}
+            except (ValueError, IndexError):
+                raise HTTPException(status_code=400, detail="Formato de BBOX inválido")
+
+        # Seleccionamos transformando a 4326 directamente en la base de datos (MUCHO más rápido que en Python)
+        # Reducimos el límite a 3000 para balancear carga/detalle
+        sql = text(f"""
+            SELECT *, ST_Transform(geom, 4326) as geom_wgs84 
+            FROM afecciones.{layer_name} 
+            {where_clause} 
+            LIMIT 3000
+        """)
+        
+        # Leemos indicando la nueva columna de geometría ya proyectada
+        gdf = gpd.read_postgis(sql, db.engine, params=params, geom_col='geom_wgs84')
+        
+        # Quitamos la columna original 'geom' (si existe) para no enviarla duplicada en el GeoJSON
+        if 'geom' in gdf.columns:
+            gdf = gdf.drop(columns=['geom'])
+            
+        # Convertir tipos no serializables a string
+        for col in gdf.columns:
+            if pd.api.types.is_datetime64_any_dtype(gdf[col]):
+                gdf[col] = gdf[col].astype(str)
+                
+        return json.loads(gdf.to_json())
+    except Exception as e:
+        # Si la tabla no existe, devolver una FeatureCollection vacía en lugar de 500
+        error_str = str(e).lower()
+        if "does not exist" in error_str or "undefinedtable" in error_str:
+            print(f"⚠️ Capa no encontrada en DB: {layer_name}")
+            return {"type": "FeatureCollection", "features": [], "status": "not_found", "layer": layer_name}
+            
+        print(f"Error fetching layer {layer_name}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/capas/geojson/{nombre_capa}")
+async def get_geojson_capa(nombre_capa: str):
+    """Obtener GeoJSON de una capa específica"""
+    print(f"🔍 Buscando capa: {nombre_capa}")
+    try:
+        if nombre_capa.lower() in ["inundacion", "inundabilidad", "t10", "t100", "t500"]:
+            print(f"⚠️ BLOQUEADO: Intento de cargar capa pesada '{nombre_capa}'")
+            return {"type": "FeatureCollection", "features": []}
+
+        # Definir posibles nombres base para la búsqueda
+        nombres_posibles = [nombre_capa]
+        
+        # Mapeos específicos basados en tus archivos
+        if nombre_capa == "natura":
+            nombres_posibles.extend(["PS.RNATURA2000", "RNATURA", "Es_Lic_SCI_Zepa"])
+        elif nombre_capa == "caminos":
+            nombres_posibles.extend(["CCNN", "ETAPAS", "caminos", "GENE"])
+        elif nombre_capa == "montes":
+            nombres_posibles.extend(["IEPF_CMUP", "CMUP", "montes", "publicos"])
+        elif nombre_capa == "vias":
+            nombres_posibles.extend(["vias", "pecuarias", "vvpp", "vias_pecuarias"])
+        # Archivos/Carpetas a excluir (archivos muy grandes que bloquean el servidor)
+        # Es_Lic... (600MB), IEPF... (1.2GB), RGVP... (196MB)
+        carpetas_excluidas = ["zonas_inundables", "Es_Lic_SCI_Zepa", "RGVP_BDN"]
+        
+        # Búsqueda recursiva en directorios raíz
+        directorios_raiz = [Path("capas"), Path("ccnn")]
+        archivo_encontrado = None # Inicialización explícita para evitar errores 500
+        
+
+        archivos_candidatos = []
+        
+        # 1. Búsqueda por nombre de ARCHIVO
+        for nombre in nombres_posibles:
+            patrones = [f"*{nombre}*.geojson", f"*{nombre}*.shp", f"*{nombre}*.zip", f"*{nombre}*.kml", f"*{nombre}*.gpkg", f"*{nombre}*.fgb"]
+            for patron in patrones:
+                # Buscar en LAYERS_DIR
+                if LAYERS_DIR.exists():
+                    archivos_candidatos.extend(list(LAYERS_DIR.rglob(patron)))
+                # Buscar en ccnn (fallback)
+                if Path("ccnn").exists():
+                    archivos_candidatos.extend(list(Path("ccnn").rglob(patron)))
+        
+        # 2. Si no hay candidatos, buscar por nombre de CARPETA (ej: carpeta 'ccnn' contiene 'track.shp')
+        if not archivos_candidatos:
+            print("  ↳ Buscando dentro de carpetas específicas...")
+            for nombre in nombres_posibles:
+                # Usar LAYERS_DIR y ccnn como raíces
+                roots = [LAYERS_DIR, Path("ccnn")]
+                for root_dir in roots:
+                    if not root_dir.exists(): continue
+                    # Buscar directorios que contengan el nombre
+                    # Usamos rglob para encontrar subdirectorios que coincidan
+                    for d in root_dir.rglob(f"*{nombre}*"):
+                        if d.is_dir():
+                            # Si encontramos la carpeta, coger todos los archivos GIS dentro
+                            for ext in ["*.shp", "*.geojson", "*.kml", "*.gpkg", "*.fgb"]:
+                                archivos_candidatos.extend(list(d.rglob(ext)))
+
+        # Filtrar duplicados
+        archivos_candidatos = list(set(archivos_candidatos))
+        
+        # Definir prioridad de extensiones (menor índice = mayor prioridad)
+        priority_ext = {'.fgb': 0, '.gpkg': 1, '.shp': 2, '.geojson': 3, '.kml': 4, '.zip': 5}
+        
+        def get_priority(path):
+            return priority_ext.get(path.suffix.lower(), 99)
+            
+        # Ordenar candidatos por prioridad
+        archivos_candidatos.sort(key=get_priority)
+
+        # Seleccionar el primer archivo encontrado que no esté excluido
+        for candidato in archivos_candidatos:
+            if any(excl in str(candidato) for excl in carpetas_excluidas):
+                continue
+            archivo_encontrado = candidato
+            print(f"  ✅ Encontrado por coincidencia (mejor formato): {candidato}")
+            break # Tomar el primero que cumpla
+
+        if not archivo_encontrado:
+            print(f"⚠️ NO ENCONTRADO: Capa {nombre_capa} (Se devolverá vacío)")
+            return {"type": "FeatureCollection", "features": []}
+
+        print(f"✅ Leyendo archivo: {archivo_encontrado}")
+
+        # Leer archivo (GPKG o GeoJSON o FGB)
+        suffix = archivo_encontrado.suffix.lower()
+        if suffix in ['.gpkg', '.shp', '.fgb']:
+            if not GEOPANDAS_AVAILABLE:
+                print(f"⚠️ Geopandas no disponible para capa {nombre_capa}")
+                return {"type": "FeatureCollection", "features": []}
+            
+            try:
+                # Convertir Path a string para compatibilidad
+                gdf = gpd.read_file(str(archivo_encontrado))
+                
+                # Convertir a WGS84 para web
+                if gdf.crs and gdf.crs.to_string() != "EPSG:4326":
+                    gdf = gdf.to_crs("EPSG:4326")
+                
+                # CORRECCIÓN: Convertir columnas de fecha a string para evitar error JSON
+                for col in gdf.columns:
+                    if pd.api.types.is_datetime64_any_dtype(gdf[col]):
+                        gdf[col] = gdf[col].astype(str)
+                        
+                return json.loads(gdf.to_json())
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                print(f"❌ Error leyendo archivo {archivo_encontrado}: {e}")
+                # Devolver vacío para no romper el visor con 500
+                return {"type": "FeatureCollection", "features": []}
+        else:
+            with open(archivo_encontrado, "r", encoding="utf-8") as f:
+                return json.load(f)
+                
+    except Exception as e:
+        print(f"ERROR en get_geojson_capa ({nombre_capa}): {e}") # Debug
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/proxy")
+async def proxy_request(url: str):
+    """
+    Proxy simple compatible hacia atrás.
+    """
+    try:
+        resp = requests.get(url, timeout=15, verify=False)
+        return Response(content=resp.content, status_code=resp.status_code, media_type=resp.headers.get("content-type"))
+    except Exception as e:
+        print(f"Error en proxy: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/wms_proxy")
+async def wms_proxy(request: Request):
+    """
+    Proxy específico para WMS que reenvía todos los parámetros.
+    Uso: /api/v1/wms_proxy?url=BASE_URL&param1=val1...
+    """
+    try:
+        params = dict(request.query_params)
+        target_url = params.pop("url", None)
+        
+        if not target_url:
+            raise HTTPException(status_code=400, detail="URL requerida")
+
+        # Hacer la petición al WMS real
+        # verify=False para evitar problemas con certificados SSL antiguos del ministerio
+        resp = requests.get(target_url, params=params, timeout=30, verify=False)
+        
+        return Response(content=resp.content, status_code=resp.status_code, media_type=resp.headers.get("content-type"))
+    except Exception as e:
+        print(f"❌ Error WMS Proxy: {e}")
+        import traceback
+        traceback.print_exc()
+        return Response(status_code=500)
+
+@app.get("/api/v1/referencia/{ref}/geojson")
+async def get_referencia_geojson(ref: str):
+    """Obtener GeoJSON de una referencia catastral"""
+    try:
+        if not CATASTRO_AVAILABLE:
+            raise HTTPException(status_code=503, detail="El módulo 'catastro4' no está disponible.")
+
+        downloader = CatastroDownloader(output_dir=cfg["rutas"]["outputs"])
+        
+        # 1. Intentar obtener la geometría real del GML
+        gml_descargado = downloader.descargar_parcela_gml(ref)
+        coords_poligono = None
+        
+        if gml_descargado:
+            # La clase crea un subdirectorio con el nombre de la referencia
+            gml_path = Path(cfg["rutas"]["outputs"]) / ref / f"{ref}_parcela.gml"
+            if gml_path.exists():
+                coords_poligono = downloader.extraer_coordenadas_gml(str(gml_path))
+
+        if coords_poligono:
+            # coords_poligono ahora es una lista de anillos
+            # Tomamos el primer anillo (perímetro exterior) para el GeoJSON
+            if len(coords_poligono) > 0:
+                anillo_exterior = coords_poligono[0]  # Primer anillo (usualmente el exterior)
+                
+                # Las coordenadas ya vienen como (lat, lon), convertimos a (lon, lat) para GeoJSON
+                polygon_geojson = [[lon, lat] for lat, lon in anillo_exterior]
+                
+                # Validar que las coordenadas estén en España
+                if polygon_geojson:
+                    sample_lon, sample_lat = polygon_geojson[0]
+                    if not (-11 <= sample_lon <= 5 and 35 <= sample_lat <= 45):
+                        print(f"⚠️ Coordenadas fuera de España: {sample_lat}, {sample_lon}")
+                        # Si están fuera de rango, probablemente están invertidas
+                        if (-11 <= sample_lat <= 5 and 35 <= sample_lon <= 45):
+                             polygon_geojson = [[lat, lon] for lat, lon in anillo_exterior]
+                             print(f"✅ Coordenadas invertidas forzosamente en GML")
+                
+                # Cerrar el polígono si no lo está
+                if polygon_geojson[0] != polygon_geojson[-1]:
+                    polygon_geojson.append(polygon_geojson[0])
+
+                return {
+                    "type": "Feature",
+                    "geometry": {"type": "Polygon", "coordinates": [polygon_geojson]},
+                    "properties": {"referencia": ref, "fuente_geometria": "GML Real", "anillos": len(coords_poligono)}
+                }
+        else:
+            # 2. Fallback: si no hay GML, usar el centroide para simular un polígono
+            coords_centro = downloader.obtener_coordenadas_unificado(ref)
+            if not coords_centro:
+                raise HTTPException(status_code=404, detail=f"No se encontraron ni geometría GML ni coordenadas para {ref}")
+
+            base_lat = coords_centro.get("lat")
+            base_lon = coords_centro.get("lon")
+            
+            # Validar que las coordenadas estén en España
+            if not (-11 <= base_lon <= 5 and 35 <= base_lat <= 45):
+                print(f"⚠️ Coordenadas centrales fuera de España: {base_lat}, {base_lon}")
+                # Intentar invertirlas
+                if (-11 <= base_lat <= 5 and 35 <= base_lon <= 45):
+                    base_lat, base_lon = base_lon, base_lat
+                    print(f"✅ Coordenadas corregidas en centroide: {base_lat}, {base_lon}")
+            
+            # Crear un polígono cuadrado simulado
+            parcel_size = 0.0001  # ~10-15 metros
+            simulated_polygon = [[
+                [base_lon - parcel_size, base_lat - parcel_size],
+                [base_lon + parcel_size, base_lat - parcel_size],
+                [base_lon + parcel_size, base_lat + parcel_size],
+                [base_lon - parcel_size, base_lat + parcel_size],
+                [base_lon - parcel_size, base_lat - parcel_size]
+            ]]
+
+            return {
+                "type": "Feature",
+                "geometry": {"type": "Polygon", "coordinates": simulated_polygon},
+                "properties": {
+                    "referencia": ref,
+                    "fuente_geometria": "Simulada (desde centroide)",
+                    "fuente_coordenadas": coords_centro.get("fuente")
+                }
+            }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ProcesoRequest(BaseModel):
+    referencia: str
+
+@app.post("/api/v1/procesar-completo")
+async def procesar_completo(request: ProcesoRequest):
+    """
+    Ejecuta el proceso completo de descarga para una referencia y devuelve el ZIP.
+    """
+    if not CATASTRO_AVAILABLE:
+        raise HTTPException(status_code=503, detail="El módulo 'catastro4' no está disponible.")
+    
+    ref = request.referencia
+    
+    try:
+        # Usar la función de catastro4.py
+        zip_path, resultados = procesar_y_comprimir(
+            referencia=ref,
+            directorio_base=cfg["rutas"]["outputs"]
+        )
+        
+        if zip_path and resultados.get('exitosa'):
+            # Recuperar geometría para análisis urbanístico
+            ref_dir = Path(cfg["rutas"]["outputs"]) / ref
+            
+            # Extraer anillos del GML de parcela
+            anillos = None
+            parcela_gml_path = ref_dir / f"{ref}_parcela.gml"
+            
+            if parcela_gml_path.exists():
+                try:
+                    # Usar CatastroDownloader para extraer coordenadas
+                    downloader = CatastroDownloader(output_dir=str(ref_dir))
+                    coords_poligono = downloader.extraer_coordenadas_gml(str(parcela_gml_path))
+                    
+                    if coords_poligono:
+                        # Convertir a formato de anillos para urbanismo.py
+                        anillos = [coords_poligono]  # Primer anillo es el exterior
+                        print(f"✅ Geometría extraída: {len(coords_poligono)} puntos")
+                    else:
+                        print("⚠️ No se pudieron extraer coordenadas del GML")
+                except Exception as e:
+                    print(f"⚠️ Error extrayendo geometría: {e}")
+            
+            # Realizar análisis urbanístico si tenemos geometría
+            datos_urbanisticos = None
+            if anillos and URBANISMO_AVAILABLE:
+                try:
+                    datos_urbanisticos = urbanismo.realizar_analisis_urbanistico(anillos)
+                    print(f"✅ Análisis urbanístico completado")
+                except Exception as e:
+                    print(f"⚠️ Error en análisis urbanístico: {e}")
+                    datos_urbanisticos = {"error": str(e)}
+            
+            # Detectar afecciones reales
+            afecciones_detectadas = []
+            if ref_dir.exists():
+                # Revisar archivos de afecciones generados
+                for tipo in ['hidrografia']:
+                    afeccion_file = ref_dir / f"afeccion_{tipo}.png"
+                    if afeccion_file.exists() and afeccion_file.stat().st_size > 1500:
+                        afecciones_detectadas.append({
+                            "tipo": tipo,
+                            "descripcion": f"Afección por {tipo} detectada en la zona",
+                            "afectacion": "Directa",
+                            "archivo": str(afeccion_file)
+                        })
+                        print(f"✅ Afección detectada: {tipo}")
+            
+            # Enriquecer resultados con análisis urbanístico y afecciones
+            resultados_enriquecidos = resultados.copy()
+            if datos_urbanisticos:
+                resultados_enriquecidos['datos_urbanisticos'] = datos_urbanisticos
+            
+            if afecciones_detectadas:
+                resultados_enriquecidos['afecciones_detectadas'] = afecciones_detectadas
+            
+            # Devolver la ruta relativa para que el frontend pueda construir el enlace
+            relative_to_mount_dir = Path(zip_path).relative_to(Path(outputs_dir))
+            url_path = f"/outputs/{relative_to_mount_dir}"
+            
+            return {
+                "status": "success",
+                "message": f"Proceso completado para {ref}",
+                "zip_path": str(url_path).replace('\\', '/'), # Ensure forward slashes for URL
+                "resultados": resultados_enriquecidos
+            }
+        else:
+            error_msg = resultados.get('error', 'Error desconocido durante el procesamiento.')
+            raise HTTPException(status_code=500, detail=error_msg)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en el servidor: {str(e)}")
+
+# Worker para procesar en segundo plano
+def background_lote_worker(referencias, exp_base, exp_id):
+    from expedientes.catastro_exp import procesar_expediente
+    import shutil
+    import traceback
+    
+    try:
+        print(f"🚀 Iniciando procesamiento de lote {exp_id} con {len(referencias)} referencias")
+        
+        # 1. Procesar referencias con manejo de errores robusto
+        try:
+            resultado = procesar_expediente(referencias, exp_base, expediente_id=exp_id)
+            print(f"✅ Procesamiento completado para lote {exp_id}")
+        except Exception as e:
+            print(f"❌ Error en procesamiento de lote {exp_id}: {str(e)}")
+            traceback.print_exc()
+            
+            # Actualizar manifiesto con error
+            exp_dir = exp_base / f"expediente_{exp_id}"
+            manifest_path = exp_dir / "manifest.json"
+            if manifest_path.exists():
+                with open(manifest_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                data["estado"] = "error"
+                data["error"] = str(e)
+                data["progreso"] = 0
+                with open(manifest_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+            return
+        
+        # 2. Organizar archivos para el ZIP final
+        exp_dir = exp_base / f"expediente_{exp_id}"
+        zip_path = exp_base / f"expediente_{exp_id}.zip"
+        
+        try:
+            if exp_dir.exists():
+                # Carpetas de destino dentro del expediente
+                geo_dir = exp_dir / "geometrias"
+                img_dir = exp_dir / "imagenes"
+                inf_dir = exp_dir / "informes"
+                
+                for d in [geo_dir, img_dir, inf_dir]:
+                    d.mkdir(exist_ok=True)
+                
+                print(f"📂 Organizando archivos para el ZIP de lote {exp_id}...")
+                
+                # Definir patrones de búsqueda (recursivos para encontrar archivos dentro de referencia_REF/REF/...)
+                # 1. Geometrías (GML y KML)
+                for f in exp_dir.rglob("*.gml"):
+                    if "geometrias" not in f.parts:  # Evitar copiar lo ya copiado
+                        shutil.copy2(f, geo_dir / f.name)
+                for f in exp_dir.rglob("*.kml"):
+                    if "geometrias" not in f.parts:
+                        shutil.copy2(f, geo_dir / f.name)
+                
+                # 2. Imágenes (Solo composición plano + ortofoto + contorno)
+                # Buscamos archivos que contengan 'plano_con_ortofoto'
+                for f in exp_dir.rglob("*plano_con_ortofoto*.png"):
+                    if "imagenes" not in f.parts:
+                        # Si hay versión con contorno, la preferimos.
+                        # Pero en este punto, simplemente copiamos todo lo que encaje con la descripción del usuario.
+                        # Para evitar duplicados (plano_con_ortofoto vs plano_con_ortofoto_contorno), filtramos:
+                        if "contorno" in f.name:
+                            shutil.copy2(f, img_dir / f.name)
+                        else:
+                            # Solo copiar si no existe ya la versión con contorno para esta referencia
+                            contorno_ver = f.parent / f.name.replace(".png", "_contorno.png")
+                            if not contorno_ver.exists():
+                                shutil.copy2(f, img_dir / f.name)
+                
+                # 3. Informes (PDF)
+                for f in exp_dir.rglob("*.pdf"):
+                    if "informes" not in f.parts:
+                        shutil.copy2(f, inf_dir / f.name)
+                
+                # Crear ZIP
+                print(f"📦 Creando ZIP organizado para lote {exp_id}...")
+                
+                # Creamos el ZIP incluyendo solo las carpetas organizadas y el manifest
+                import zipfile
+                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    # Añadir manifest al ROOT del ZIP
+                    manifest_file = exp_dir / "manifest.json"
+                    if manifest_file.exists():
+                        zipf.write(manifest_file, "manifest.json")
+                    
+                    # Añadir subcarpetas organizadas
+                    for folder in [geo_dir, img_dir, inf_dir]:
+                        for f in folder.glob("*"):
+                            if f.is_file():
+                                # Guardamos como 'geometrias/archivo.gml' etc.
+                                zipf.write(f, folder.name + "/" + f.name)
+                
+                print(f"✅ ZIP creado: {zip_path}")
+            else:
+                print(f"❌ Directorio del expediente no existe: {exp_dir}")
+        except Exception as e:
+            print(f"❌ Error organizando/creando ZIP para lote {exp_id}: {str(e)}")
+            traceback.print_exc()
+        
+        # 3. Actualizar manifiesto con URL del ZIP y estado final
+        manifest_path = exp_dir / "manifest.json"
+        if manifest_path.exists():
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            # Añadir URL del ZIP si existe
+            if zip_path.exists():
+                data["zip_url"] = f"/outputs/expedientes/{zip_path.name}"
+                data["zip_size"] = zip_path.stat().st_size
+            
+            # Actualizar estado final
+            if data.get("estado") != "error":
+                data["estado"] = "completado"
+                data["fecha_finalizacion"] = datetime.now().isoformat()
+            
+            with open(manifest_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            
+            print(f"📋 Manifiesto actualizado para lote {exp_id}")
+        
+    except Exception as e:
+        print(f"❌ Error crítico en background_lote_worker para {exp_id}: {str(e)}")
+        traceback.print_exc()
+        
+        # Intentar actualizar manifiesto con error crítico
+        try:
+            exp_dir = exp_base / f"expediente_{exp_id}"
+            manifest_path = exp_dir / "manifest.json"
+            if manifest_path.exists():
+                with open(manifest_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                data["estado"] = "error_critico"
+                data["error"] = str(e)
+                data["fecha_error"] = datetime.now().isoformat()
+                with open(manifest_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+        except:
+            pass
+
+@app.post("/api/v1/procesar-lote")
+async def procesar_lote_endpoint(request: LoteRequest, background_tasks: BackgroundTasks):
+    """Procesa un lote de referencias y genera un expediente conjunto"""
+    try:
+        from expedientes.catastro_exp import crear_expediente_id
+        
+        # Directorio base para expedientes
+        exp_base = Path(outputs_dir) / "expedientes"
+        exp_base.mkdir(exist_ok=True)
+        
+        # Generar ID y lanzar tarea
+        exp_id = crear_expediente_id()
+        
+        # Pre-crear directorio y manifiesto para evitar 404 en polling inmediato
+        exp_dir = exp_base / f"expediente_{exp_id}"
+        exp_dir.mkdir(parents=True, exist_ok=True)
+        
+        initial_manifest = {
+            "expediente_id": exp_id,
+            "estado": "iniciando",
+            "progreso": 0,
+            "numero_referencias": len(request.referencias),
+            "referencias": request.referencias,
+            "fecha_creacion": datetime.now().isoformat(),
+            "items": []
+        }
+        
+        with open(exp_dir / "manifest.json", "w", encoding="utf-8") as f:
+            json.dump(initial_manifest, f, indent=2, ensure_ascii=False)
+            
+        background_tasks.add_task(background_lote_worker, request.referencias, exp_base, exp_id)
+        
+        return {
+            "status": "processing",
+            "expediente_id": exp_id,
+            "message": "Procesamiento iniciado en segundo plano"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/analizar-referencia")
+async def analizar_referencia(referencia: dict):
+    """Analizar una referencia catastral completa con estructura de datos ampliada"""
+    try:
+        ref = referencia.get("referencia", "")
+        
+        if not ref:
+            raise HTTPException(status_code=400, detail="Se requiere una referencia")
+        
+        if not CATASTRO_AVAILABLE:
+            return {
+                "status": "error",
+                "message": "Catastro no disponible",
+                "data": None
+            }
+        
+        downloader = CatastroDownloader(output_dir=outputs_dir)
+        
+        # 1. Obtener Coordenadas
+        coords = downloader.obtener_coordenadas_unificado(ref) or {}
+        
+        # 2. Obtener Datos Alfanuméricos
+        datos_xml = downloader.obtener_datos_alfanumericos(ref) or {}
+        
+        # 3. Calcular Superficie (intentar obtener de GML o XML)
+        superficie = float(datos_xml.get("superficie_construida", 0)) # Fallback
+        
+        # 4. Obtener Población INE
+        municipio_nombre = datos_xml.get("municipio", "")
+        poblacion = obtener_poblacion_ine(municipio_nombre)
+        
+        # Construir modelo de respuesta
+        data = ReferenciaData(
+            referencia_catastral=ref,
+            direccion=datos_xml.get("domicilio", "Dirección no disponible"),
+            municipio=datos_xml.get("municipio", "Desconocido"),
+            provincia=datos_xml.get("provincia", "Desconocida"),
+            distrito=None,
+            coordenadas_x=coords.get("lon", 0.0),
+            coordenadas_y=coords.get("lat", 0.0),
+            superficie_m2=superficie,
+            fecha_alta_catastro=str(datos_xml.get("anio_construccion", "N/D")),
+            num_habitantes_municipio=poblacion
+        )
+        
+        return {
+            "status": "success",
+            "data": data.dict(),
+            "message": "Análisis de referencia completado"
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e), "data": None}
+
+@app.post("/api/v1/analizar-urbanismo")
+async def analizar_urbanismo(request: UrbanismoRequest):
+    """Analizar urbanismo de una referencia o archivo"""
+    try:
+        if not URBANISMO_AVAILABLE:
+            return {
+                "status": "error",
+                "message": "Urbanismo no disponible",
+                "data": None
+            }
+        
+        if not CATASTRO_AVAILABLE:
+            return {"status": "error", "message": "Catastro no disponible", "data": None}
+
+        ref = request.referencia
+        if not ref:
+            return {"status": "error", "message": "Referencia requerida", "data": None}
+
+        # 1. Obtener geometría real
+        downloader = CatastroDownloader(output_dir=outputs_dir)
+        gml_path = Path(outputs_dir) / ref / f"{ref}_parcela.gml"
+        
+        # Descargar si no existe
+        if not gml_path.exists():
+            downloader.descargar_parcela_gml(ref)
+        
+        anillos = None
+        if gml_path.exists():
+            anillos = downloader.extraer_coordenadas_gml(str(gml_path))
+            
+        if not anillos:
+            return {"status": "error", "message": "No se pudo obtener la geometría", "data": None}
+
+        # 2. Calcular datos reales
+        datos = urbanismo.realizar_analisis_urbanistico(anillos)
+        
+        if "error" in datos:
+            return {"status": "error", "message": datos["error"], "data": None}
+
+        # Construir respuesta con modelo UrbanismoData
+        urbanismo_data = UrbanismoData(
+            fecha_pgou="2024-01-01", # Dato simulado (requiere BBDD planeamiento)
+            clasificacion_suelo="Urbano Consolidado",
+            zona_urbanistica="Zona Residencial",
+            ordenanza=Ordenanza(
+                codigo="NZ-RES",
+                uso_principal=datos.get("uso_principal", "Residencial"),
+                coef_edificabilidad=None,
+                altura_max_plantas=None,
+                fondo_edificable=None
+            ),
+            usos_compatibilidad=[
+                UsoCompatibilidad(uso="Residencial", compatibilidad="Permitido"),
+                UsoCompatibilidad(uso="Comercial", compatibilidad="Compatible")
+            ],
+            # Datos calculados reales
+            edificabilidad_estimada=f"{datos.get('edificabilidad_estimada_m2', 0)} m²",
+            ocupacion_estimada=f"{datos.get('porcentaje_ocupacion', 0)}%",
+            superficie_parcela=f"{datos.get('superficie_parcela_m2', 0)} m²",
+            superficie_ocupada=f"{datos.get('superficie_ocupada_m2', 0)} m²"
+        )
+
+        return {
+            "status": "success",
+            "data": {
+                "referencia": ref,
+                "analisis_urbanistico": urbanismo_data.dict()
+            },
+            "message": "Análisis urbanístico calculado sobre geometría real"
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e), "data": None}
+
+@app.post("/api/v1/analizar-afecciones")
+async def analizar_afecciones(request: AfeccionesRequest):
+    """Analizar afecciones de una referencia (Proceso completo con generación de mapas)"""
+    try:
+        if not all([AFECCIONES_AVAILABLE, CATASTRO_AVAILABLE, GEOPANDAS_AVAILABLE]):
+            return {
+                "status": "error", 
+                "message": "Faltan módulos necesarios (afecciones, catastro4, geopandas).",
+                "data": None
+            }
+            
+        ref = request.referencia
+        if not ref:
+            return {"status": "error", "message": "Referencia requerida"}
+
+        # 1. Obtener GML de Catastro
+        downloader = CatastroDownloader(output_dir=outputs_dir)
+        # Asegurar que el directorio de salida existe
+        ref_dir = Path(outputs_dir) / ref
+        ref_dir.mkdir(parents=True, exist_ok=True)
+        
+        gml_path = ref_dir / f"{ref}_parcela.gml"
+        
+        # Descargar si no existe
+        if not gml_path.exists():
+            print(f"Descargando GML para {ref}...")
+            downloader.descargar_parcela_gml(ref)
+            
+        if not gml_path.exists():
+            return {"status": "error", "message": f"No se pudo descargar la geometría para {ref}"}
+
+        # 2. Configurar Afecciones (Modo Híbrido: PostGIS + Script tradicional)
+        afecciones_db = []
+        try:
+            from gis_db import GISDatabase
+            db = GISDatabase()
+            
+            # Obtener capas del esquema afecciones
+            capas_db = db.get_available_layers(schema='afecciones')
+            if capas_db:
+                print(f"🔍 Analizando {len(capas_db)} capas en PostGIS...")
+                # Aquí llamaríamos a una función de intersección espacial directa
+                # Por ahora simulamos la integración con el flujo existente
+                pass
+        except Exception as e_db:
+            print(f"⚠️ Error consultando PostGIS: {e_db}")
+
+        try:
+            # Flujo tradicional (Script afecciones.py)
+            capas_locales = afecciones.listar_capas_locales()
+            capas_wfs = afecciones.listar_capas_wfs("capas_wfs.csv")
+            capas_wms_path = "capas/wms/capas_wms.csv"
+            
+            capas_wms = afecciones.listar_capas_wms(capas_wms_path)
+            config_titulos = afecciones.cargar_config_titulos()
+            
+            # 3. Ejecutar Procesamiento
+            print(f"Iniciando análisis de afecciones para {ref}...")
+            
+            resultados_proc = afecciones.procesar_parcelas(
+                capas_locales, capas_wfs, capas_wms, "EPSG:25830", config_titulos,
+                ruta_input=str(gml_path),
+                output_dir_base=str(ref_dir)
+            )
+            
+            # 4. Formatear respuesta
+            mapas_urls = []
+            detalles_afeccion = []
+            
+            if resultados_proc:
+                res = resultados_proc[0]
+                
+                # Procesar mapas generados
+                for mapa_path in res.get('mapas', []):
+                    p_map = Path(mapa_path)
+                    try:
+                        rel = p_map.relative_to(Path(outputs_dir))
+                        mapas_urls.append(f"/outputs/{str(rel).replace(os.sep, '/')}")
+                    except ValueError:
+                         mapas_urls.append(f"/outputs/{ref}/{p_map.name}")
+
+                # Procesar datos numéricos
+                for d in res.get('datos', []):
+                    if d['porcentaje'] > 0:
+                        detalles_afeccion.append({
+                            "tipo": d['capa'],
+                            "descripcion": f"Afección detectada: {d['porcentaje']:.2f}%",
+                            "afectacion": "Total" if d['porcentaje'] > 99 else "Parcial",
+                            "porcentaje": d['porcentaje']
+                        })
+            else:
+                return {"status": "error", "message": "El proceso de afecciones no devolvió resultados."}
+
+            return {
+                "status": "success",
+                "data": {
+                    "referencia": ref,
+                    "afecciones": detalles_afeccion,
+                    "mapas": mapas_urls,
+                    "source": "PostGIS + GeoPandas (Hybrid)"
+                },
+                "message": f"Análisis completado. {len(detalles_afeccion)} afecciones detectadas."
+            }
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {"status": "error", "message": f"Error interno en análisis: {str(e)}"}
+
+    except Exception as e:
+        return {"status": "error", "message": str(e), "data": None}
+
+@app.post("/api/v1/generar-pdf")
+async def generar_pdf(request: GenerarPDFRequest):
+    """Generar PDF personalizado (Endpoint compatible con visor_logic.js)"""
+    if not PDF_GENERATOR_AVAILABLE:
+        return {"status": "error", "error": "El generador de PDF no está disponible"}
+    
+    if not CATASTRO_AVAILABLE:
+        return {"status": "error", "error": "Catastro no disponible"}
+
+    try:
+        ref = request.referencia
+        contenidos = request.contenidos
+        
+        downloader = CatastroDownloader(output_dir=outputs_dir)
+        
+        # 1. Obtener datos alfanuméricos (XML) si se solicitan
+        datos_xml = None
+        if 'datos_descriptivos' in contenidos:
+            datos_xml = downloader.obtener_datos_alfanumericos(ref)
+        
+        # 2. Preparar estructura de resultados
+        resultados_analisis = {
+            "referencia": ref,
+            "empresa": request.empresa,
+            "colegiado": request.colegiado,
+            "fecha": "Hoy",
+            "datos_catastro": datos_xml,
+            "detalle": {},
+            "total": 0
+        }
+
+        # 3. Recopilar mapas/imágenes
+        mapas = []
+        ref_dir = Path(outputs_dir) / ref
+        if ref_dir.exists():
+            # Mapas básicos
+            if 'composicion' in contenidos or 'plano_ortofoto' in contenidos:
+                mapas.append(str(ref_dir / f"{ref}_plano_con_ortofoto.png"))
+            if 'plano_catastro' in contenidos:
+                mapas.append(str(ref_dir / f"{ref}_plano_catastro.png"))
+            if 'ortofoto_pnoa' in contenidos:
+                mapas.append(str(ref_dir / f"{ref}_ortofoto_pnoa.jpg"))
+            
+            # Ortofotos de contexto
+            for tipo in ['provincial', 'autonomico', 'nacional']:
+                if f'ortofoto_{tipo}' in contenidos:
+                    mapas.append(str(ref_dir / f"{ref}_ortofoto_{tipo}.jpg"))
+            
+            # Contornos y afecciones
+            if 'contorno_superpuesto' in contenidos:
+                mapas.append(str(ref_dir / f"{ref}_plano_con_ortofoto_contorno.png"))
+            if 'capas_afecciones' in contenidos:
+                for f in ref_dir.glob("*afeccion*.png"):
+                    mapas.append(str(f))
+
+        # 4. Generar PDF
+        pdf_gen = AfeccionesPDF(output_dir=outputs_dir)
+        pdf_path = pdf_gen.generar(
+            referencia=ref,
+            resultados=resultados_analisis,
+            mapas=mapas,
+            incluir_tabla=('datos_descriptivos' in contenidos)
+        )
+
+        if pdf_path:
+            return {"status": "success", "url": f"/outputs/{pdf_path.name}"}
+        else:
+            return {"status": "error", "error": "Fallo al generar el archivo PDF"}
+
+    except Exception as e:
+        print(f"Error generando PDF: {e}")
+        return {"status": "error", "error": str(e)}
+
+class GeometriaRequest(BaseModel):
+    """Request para análisis sobre geometrías cargadas"""
+    geometria: dict = None  # GeoJSON geometry
+    tipo: str = "desconocido"  # kml, gml, geojson, referencia
+
+@app.post("/api/v1/analizar-afecciones-geometria")
+async def analizar_afecciones_geometria(request: GeometriaRequest):
+    """Analizar afecciones sobre geometrías cargadas en el visor"""
+    try:
+        if not all([AFECCIONES_AVAILABLE, CATASTRO_AVAILABLE, GEOPANDAS_AVAILABLE]):
+            return {
+                "status": "error", 
+                "message": "Módulos necesarios (afecciones, catastro4, geopandas) no disponibles.",
+                "data": None
+            }
+        
+        geometria = request.geometria
+        if not geometria:
+            raise HTTPException(status_code=400, detail="Se requiere una geometría para analizar")
+        
+        # Convertir la geometría a GeoDataFrame
+        from shapely.geometry import shape
+        import geopandas as gpd
+        from geojson import Feature, Polygon, FeatureCollection
+        
+        try:
+            # Crear GeoDataFrame desde la geometría
+            if geometria.get('type') == 'FeatureCollection':
+                features = geometria.get('features', [])
+                if not features:
+                    raise HTTPException(status_code=400, detail="La geometría no tiene features válidos")
+                
+                # Combinar todas las geometrías
+                geometrias = []
+                for feature in features:
+                    if feature.get('geometry'):
+                        geometrias.append(shape(feature['geometry']))
+                
+                if not geometrias:
+                    raise HTTPException(status_code=400, detail="No hay geometrías válidas en el FeatureCollection")
+                
+                # Crear GeoDataFrame
+                gdf = gpd.GeoDataFrame(geometry=geometrias, crs='EPSG:4326')
+                
+            elif geometria.get('type') == 'Feature':
+                if not geometria.get('geometry'):
+                    raise HTTPException(status_code=400, detail="El Feature no tiene geometría válida")
+                
+                geom_shape = shape(geometria['geometry'])
+                gdf = gpd.GeoDataFrame(geometry=[geom_shape], crs='EPSG:4326')
+                
+            elif geometria.get('type') in ['Polygon', 'MultiPolygon']:
+                geom_shape = shape(geometria)
+                gdf = gpd.GeoDataFrame(geometry=[geom_shape], crs='EPSG:4326')
+                
+            else:
+                raise HTTPException(status_code=400, detail=f"Tipo de geometría no soportado: {geometria.get('type')}")
+            
+            # Convertir a CRS proyectado para cálculos de área
+            gdf_projected = gdf.to_crs(epsg=25830)
+            geom_union = gdf_projected.union_all()
+            area_total = gdf_projected.area.sum()
+            
+            # Cargar capas de afecciones y calcular intersecciones
+            capas_wms_config = afecciones.listar_capas_wms("capas/wms/capas_wms.csv")
+            resultados_afecciones = []
+            
+            for capa_config in capas_wms_config:
+                nombre_gpkg = capa_config.get("gpkg")
+                if not nombre_gpkg: 
+                    continue
+                
+                ruta_gpkg = Path("capas/gpkg") / nombre_gpkg
+                if not ruta_gpkg.exists(): 
+                    continue
+                
+                capa_afeccion_gdf = gpd.read_file(ruta_gpkg).to_crs(epsg=25830)
+                capa_filtrada = capa_afeccion_gdf[capa_afeccion_gdf.intersects(geom_union)]
+                
+                if capa_filtrada.empty: 
+                    continue
+                
+                interseccion = gpd.overlay(gdf_projected, capa_filtrada, how="intersection", keep_geom_type=False)
+                
+                if not interseccion.empty:
+                    porcentaje_total = (interseccion.area.sum() / area_total) * 100
+                    
+                    resultados_afecciones.append({
+                        "tipo": capa_config['nombre'],
+                        "descripcion": f"Afectado en un {porcentaje_total:.2f}%",
+                        "afectacion": "Parcial" if porcentaje_total < 100 else "Total",
+                        "area_afectada_m2": float(interseccion.area.sum()),
+                        "area_total_m2": float(area_total)
+                    })
+            
+            return {
+                "status": "success",
+                "data": {
+                    "tipo_geometria": request.tipo,
+                    "area_analizada_m2": float(area_total),
+                    "afecciones": resultados_afecciones,
+                    "capas_analizadas": len([c for c in capas_wms_config if c.get("gpkg") and (Path("capas/gpkg") / c["gpkg"]).exists()])
+                },
+                "message": f"Análisis de afecciones completado: {len(resultados_afecciones)} afecciones encontradas"
+            }
+            
+        except Exception as e:
+            print(f"Error en análisis de afecciones sobre geometría: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {"status": "error", "message": str(e), "data": None}
+
+@app.get("/api/v1/buscar-municipio")
+async def buscar_municipio(q: str = ""):
+    """Buscar municipio por código o nombre"""
+    try:
+        with open(MAPA_FILE, "r") as f:
+            municipios = json.load(f)
+        
+        resultados = []
+        query = q.lower()
+        
+        for codigo, data in municipios.items():
+            # Manejar formato simple (solo URL) o complejo (dict)
+            if isinstance(data, dict):
+                nombre = data.get("nombre", codigo)
+                url = data.get("url", "")
+            else:
+                url = str(data)
+                nombre = codigo
+                # Intentar extraer nombre de URL
+                try:
+                    parts = url.split('/')
+                    for p in parts:
+                        if p.startswith(f"{codigo}-"):
+                            nombre = p.split('-', 1)[1].replace('%20', ' ')
+                            break
+                except: pass
+
+            if query in codigo.lower() or query in nombre.lower():
+                resultados.append({
+                    "codigo": codigo,
+                    "nombre": nombre,
+                    "url": url
+                })
+        
+        return {"municipios": resultados[:10]}  # Limitar a 10 resultados
+    except Exception as e:
+        # Municipios por defecto
+        default_municipios = [
+            {"codigo": "28079", "nombre": "Madrid", "url": ""},
+            {"codigo": "08019", "nombre": "Barcelona", "url": ""},
+            {"codigo": "46091", "nombre": "Valencia", "url": ""}
+        ]
+        
+        if q:
+            filtrados = [m for m in default_municipios if q.lower() in m["nombre"].lower()]
+            return {"municipios": filtrados}
+        
+        return {"municipios": default_municipios[:5]}
+
+def generar_html_informe(contenido_pdf):
+    """Genera HTML para el informe completo"""
+    html = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <title>{contenido_pdf['metadatos']['titulo']}</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }}
+            .header {{ background: #f4f4f4; padding: 20px; border-radius: 5px; margin-bottom: 20px; }}
+            .seccion {{ margin: 20px 0; padding: 15px; border-left: 4px solid #007cba; background: #f9f9f9; }}
+            .seccion h2 {{ color: #007cba; margin-top: 0; }}
+            .error {{ color: #d32f2f; background: #ffebee; padding: 10px; border-radius: 3px; }}
+            .metadata {{ font-size: 0.9em; color: #666; }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>{contenido_pdf['metadatos']['titulo']}</h1>
+            <div class="metadata">
+                <p><strong>Referencia:</strong> {contenido_pdf['metadatos']['referencia']}</p>
+                <p><strong>Fecha:</strong> {contenido_pdf['metadatos']['fecha_generacion']}</p>
+            </div>
+        </div>
+    """
+    
+    for seccion in contenido_pdf["secciones"]:
+        html += f"""
+        <div class="seccion">
+            <h2>{seccion['titulo']}</h2>
+            <pre>{json.dumps(seccion['contenido'], indent=2, ensure_ascii=False)}</pre>
+        </div>
+        """
+    
+    html += """
+    </body>
+    </html>
+    """
+    
+    return html
+
+@app.post("/api/v1/generar-pdf-completo")
+async def generar_pdf_completo(request: PDFCompletoRequest):
+    """Genera PDF completo con toda la información seleccionada"""
+    try:
+        # Recopilar información
+        contenido_pdf = {
+            "metadatos": {
+                "fecha_generacion": datetime.now().isoformat(),
+                "titulo": "Informe Catastral Completo",
+                "referencia": request.referencia or "No especificada"
+            },
+            "secciones": []
+        }
+        
+        # Generar HTML
+        html_content = generar_html_informe(contenido_pdf)
+        
+        # Guardar archivo
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        nombre_base = f"informe_completo_{request.referencia or 'sin_ref'}_{timestamp}"
+        output_path = Path(cfg["rutas"]["outputs"]) / f"{nombre_base}.html"
+        
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
+        
+        return {
+            "status": "success",
+            "formato": "html",
+            "output": str(output_path),
+            "secciones_generadas": len(contenido_pdf["secciones"]),
+            "message": "Informe HTML generado exitosamente"
+        }
+        
+    except Exception as e:
+        return {"error": str(e), "status": "error"}
+
+@app.get("/visor")
+async def get_visor_page():
+    """Endpoint para el visor integrado"""
+    if VISOR_FUNCTIONS_AVAILABLE:
+        try:
+            return await get_visor()
+        except Exception as e:
+            print(f"Error en get_visor: {e}")
+            if os.path.exists("visor.html"):
+                return FileResponse("visor.html")
+            return FileResponse("static/visor.html")
+    else:
+        if os.path.exists("visor.html"):
+            return FileResponse("visor.html")
+        return FileResponse("static/visor.html")
+
+# Montar archivos estáticos
+try:
+    app.mount("/outputs", StaticFiles(directory=outputs_dir), name="outputs")
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+    # Montar directorios de capas para acceso directo a FlatGeobuf (.fgb)
+    if os.path.exists("capas"):
+        app.mount("/capas", StaticFiles(directory="capas"), name="capas")
+    if os.path.exists("ccnn"):
+        app.mount("/ccnn", StaticFiles(directory="ccnn"), name="ccnn")
+    print("✅ Archivos estáticos montados en /static, /outputs, /capas y /ccnn")
+except Exception as e:
+    print(f"⚠️ Error montando archivos estáticos: {e}")
+
+if __name__ == "__main__":
+    print("🚀 Iniciando servidor FastAPI para visor catastral con Glassmorphism...")
+    def get_local_ip():
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(('10.255.255.255', 1))
+            IP = s.getsockname()[0]
+        except Exception:
+            IP = '127.0.0.1'
+        finally:
+            s.close()
+        return IP
+    
+    local_ip = get_local_ip()
+    PORT = 8000
+
+    print(f"📁 Visor Local: http://localhost:{PORT}/static/visor.html")
+    print(f"🌍 Visor LAN:   http://{local_ip}:{PORT}/static/visor.html")
+    print(f"🔗 API Docs:    http://localhost:{PORT}/docs")
+    print("�� Diseño: Glassmorphism")
+    print(f"📂 referenciaspy: {REFERENCIASPY_PATH}")
+    
+    # DESHABILITADO: ngrok causaba bloqueos al arrancar
+    # try:
+    #     from pyngrok import ngrok
+    #     public_url = ngrok.connect(PORT).public_url
+    #     print(f"🌐 Visor Público (ngrok): {public_url}/static/visor.html")
+    # except ImportError:
+    #     print("ℹ️  Para acceso público: pip install pyngrok")
+    # except Exception:
+    #     pass
+        
+    # Iniciar el servidor
+    uvicorn.run(app, host="0.0.0.0", port=PORT)

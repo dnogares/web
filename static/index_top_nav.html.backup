@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Visor Catastral - Corporate</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.2.0/leaflet-omnivore.min.js'></script>
+    <style>
+        body { margin: 0; display: flex; flex-direction: column; height: 100vh; font-family: 'Helvetica Neue', sans-serif; background: #f4f4f4; }
+        
+        /* Top Nav */
+        .navbar { height: 60px; background: #003366; color: white; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; }
+        .navbar h1 { margin: 0; font-size: 1.4rem; flex: 1; }
+        .nav-items { display: flex; gap: 20px; }
+        .nav-item { cursor: pointer; opacity: 0.8; font-size: 0.9rem; }
+        .nav-item:hover { opacity: 1; text-decoration: underline; }
+
+        /* Layout */
+        .container { flex: 1; position: relative; display: flex; }
+        
+        /* Floating Left Panel */
+        .control-panel { position: absolute; top: 20px; left: 20px; width: 280px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); z-index: 1000; max-height: 90%; overflow-y: auto; }
+        .section { margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
+        .section:last-child { border-bottom: none; }
+        .section h4 { margin-top: 0; color: #003366; }
+
+        /* Inputs */
+        input[type="text"] { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 5px; box-sizing: border-box; }
+        button { background: #0055a5; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 5px; }
+        button:hover { background: #003366; }
+        
+        /* Map */
+        #map { flex: 1; height: 100%; z-index: 1; }
+
+        /* Right Floating Layers */
+        .layers-float { position: absolute; bottom: 30px; right: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1000; width: 180px; }
+        
+        /* Results */
+        .res-div { font-size: 0.8rem; color: #666; margin-top: 5px; background: #f9f9f9; padding: 5px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1><i class="fa-solid fa-globe"></i> GeoVisor Corporativo</h1>
+        <div class="nav-items">
+            <div class="nav-item" onclick="activarMedicion('distancia')"><i class="fa-solid fa-ruler"></i> Medir</div>
+            <div class="nav-item" onclick="limpiarMapa()"><i class="fa-solid fa-eraser"></i> Limpiar</div>
+            <div class="nav-item" onclick="mostrarDialogoPDF()"><i class="fa-solid fa-print"></i> Imprimir</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="control-panel">
+            <div class="section">
+                <h4>Búsqueda Catastral</h4>
+                <input type="text" id="ref-input" placeholder="Referencia (14/20 dígitos)">
+                <button onclick="cargarReferencia()">Localizar</button>
+                <div id="ref-results-checklist" class="res-div"></div>
+            </div>
+
+            <div class="section">
+                <h4>Análisis Urbanístico</h4>
+                <input type="file" id="file-urbanismo" style="font-size:0.8rem; margin-bottom:5px;">
+                <button onclick="analizarUrbanismo()">Ejecutar Análisis</button>
+                <div id="urbanismo-resultados" class="res-div"></div>
+            </div>
+
+            <div class="section">
+                <h4>Descarga Municipal</h4>
+                <input type="text" id="municipio-input" placeholder="Municipio">
+                <button onclick="buscarMunicipio()">Buscar ZIP</button>
+                <div id="municipio-resultados" class="res-div" style="display:block"></div>
+            </div>
+        </div>
+
+        <div id="map"></div>
+
+        <div class="layers-float">
+            <strong>Capas Visibles</strong><br><br>
+            <label><input type="checkbox" checked onchange="toggleBaseLayer('osm', this.checked)"> Mapa Base</label><br>
+            <label><input type="checkbox" onchange="toggleBaseLayer('satelite', this.checked)"> Satélite</label><br>
+            <hr>
+            <label><input type="checkbox" checked onchange="toggleLayer('catastro', this.checked)"> Catastro</label><br>
+            <label><input type="checkbox" onchange="toggleLayer('inundacion', this.checked)"> Inundabilidad</label><br>
+            <div style="margin-top:10px; font-size:0.8rem">
+                Opacidad Catastro:<br>
+                <input type="range" id="opacidad-catastro" style="width:100%">
+            </div>
+        </div>
+        
+        <div id="medicion-resultado" style="position:absolute; top:20px; right:60px; background:white; padding:5px 10px; border-radius:4px; z-index:1000; font-weight:bold; display:none;"></div>
+    </div>
+
+    <!-- Modal PDF simplificado -->
+    <div id="pdfDialog" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index:2000; justify-content:center; align-items:center;">
+        <div style="background:white; padding:40px; border:1px solid #ccc; box-shadow:0 10px 30px rgba(0,0,0,0.1); width:500px; text-align:center;">
+            <h2 style="color:#003366">Generar Informe</h2>
+            <p>Se generará un PDF con la vista actual y los datos cargados.</p>
+            <button onclick="generarPDFSeleccionado()" style="width:auto; padding:10px 30px;">Descargar PDF</button>
+            <button onclick="cerrarDialogoPDF()" style="width:auto; background:#999; margin-left:10px;">Cerrar</button>
+        </div>
+    </div>
+
+    <script src="js/visor_logic.js"></script>
+</body>
+</html>

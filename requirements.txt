@@ -1,0 +1,20 @@
+# Dependencias principales
+requests>=2.31.0
+requests-cache>=1.1.0
+Pillow>=10.0.0
+reportlab>=4.0.4
+
+# Interfaz gráfica
+ttkthemes>=3.2.2
+
+# Para crear EXE
+pyinstaller>=6.0.0
+
+# Para desarrollo
+black>=23.0.0
+pylint>=3.0.0
+
+# Dependencias geoespaciales para análisis
+geopandas>=0.14.0
+matplotlib>=3.8.0
+contextily>=1.5.0

@@ -1,0 +1,13 @@
+{
+  "output_dir": "descargas_catastro",
+  "template_html": "plantillas/informe_base.html",
+  "css_path": "plantillas/estilos_base.css",
+  "organize_by_type": false,
+  "generate_pdf": true,
+  "descargar_afecciones": true,
+  "theme": "arc",
+  "cache_hours": 1,
+  "max_workers": 3,
+  "ultimas_referencias": [],
+  "version": "2.0.0"
+}

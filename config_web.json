@@ -1,0 +1,24 @@
+{
+  "rutas": {
+    "capas_locales": "capas",
+    "outputs": "outputs",
+    "resultados": "resultados_analisis"
+  },
+  "servicios": {
+    "catastro_wfs": "https://www.catastro.minhap.es/cartografia/web",
+    "ign_pnoa": "https://www.ign.es/wms-inspire/pnoa-ma"
+  },
+  "analisis": {
+    "generar_pdf": true,
+    "incluir_ortofoto": true,
+    "incluir_afecciones": true,
+    "incluir_urbanismo": true
+  },
+  "database": {
+    "host": "192.168.1.138",
+    "port": "5432",
+    "user": "manuel",
+    "password": "Aa123456",
+    "dbname": "GIS"
+  }
+}

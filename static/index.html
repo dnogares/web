@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Catastral</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 40px;
+            font-size: 2.5rem;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .cards-wrapper {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .card {
+            background: white;
+            width: 300px;
+            height: 350px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            text-decoration: none;
+            color: inherit;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+        }
+
+        .icon-circle {
+            width: 100px;
+            height: 100px;
+            background: #eef2f5;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            transition: background 0.3s;
+        }
+
+        .card:hover .icon-circle {
+            background: #3498db;
+        }
+
+        .card:hover .icon-circle i {
+            color: white;
+        }
+
+        .icon-circle i {
+            font-size: 3rem;
+            color: #3498db;
+            transition: color 0.3s;
+        }
+
+        .card h2 {
+            font-size: 1.5rem;
+            color: #34495e;
+            margin: 0;
+        }
+
+        .card p {
+            color: #7f8c8d;
+            padding: 0 20px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        /* Specific Colors for Cards */
+        .card-urbanismo:hover .icon-circle { background: #e67e22; }
+        .card-urbanismo:hover .icon-circle i { color: white; }
+        .card-urbanismo .icon-circle i { color: #e67e22; }
+
+        .card-afecciones:hover .icon-circle { background: #27ae60; }
+        .card-afecciones:hover .icon-circle i { color: white; }
+        .card-afecciones .icon-circle i { color: #27ae60; }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Portal de Gestión Territorial</h1>
+        
+        <div class="cards-wrapper">
+            <!-- Tarjeta 1: Catastro -->
+            <a href="/catastro" class="card">
+                <div class="icon-circle">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                </div>
+                <h2>Catastro</h2>
+                <p>Visor catastral interactivo, consulta de parcelas y herramientas de medición.</p>
+            </a>
+
+            <!-- Tarjeta 2: Análisis Urbanístico -->
+            <a href="#" class="card card-urbanismo" onclick="alert('Módulo en desarrollo')">
+                <div class="icon-circle">
+                    <i class="fa-solid fa-city"></i>
+                </div>
+                <h2>Análisis Urbanístico</h2>
+                <p>Evaluación normativa, usos del suelo y planificación urbana.</p>
+            </a>
+
+            <!-- Tarjeta 3: Análisis Afecciones -->
+            <a href="#" class="card card-afecciones" onclick="alert('Módulo en desarrollo')">
+                <div class="icon-circle">
+                    <i class="fa-solid fa-layer-group"></i>
+                </div>
+                <h2>Análisis Afecciones</h2>
+                <p>Cruce con capas ambientales, riesgos y restricciones sectoriales.</p>
+            </a>
+        </div>
+    </div>
+
+</body>
+</html>

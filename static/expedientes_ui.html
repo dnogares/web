@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expedientes Catastro - UI</title>
+  <style>
+    body{font-family: Arial, sans-serif; background:#f4f5f7; margin:0; padding:20px;}
+    .card{background:white; border:1px solid #ddd; border-radius:8px; padding:16px; margin-bottom:16px; box-shadow:0 2px 6px rgba(0,0,0,.05)}
+    label{display:block; font-weight:600; margin:6px 0}
+    input[type=text], textarea{width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;}
+    button{padding:10px 14px; border-radius:6px; border:0; background:#2d7bd3; color:white; cursor:pointer; font-weight:600}
+    button.secondary{ background:#8a8a8a }
+    #output{ white-space:pre-wrap; background:#fff; border:1px solid #ddd; padding:10px; border-radius:6px; min-height:100px; }
+  </style>
+</head>
+<body>
+  <h1>Expedientes Catastro – UI</h1>
+
+  <div class="card" id="solo-form">
+    <h3>Crear expediente (una referencia)</h3>
+    <label for="ref">Referencia catastral</label>
+    <input type="text" id="ref" placeholder="ABC123"/>
+    <button onclick="crearUno();">Crear expediente</button>
+  </div>
+
+  <div class="card" id="batch-form">
+    <h3>Crear expediente (lote desde CSV/TXT)</h3>
+    <label for="batch">Referencias (una por línea, o CSV):</label>
+    <textarea id="batch" rows="6" placeholder="ABC123\nDEF456"></textarea>
+    <button onclick="crearLote();">Crear expediente de lote</button>
+  </div>
+
+  <div class="card">
+    <h3>Expediente actual</h3>
+    <div id="expediente-lista">Cargando expedientes...</div>
+  </div>
+
+  <div class="card" id="pdf-panel" style="display:none">
+    <h3>Generar PDF completo</h3>
+    <label for="pdf-id">ID de Expediente</label>
+    <input type="text" id="pdf-id" placeholder="EXP-XXX"/>
+    <label>Contenidos a incluir</label>
+    <div>
+      <label><input type="checkbox" value="datos"/> Datos</label>
+      <label><input type="checkbox" value="kml"/> KML</label>
+      <label><input type="checkbox" value="informe"/> Informe</label>
+    </div>
+    <button onclick="generarPDFCompleto();">Generar PDF completo</button>
+    <div id="pdf-result" style="margin-top:8px"></div>
+  </div>
+
+  <script>
+    const apiBase = '/api/v1';
+    async function postJson(url, data){
+      const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)});
+      return r.json().then(j=>({ok: r.ok, status: r.status, json: j}));
+    }
+    async function crearUno(){
+      const ref = document.getElementById('ref').value.trim();
+      if(!ref){ alert('Ingrese una referencia'); return; }
+      const res = await postJson(apiBase+"/expedientes/crear", {referencia: ref});
+      showResp(res);
+    }
+    async function crearLote(){
+      const data = document.getElementById('batch').value;
+      const res = await postJson(apiBase+"/expedientes/crear", {archivo_csv: data});
+      showResp(res);
+    }
+    function showResp(res){
+      const out = document.getElementById('expediente-lista');
+      if(res.ok){
+        out.textContent = JSON.stringify(res.json, null, 2);
+        // mostrar panel de PDF si corresponde
+        document.getElementById('pdf-panel').style.display = 'block';
+      } else {
+        out.textContent = 'Error: '+res.status+' '+JSON.stringify(res.json);
+      }
+    }
+    async function generarPDFCompleto(){
+      const id = document.getElementById('pdf-id').value.trim();
+      const conts = Array.from(document.querySelectorAll('#pdf-panel input[type=checkbox]')).filter(cb=>cb.checked).map(cb=>cb.value);
+      if(!id){ alert('Ingrese el ID de expediente'); return; }
+      const payload = { contenidos: conts };
+      const r = await fetch(`/api/v1/expedientes/${encodeURIComponent(id)}/generar-pdf-completo`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      const data = await r.json();
+      const div = document.getElementById('pdf-result');
+      if(r.ok){ div.textContent = 'PDF generado en: ' + data.pdf_path; } else { div.textContent = 'Error: '+r.status+' '+JSON.stringify(data); }
+    }
+    async function cargarExpedientes(){
+      try{
+        const r = await fetch('/api/v1/expedientes');
+        const data = await r.json();
+        document.getElementById('expediente-lista').textContent = JSON.stringify(data, null, 2);
+      }catch(e){ document.getElementById('expediente-lista').textContent = 'No se pudo cargar expedientes'; }
+    }
+    // Cargar al inicio
+    window.onload = cargarExpedientes;
+  </script>
+</body>
+</html>
