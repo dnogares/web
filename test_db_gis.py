@@ -14,8 +14,8 @@ def test_db():
     print("✅ Conexión establecida correctamente.")
     
     # Listar tablas disponibles
-    layers = db.get_available_layers("afecciones")
-    print(f"📊 Capas encontradas en esquema 'afecciones': {len(layers)}")
+    layers = db.get_available_layers(schemas=["capas", "public"])
+    print(f"📊 Capas encontradas en esquemas 'capas' y 'public': {len(layers)}")
     if layers:
         print(f"   Primeras 5: {layers[:5]}")
     

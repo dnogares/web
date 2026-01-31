@@ -328,7 +328,7 @@ async def root():
 @app.get("/catastro")
 async def visor_catastro():
     """Visor Catastral"""
-    return FileResponse("static/catastro.html")
+    return FileResponse("static/2catastro.html")
 
 @app.get("/urbanismo")
 async def visor_urbanismo():
@@ -400,7 +400,8 @@ async def get_capas_disponibles():
         if not db_gis.test_connection():
              return {"status": "success", "message": "Conectado a GIS (Simulado para pruebas o BD vacía)", "capas": []}
              
-        layers = db_gis.get_available_layers(schema="afecciones")
+        # Consultar esquemas 'capas' y 'public'
+        layers = db_gis.get_available_layers(schemas=["capas", "public"])
         return {"status": "success", "capas": layers}
     except Exception as e:
         print(f"Error en capas-disponibles: {e}")
@@ -410,7 +411,7 @@ async def get_capas_disponibles():
 async def get_layer_data(layer_name: str, bbox: Optional[str] = Query(None)):
     """
     Obtener GeoJSON de una capa PostGIS.
-    Filtra por BBOX si se proporciona (formato: minx,miny,maxx,maxy).
+    Soporta formato 'schema.table' o 'table' (busca en esquemas por defecto).
     """
     try:
         if not GIS_DB_AVAILABLE or db_gis is None:
@@ -420,6 +421,23 @@ async def get_layer_data(layer_name: str, bbox: Optional[str] = Query(None)):
              raise HTTPException(status_code=500, detail="No se pudo acceder al motor de base de datos")
         
         db = db_gis # Usar la instancia global
+        
+        # Determinar esquema y tabla
+        if "." in layer_name:
+            schema_name, table_name = layer_name.split(".", 1)
+        else:
+            # Por defecto intentar 'capas', luego 'public'
+            # Para evitar SQL injection y errores, idealmente verificaríamos existencia,
+            # pero por rendimiento asumiremos 'capas' si no se especifica, o probamos.
+            # Estrategia segura: Si no tiene punto, buscar en metadata primero o intentar queries.
+            # Vamos a intentar 'capas' por defecto como solicitó el usuario.
+            schema_name = "capas"
+            table_name = layer_name
+            
+            # Verificar si existe en 'capas', si no, probar 'public'
+            # Esto es costoso por request. 
+            # Mejor: Asumir que el frontend envía el nombre completo si usó get_capas_disponibles.
+            # Si envía nombre corto, asumimos 'capas' como principal.
         
         params = {}
         where_clause = ""
@@ -432,11 +450,14 @@ async def get_layer_data(layer_name: str, bbox: Optional[str] = Query(None)):
             except (ValueError, IndexError):
                 raise HTTPException(status_code=400, detail="Formato de BBOX inválido")
 
-        # Seleccionamos transformando a 4326 directamente en la base de datos (MUCHO más rápido que en Python)
-        # Reducimos el límite a 3000 para balancear carga/detalle
+        # SQL dinámico pero controlado (schema_name y table_name vienen de lógica interna o split)
+        # Importante: Validar caracteres para evitar SQL Injection básico
+        if not all(c.isalnum() or c in "_-" for c in table_name) or not all(c.isalnum() or c in "_" for c in schema_name):
+             raise HTTPException(status_code=400, detail="Nombre de capa o esquema inválido")
+
         sql = text(f"""
             SELECT *, ST_Transform(geom, 4326) as geom_wgs84 
-            FROM afecciones.{layer_name} 
+            FROM {schema_name}.{table_name} 
             {where_clause} 
             LIMIT 3000
         """)
@@ -1579,10 +1600,11 @@ if __name__ == "__main__":
         return IP
     
     local_ip = get_local_ip()
-    PORT = 8000
+    # Usar puerto 80 si está en EasyPanel/Docker, o 8000 en local
+    PORT = int(os.environ.get("PORT", 8000))
 
-    print(f"📁 Visor Local: http://localhost:{PORT}/static/visor.html")
-    print(f"🌍 Visor LAN:   http://{local_ip}:{PORT}/static/visor.html")
+    print(f"📁 Visor Local: http://localhost:{PORT}/catastro")
+    print(f"🌍 Visor LAN:   http://{local_ip}:{PORT}/catastro")
     print(f"🔗 API Docs:    http://localhost:{PORT}/docs")
     print("�� Diseño: Glassmorphism")
     print(f"📂 referenciaspy: {REFERENCIASPY_PATH}")
