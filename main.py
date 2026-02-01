@@ -863,41 +863,8 @@ async def get_referencia_geojson(ref: str):
                     "properties": {"referencia": ref, "fuente_geometria": "GML Real", "anillos": len(coords_poligono)}
                 }
         else:
-            # 2. Fallback: si no hay GML, usar el centroide para simular un polígono
-            coords_centro = downloader.obtener_coordenadas_unificado(ref)
-            if not coords_centro:
-                raise HTTPException(status_code=404, detail=f"No se encontraron ni geometría GML ni coordenadas para {ref}")
-
-            base_lat = coords_centro.get("lat")
-            base_lon = coords_centro.get("lon")
-            
-            # Validar que las coordenadas estén en España
-            if not (-11 <= base_lon <= 5 and 35 <= base_lat <= 45):
-                print(f"⚠️ Coordenadas centrales fuera de España: {base_lat}, {base_lon}")
-                # Intentar invertirlas
-                if (-11 <= base_lat <= 5 and 35 <= base_lon <= 45):
-                    base_lat, base_lon = base_lon, base_lat
-                    print(f"✅ Coordenadas corregidas en centroide: {base_lat}, {base_lon}")
-            
-            # Crear un polígono cuadrado simulado
-            parcel_size = 0.0001  # ~10-15 metros
-            simulated_polygon = [[
-                [base_lon - parcel_size, base_lat - parcel_size],
-                [base_lon + parcel_size, base_lat - parcel_size],
-                [base_lon + parcel_size, base_lat + parcel_size],
-                [base_lon - parcel_size, base_lat + parcel_size],
-                [base_lon - parcel_size, base_lat - parcel_size]
-            ]]
-
-            return {
-                "type": "Feature",
-                "geometry": {"type": "Polygon", "coordinates": simulated_polygon},
-                "properties": {
-                    "referencia": ref,
-                    "fuente_geometria": "Simulada (desde centroide)",
-                    "fuente_coordenadas": coords_centro.get("fuente")
-                }
-            }
+            # Sin GML: devolver error para que el frontend muestre mensaje claro
+            raise HTTPException(status_code=404, detail=f"No hay geometría GML disponible para la referencia {ref}")
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

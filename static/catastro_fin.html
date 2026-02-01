@@ -1323,13 +1323,15 @@
 
             // 1. Cargar contorno
             try {
-                var res = await fetch(`/api/v1/referencia/${ref}/geojson`, { signal: busquedaController.signal });
-                var data = await res.json();
-
-                // Verificar si hay error en la respuesta
-                if (data.status === 'error') {
-                    throw new Error(data.error);
+                var res = await fetch(`/api/v1/referencia/${ref}/geojson`);
+                if (!res.ok) {
+                    if (res.status === 404) {
+                        throw new Error('No hay geometría GML disponible para esta referencia. El contorno no se puede mostrar.');
+                    }
+                    const errorData = await res.json();
+                    throw new Error(errorData.detail || 'Error al cargar la geometría');
                 }
+                var data = await res.json();
 
                 loadedLayer.clearLayers();
                 var layer = L.geoJSON(data, { style: redStyle }).addTo(loadedLayer);
