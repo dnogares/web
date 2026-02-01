@@ -563,8 +563,12 @@
 
     <!-- CENTRO: MAPA -->
     <div class="center-panel">
+        <!-- Panel de información de parcela -->
+        <div class="right-box" id="parcel-info" style="display:none; position: absolute; top: 20px; right: 20px; z-index: 1000; background: rgba(255,255,255,0.95); padding: 15px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); max-width: 300px;"></div>
+        
         <div id="map-container">
             <div class="map-toolbar">
+                <button class="tool-btn" id="catastro-toggle" onclick="toggleCatastroLayer()" title="Activar/Desactivar Catastro" style="background: #2c3e50; color: white;"><i class="fa-solid fa-map"></i></button>
                 <button class="tool-btn" onclick="activarMedicion('distancia')" title="Medir Distancia"><i class="fa-solid fa-ruler"></i></button>
                 <button class="tool-btn" onclick="activarMedicion('area')" title="Medir Área"><i class="fa-solid fa-draw-polygon"></i></button>
                 <button class="tool-btn danger" onclick="limpiarMapa()" title="Limpiar Mapa"><i class="fa-solid fa-trash"></i></button>
@@ -1130,6 +1134,23 @@
         function isCatastroActivo() {
             const cb = document.getElementById('layer-catastro');
             return cb ? cb.checked : map.hasLayer(layers.catastro);
+        }
+
+        function toggleCatastroLayer() {
+            const btn = document.getElementById('catastro-toggle');
+            const isActive = map.hasLayer(layers.catastro);
+            
+            if (isActive) {
+                map.removeLayer(layers.catastro);
+                btn.style.background = 'white';
+                btn.style.color = '#444';
+            } else {
+                map.addLayer(layers.catastro);
+                btn.style.background = '#2c3e50';
+                btn.style.color = 'white';
+            }
+            
+            actualizarPanelParcela();
         }
 
         function actualizarPanelParcela() {
@@ -1771,6 +1792,19 @@
         // --- HERRAMIENTAS DE MEDICIÓN ---
         map.on('zoomend', updateLayersVisibility); // Actualizar capas al cambiar el zoom
         updateLayersVisibility(); // Llamada inicial para el estado correcto
+
+        // Inicializar mapa
+        map.whenReady(function() {
+            // Activar capa de catastro por defecto
+            if (layers.catastro) {
+                map.addLayer(layers.catastro);
+                const btn = document.getElementById('catastro-toggle');
+                if (btn) {
+                    btn.style.background = '#2c3e50';
+                    btn.style.color = 'white';
+                }
+            }
+        });
 
         // Actualizar botones CAD
         function updateCadButtons() {
