@@ -869,6 +869,9 @@ async def get_referencia_geojson(ref: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class LoteRequest(BaseModel):
+    referencias: List[str]
+
 class ProcesoRequest(BaseModel):
     referencia: str
 
@@ -961,6 +964,229 @@ async def procesar_completo(request: ProcesoRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en el servidor: {str(e)}")
+
+@app.post("/api/v1/procesar-lote")
+async def procesar_lote(request: LoteRequest):
+    """
+    Procesa un lote de referencias como una unidad unificada:
+    - Un XML con información de todas las referencias
+    - Todos los GML juntos en la misma vista
+    - ZIP con carpetas organizadas (documentos, geometrías, imágenes, etc.)
+    """
+    if not CATASTRO_AVAILABLE:
+        raise HTTPException(status_code=503, detail="El módulo 'catastro4' no está disponible.")
+    
+    referencias = request.referencias
+    if not referencias:
+        raise HTTPException(status_code=400, detail="No se proporcionaron referencias")
+    
+    # Generar ID único para el lote
+    lote_id = f"lote_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(referencias)}refs"
+    lote_dir = Path(cfg["rutas"]["outputs"]) / lote_id
+    lote_dir.mkdir(exist_ok=True)
+    
+    print(f"🚀 Iniciando procesamiento de lote {lote_id} con {len(referencias)} referencias")
+    
+    try:
+        # 1. Procesar cada referencia individualmente
+        todas_geometrias = []
+        resultados_individuales = []
+        xml_datos = []
+        
+        for i, ref in enumerate(referencias):
+            print(f"📋 Procesando referencia {i+1}/{len(referencias)}: {ref}")
+            
+            try:
+                # Procesar referencia individual
+                zip_path, resultados = procesar_y_comprimir(
+                    referencia=ref,
+                    directorio_base=str(lote_dir)
+                )
+                
+                if zip_path and resultados.get('exitosa'):
+                    # Extraer geometría
+                    ref_dir = lote_dir / ref
+                    parcela_gml_path = ref_dir / f"{ref}_parcela.gml"
+                    
+                    if parcela_gml_path.exists():
+                        try:
+                            downloader = CatastroDownloader(output_dir=str(ref_dir))
+                            coords_poligono = downloader.extraer_coordenadas_gml(str(parcela_gml_path))
+                            
+                            if coords_poligono:
+                                # Añadir a la lista de geometrías combinadas
+                                for j, anillo in enumerate(coords_poligono):
+                                    todas_geometrias.append({
+                                        'referencia': ref,
+                                        'anillo': j,
+                                        'coordenadas': anillo
+                                    })
+                                
+                                # Añadir datos para XML
+                                xml_datos.append({
+                                    'referencia': ref,
+                                    'geometria': coords_poligono,
+                                    'resultados': resultados
+                                })
+                                
+                                print(f"✅ Geometría extraída para {ref}: {len(coords_poligono)} anillos")
+                            else:
+                                print(f"⚠️ No se pudieron extraer coordenadas del GML para {ref}")
+                        except Exception as e:
+                            print(f"⚠️ Error extrayendo geometría para {ref}: {e}")
+                    
+                    resultados_individuales.append({
+                        'referencia': ref,
+                        'exitosa': True,
+                        'resultados': resultados
+                    })
+                else:
+                    resultados_individuales.append({
+                        'referencia': ref,
+                        'exitosa': False,
+                        'error': resultados.get('error', 'Error desconocido')
+                    })
+                    
+            except Exception as e:
+                print(f"❌ Error procesando referencia {ref}: {e}")
+                resultados_individuales.append({
+                    'referencia': ref,
+                    'exitosa': False,
+                    'error': str(e)
+                })
+        
+        # 2. Crear XML unificado
+        xml_content = crear_xml_unificado(xml_datos, lote_id)
+        xml_path = lote_dir / f"{lote_id}_informacion.xml"
+        with open(xml_path, 'w', encoding='utf-8') as f:
+            f.write(xml_content)
+        
+        # 3. Crear GeoJSON combinado para visualización
+        geojson_combinado = crear_geojson_combinado(todas_geometrias)
+        geojson_path = lote_dir / f"{lote_id}_geometrias_combinadas.geojson"
+        with open(geojson_path, 'w', encoding='utf-8') as f:
+            json.dump(geojson_combinado, f, ensure_ascii=False, indent=2)
+        
+        # 4. Organizar carpetas del ZIP final
+        zip_final_path = organizar_zip_lote(lote_dir, lote_id, referencias, resultados_individuales)
+        
+        return {
+            "status": "success",
+            "message": f"Lote procesado: {len(referencias)} referencias",
+            "lote_id": lote_id,
+            "zip_path": f"/outputs/{lote_id}/{lote_id}.zip".replace('\\', '/'),
+            "geometrias_combinadas": len(todas_geometrias),
+            "resultados": resultados_individuales,
+            "geojson_url": f"/outputs/{lote_id}/{lote_id}_geometrias_combinadas.geojson".replace('\\', '/')
+        }
+        
+    except Exception as e:
+        print(f"❌ Error en procesamiento de lote: {e}")
+        raise HTTPException(status_code=500, detail=f"Error procesando lote: {str(e)}")
+
+def crear_xml_unificado(datos_xml, lote_id):
+    """Crear XML unificado con información de todas las referencias"""
+    xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<lote_catastral id="{lote_id}" fecha_generacion="{datetime.now().isoformat()}">
+    <metadatos>
+        <total_referencias>{len(datos_xml)}</total_referencias>
+        <fecha_procesamiento>{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</fecha_procesamiento>
+    </metadatos>
+    <referencias>"""
+    
+    for dato in datos_xml:
+        xml_content += f"""
+        <referencia>
+            <codigo>{dato['referencia']}</codigo>
+            <geometria>
+                <anillos>{len(dato['geometria'])}</anillos>
+            </geometria>
+        </referencia>"""
+    
+    xml_content += """
+    </referencias>
+</lote_catastral>"""
+    
+    return xml_content
+
+def crear_geojson_combinado(geometrias):
+    """Crear GeoJSON con todas las geometrías combinadas"""
+    features = []
+    
+    for geom in geometrias:
+        # Convertir coordenadas de (lat, lon) a (lon, lat) para GeoJSON
+        coords = [[lon, lat] for lat, lon in geom['coordenadas']]
+        
+        feature = {
+            "type": "Feature",
+            "properties": {
+                "referencia": geom['referencia'],
+                "anillo": geom['anillo'],
+                "tipo": "parcela_catastral"
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [coords]
+            }
+        }
+        features.append(feature)
+    
+    return {
+        "type": "FeatureCollection",
+        "features": features
+    }
+
+def organizar_zip_lote(lote_dir, lote_id, referencias, resultados):
+    """Organizar carpetas y crear ZIP final del lote"""
+    import zipfile
+    import shutil
+    
+    # Crear estructura de carpetas
+    carpetas = {
+        'documentos': [],
+        'geometrias': [],
+        'imagenes': [],
+        'informes': [],
+        'individuales': []
+    }
+    
+    # Mover archivos a carpetas correspondientes
+    for ref in referencias:
+        ref_dir = lote_dir / ref
+        if ref_dir.exists():
+            # Mover a individuales
+            destino_individual = lote_dir / 'individuales' / ref
+            if destino_individual.exists():
+                shutil.rmtree(destino_individual)
+            shutil.move(str(ref_dir), str(destino_individual))
+    
+    # Crear ZIP final
+    zip_path = lote_dir / f"{lote_id}.zip"
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for item in lote_dir.rglob('*'):
+            if item.is_file() and item != zip_path:
+                arc_path = item.relative_to(lote_dir)
+                zipf.write(item, arc_path)
+    
+    return str(zip_path)
+
+@app.get("/api/v1/logs")
+async def get_logs():
+    """
+    Endpoint para obtener logs del servidor (compatibilidad con visor)
+    """
+    # Simular logs para compatibilidad con el visor
+    mock_logs = [
+        f"Servidor iniciado - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "Módulo catastro4 cargado correctamente",
+        "Conexión GIS establecida",
+        "Sistema listo para procesar solicitudes"
+    ]
+    
+    return {
+        "status": "success",
+        "logs": mock_logs
+    }
 
 # Worker para procesar en segundo plano
 def background_lote_worker(referencias, exp_base, exp_id):

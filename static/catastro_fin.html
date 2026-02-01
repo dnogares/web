@@ -102,16 +102,7 @@
             transform: scale(1.05);
         }
 
-        /* --- COLUMNA DERECHA: CAPAS --- */
-        .right-panel {
-            inline-size: 250px;
-            background: white;
-            border-inline-start: 1px solid #ccc;
-            padding: 20px;
-            overflow-y: auto;
-            box-shadow: -2px 0 5px rgba(0,0,0,0.05);
-            z-index: 10;
-        }
+        /* --- COLUMNA DERECHA: ELIMINADA --- */
 
         .layer-group {
             margin-block-end: 25px;
@@ -542,8 +533,7 @@
                 <button class="action-btn" style="inline-size: auto; margin-block-start: 0; padding: 0 12px;" onclick="buscarMunicipio()"><i class="fa-solid fa-magnifying-glass"></i></button>
             </div>
             <div id="municipio-resultados" style="margin-block-start: 10px; font-size: 0.85rem; max-block-size: 150px; overflow-y: auto;"></div>
-            <div style="text-align: end; margin-block-start: 5px;"><small><a href="#" onclick="verLogsServidor(); return false;" style="color: #3498db;">Ver logs del servidor</a></small></div>
-        </div>
+                    </div>
 
         <div class="module">
             <h3><i class="fa-solid fa-city"></i> Análisis Urbanístico</h3>
@@ -585,87 +575,7 @@
         <button class="center-btn" onclick="centrarMapa()"><i class="fa-solid fa-crosshairs"></i> Centrar Vista</button>
     </div>
 
-    <!-- DERECHA: CAPAS -->
-    <div class="right-panel">
-        <div class="right-box" id="parcel-info" style="display:none;"></div>
-
-        <div class="right-box" id="legend-panel">
-            <h4><i class="fa-solid fa-map"></i> Leyenda</h4>
-            <div id="legend-content" style="font-size: 0.85rem; color:#666;">Selecciona una capa para ver su leyenda.</div>
-        </div>
-
-        <details class="layer-accordion" open>
-            <summary>Mapas base</summary>
-            <div class="accordion-body">
-                <div class="layer-item">
-                    <input type="checkbox" checked onchange="toggleBaseLayer('osm', this.checked)"> OSM (Callejero)
-                </div>
-                <div class="layer-item">
-                    <input type="checkbox" onchange="toggleBaseLayer('satelite', this.checked)"> Satélite (Google)
-                </div>
-            </div>
-        </details>
-
-        <details class="layer-accordion" open>
-            <summary>Catastro y urbanismo</summary>
-            <div class="accordion-body">
-                <div class="layer-item">
-                    <input type="checkbox" id="layer-catastro" checked onchange="toggleLayer('catastro', this.checked)"> Catastro
-                </div>
-                <div class="layer-item">
-                    <input type="checkbox" id="layer-inundacion" onchange="toggleLayer('inundacion', this.checked)"> Inundabilidad
-                </div>
-                <div class="layer-item">
-                    <input type="checkbox" id="layer-siose" onchange="toggleLayer('siose', this.checked)"> SIOSE (Usos del suelo)
-                </div>
-                <div class="layer-item">
-                    <input type="checkbox" id="layer-calificacion" onchange="toggleLayer('calificacion', this.checked)"> Calificación urbanística
-                </div>
-            </div>
-        </details>
-
-        <details class="layer-accordion">
-            <summary>Capas locales</summary>
-            <div class="accordion-body">
-                <div class="layer-item" style="font-size: 0.8rem; color:#666; margin-block-end: 6px;">/app/capas</div>
-                <div id="dynamic-layers-container">
-                    <div style="font-size:0.8rem; color:#666;">Cargando...</div>
-                </div>
-            </div>
-        </details>
-
-        <details class="layer-accordion">
-            <summary>Riesgos hídricos</summary>
-            <div class="accordion-body">
-                <div class="layer-item"><input type="checkbox" id="layer-t10" onchange="toggleLayer('t10', this.checked)"> T10 (10 años)</div>
-                <div class="layer-item"><input type="checkbox" id="layer-t100" onchange="toggleLayer('t100', this.checked)"> T100 (100 años)</div>
-                <div class="layer-item"><input type="checkbox" id="layer-t500" onchange="toggleLayer('t500', this.checked)"> T500 (500 años)</div>
-            </div>
-        </details>
-
-        <details class="layer-accordion">
-            <summary>Medio ambiente</summary>
-            <div class="accordion-body">
-                <div class="layer-item"><input type="checkbox" id="layer-natura" onchange="toggleLayer('natura', this.checked)"> Red Natura 2000</div>
-                <div class="layer-item"><input type="checkbox" id="layer-vias" onchange="toggleLayer('vias', this.checked)"> Vías pecuarias</div>
-                <div class="layer-item"><input type="checkbox" id="layer-montes" onchange="toggleLayer('montes', this.checked)"> Montes de utilidad pública</div>
-            </div>
-        </details>
-
-        <details class="layer-accordion">
-            <summary>Mezcla</summary>
-            <div class="accordion-body">
-                <div class="layer-item">
-                    <input type="checkbox" id="mezclar-capas" onchange="toggleMezclaCapas(this.checked)"> Activar mezcla
-                </div>
-                <div class="layer-item">
-                    <label style="font-size: 0.85rem;">Opacidad Catastro:</label>
-                    <input type="range" id="opacidad-catastro" min="0" max="100" value="70" onchange="actualizarOpacidadCatastro(this.value)" style="inline-size: 100%;">
-                </div>
-            </div>
-        </details>
-    </div>
-
+    
     <!-- DIÁLOGO MODAL PARA GENERAR PDF -->
     <div id="pdfDialog" style="display: none; position: fixed; inset-block-start: 0; inset-inline-start: 0; inline-size: 100%; block-size: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center;">
         <div style="background: white; border-radius: 12px; padding: 25px; max-inline-size: 600px; inline-size: 90%; max-block-size: 80vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
@@ -1579,37 +1489,164 @@
             }
             
             var refsFileList = document.getElementById('refs-file-list');
-            refsFileList.innerHTML = '⏳ Cargando ' + referencias.length + ' referencias...';
             
-            // Cargar referencias en lotes para no sobrecargar
-            var cargadas = 0;
-            var errores = 0;
+            // Crear barra de progreso visual
+            var progressHtml = `
+                <div style="margin-bottom: 10px;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
+                        🚀 Procesando lote unificado de ${referencias.length} referencias...
+                    </div>
+                    <div style="background: #e9ecef; border-radius: 4px; height: 20px; overflow: hidden;">
+                        <div id="batch-progress-bar" style="background: linear-gradient(90deg, #3498db, #2ecc71); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 4px;"></div>
+                    </div>
+                    <div id="batch-progress-text" style="font-size: 11px; color: #666; margin-top: 3px;">Iniciando proceso unificado...</div>
+                </div>
+            `;
+            refsFileList.innerHTML = progressHtml;
             
-            function cargarSiguiente() {
-                if (cargadas < referencias.length) {
-                    var ref = referencias[cargadas];
-                    cargarReferenciaIndividual(ref, function(success) {
-                        if (success) {
-                            cargadas++;
-                        } else {
-                            errores++;
-                        }
-                        
-                        // Actualizar progreso
-                        var progress = Math.round((cargadas + errores) / referencias.length * 100);
-                        refsFileList.innerHTML = '⏳ Progreso: ' + progress + '% (' + (cargadas + errores) + '/' + referencias.length + ')<br>✅ Cargadas: ' + cargadas + ' | ❌ Errores: ' + errores;
-                        
-                        // Siguiente referencia
-                        setTimeout(cargarSiguiente, 100); // Pequeña pausa para no sobrecargar
-                    });
-                } else {
-                    // Finalizado
-                    refsFileList.innerHTML = '🎉 ¡Completado!<br>✅ Cargadas: ' + cargadas + '<br>❌ Errores: ' + errores + '<br><small>Revisa el mapa para ver los resultados</small>';
+            // Procesar como lote unificado
+            procesarLoteUnificado(referencias);
+        }
+
+        async function procesarLoteUnificado(referencias) {
+            var refsFileList = document.getElementById('refs-file-list');
+            var progressBar = document.getElementById('batch-progress-bar');
+            var progressText = document.getElementById('batch-progress-text');
+            
+            try {
+                // Actualizar progreso
+                if (progressBar) progressBar.style.width = '25%';
+                if (progressText) progressText.textContent = 'Enviando referencias al servidor...';
+                
+                // Llamar al nuevo endpoint de procesamiento de lote
+                const response = await fetch('/api/v1/procesar-lote', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ referencias: referencias })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Error procesando lote');
                 }
+                
+                // Actualizar progreso
+                if (progressBar) progressBar.style.width = '75%';
+                if (progressText) progressText.textContent = 'Procesando geometrías combinadas...';
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // Cargar geometrías combinadas en el mapa
+                    if (data.geojson_url) {
+                        try {
+                            const geoResponse = await fetch(data.geojson_url);
+                            const geojsonData = await geoResponse.json();
+                            
+                            // Limpar capa cargada anterior
+                            loadedLayer.clearLayers();
+                            
+                            // Añadir geometrías combinadas con estilo unificado
+                            const combinedLayer = L.geoJSON(geojsonData, {
+                                style: function(feature) {
+                                    return {
+                                        color: '#e74c3c',
+                                        weight: 2,
+                                        opacity: 0.8,
+                                        fillOpacity: 0.3,
+                                        fillColor: '#3498db'
+                                    };
+                                },
+                                onEachFeature: function(feature, layer) {
+                                    // Añadir popup con información de la referencia
+                                    if (feature.properties) {
+                                        const ref = feature.properties.referencia || 'N/A';
+                                        const anillo = feature.properties.anillo || 'N/A';
+                                        layer.bindPopup(`
+                                            <div style="font-size: 12px;">
+                                                <strong>Referencia:</strong> ${ref}<br>
+                                                <strong>Anillo:</strong> ${anillo}<br>
+                                                <strong>Tipo:</strong> Parcela Catastral
+                                            </div>
+                                        `);
+                                    }
+                                }
+                            }).addTo(loadedLayer);
+                            
+                            // Centrar mapa en todas las geometrías
+                            if (combinedLayer.getBounds().isValid()) {
+                                map.fitBounds(combinedLayer.getBounds());
+                            }
+                            
+                            console.log(`✅ Geometrías combinadas cargadas: ${data.geometrias_combinadas} geometrías`);
+                            
+                        } catch (geoError) {
+                            console.warn('⚠️ Error cargando GeoJSON combinado:', geoError);
+                        }
+                    }
+                    
+                    // Actualizar progreso a 100%
+                    if (progressBar) progressBar.style.width = '100%';
+                    if (progressText) progressText.textContent = '¡Proceso completado!';
+                    
+                    // Mostrar resultados finales
+                    var finalHtml = `
+                        <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                            <div style="color: #155724; font-weight: bold;">🎉 ¡Lote procesado unificadamente!</div>
+                            <div style="font-size: 12px; color: #155724;">
+                                📋 ID del lote: ${data.lote_id}<br>
+                                📦 Geometrías combinadas: ${data.geometrias_combinadas}<br>
+                                📄 XML generado: ${data.lote_id}_informacion.xml<br>
+                                🗂️ ZIP organizado con carpetas estructuradas
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Añadir botón de descarga del ZIP unificado
+                    if (data.zip_path) {
+                        finalHtml += `
+                            <div style="border-top: 1px solid #ddd; padding-top: 10px;">
+                                <strong>Descargar lote completo:</strong><br>
+                                <button class="action-btn" style="margin: 2px; padding: 6px 12px;" onclick="window.open('${data.zip_path}', '_blank')">
+                                    <i class="fa-solid fa-download"></i> Descargar ZIP Unificado
+                                </button>
+                            </div>
+                        `;
+                    }
+                    
+                    // Mostrar detalles individuales
+                    if (data.resultados && data.resultados.length > 0) {
+                        finalHtml += `
+                            <div style="margin-top: 10px; font-size: 11px; color: #666;">
+                                <strong>Detalles por referencia:</strong><br>
+                        `;
+                        
+                        data.resultados.forEach(function(resultado) {
+                            var icono = resultado.exitosa ? '✅' : '❌';
+                            finalHtml += `${icono} ${resultado.referencia} - ${resultado.exitosa ? 'Procesada' : 'Error: ' + (resultado.error || 'Desconocido')}<br>`;
+                        });
+                        
+                        finalHtml += '</div>';
+                    }
+                    
+                    refsFileList.innerHTML = finalHtml;
+                    
+                } else {
+                    throw new Error(data.error || 'Error en el procesamiento del lote');
+                }
+                
+            } catch (error) {
+                console.error('❌ Error procesando lote unificado:', error);
+                
+                var errorHtml = `
+                    <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; padding: 10px;">
+                        <div style="color: #721c24; font-weight: bold;">❌ Error en el procesamiento</div>
+                        <div style="font-size: 12px; color: #721c24;">${error.message}</div>
+                    </div>
+                `;
+                
+                refsFileList.innerHTML = errorHtml;
             }
-            
-            // Iniciar carga
-            cargarSiguiente();
         }
 
         async function cargarReferenciaIndividual(ref, callback) {
@@ -1619,7 +1656,7 @@
                 var data = await res.json();
 
                 if (data.status === 'error') {
-                    if (callback) callback(false);
+                    if (callback) callback(false, null);
                     return;
                 }
 
@@ -1631,6 +1668,8 @@
                         map.fitBounds(layer.getBounds());
                     }
                 }
+                
+                var zipPath = null;
                 
                 // 2. Ejecutar proceso completo de catastro4 si la geometría se cargó
                 try {
@@ -1644,9 +1683,10 @@
                         const processData = await processRes.json();
                         console.log(`✅ Proceso catastro completado para ${ref}:`, processData);
                         
-                        // Mostrar notificación de éxito
+                        // Mostrar notificación de éxito y guardar ruta del ZIP
                         if (processData.status === 'success' && processData.zip_path) {
                             console.log(`📦 ZIP generado: ${processData.zip_path}`);
+                            zipPath = processData.zip_path;
                         }
                     } else {
                         console.warn(`⚠️ Proceso catastro falló para ${ref}`);
@@ -1656,10 +1696,10 @@
                     // No fallar la carga de geometría si el proceso completo falla
                 }
                 
-                if (callback) callback(true);
+                if (callback) callback(true, zipPath);
             } catch(e) { 
                 console.error(`❌ Error cargando referencia ${ref}:`, e);
-                if (callback) callback(false);
+                if (callback) callback(false, null);
             }
         }
 
