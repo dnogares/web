@@ -5,7 +5,7 @@ Servicio de Informes Urbanísticos
 
 import json
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from shapely.geometry import Polygon
 
 
