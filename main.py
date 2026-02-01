@@ -10,7 +10,7 @@ import socket
 import requests
 import unicodedata
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, Query
@@ -152,6 +152,13 @@ class UrbanismoRequest(BaseModel):
 class AfeccionesRequest(BaseModel):
     referencia: Optional[str] = None
     archivos: Optional[List[dict]] = None
+
+
+class AjustesCapasPayload(BaseModel):
+    max_visible_layers: int = 6
+    visibles_wms: List[str] = []
+    visibles_locales: List[str] = []
+    vectoriales_gis: List[str] = []
 
 class GenerarPDFRequest(BaseModel):
     referencia: str
@@ -361,6 +368,127 @@ async def visor_urbanismo():
 async def visor_afecciones():
     """Visor Afecciones (Placeholder)"""
     return HTMLResponse("<h1>Módulo de Análisis de Afecciones en construcción</h1><a href='/'>Volver</a>")
+
+
+AJUSTES_CAPAS_FILE = Path("ajustes_config.json")
+
+
+def _default_ajustes_config() -> Dict[str, Any]:
+    return {
+        "max_visible_layers": 6,
+        "visibles_wms": [
+            "catastro",
+            "inundacion",
+            "siose",
+            "calificacion",
+            "t10",
+            "t100",
+            "t500",
+            "natura",
+            "vias",
+            "montes",
+        ],
+        "visibles_locales": [],
+        "vectoriales_gis": [],
+    }
+
+
+def _load_ajustes_config() -> Dict[str, Any]:
+    try:
+        if AJUSTES_CAPAS_FILE.exists():
+            with open(AJUSTES_CAPAS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            base = _default_ajustes_config()
+            if isinstance(data, dict):
+                base.update({k: v for k, v in data.items() if k in base})
+            return base
+    except Exception:
+        pass
+    return _default_ajustes_config()
+
+
+def _save_ajustes_config(cfg_data: Dict[str, Any]) -> None:
+    with open(AJUSTES_CAPAS_FILE, "w", encoding="utf-8") as f:
+        json.dump(cfg_data, f, ensure_ascii=False, indent=2)
+
+
+def _list_capas_files_for_ajustes() -> List[Dict[str, Any]]:
+    files: List[Dict[str, Any]] = []
+    if not LAYERS_DIR.exists():
+        return files
+
+    extensions = ['.fgb', '.gpkg', '.shp', '.geojson', '.kml', '.zip']
+    seen_stems = set()
+
+    for ext in extensions:
+        for f in LAYERS_DIR.rglob(f"*{ext}"):
+            if f.name.startswith('.'):
+                continue
+            if f.stem in seen_stems:
+                continue
+            seen_stems.add(f.stem)
+            try:
+                rel_path = f.relative_to(LAYERS_DIR)
+            except ValueError:
+                rel_path = f.name
+            layer_id = f.stem.replace(" ", "_").replace(".", "_").lower()
+            files.append({
+                "id": layer_id,
+                "name": f.stem,
+                "filename": f.name,
+                "path": str(rel_path),
+                "type": f.suffix.lower(),
+            })
+
+    files.sort(key=lambda x: x['name'])
+    return files
+
+
+def _visor_wms_catalog() -> List[Dict[str, str]]:
+    return [
+        {"id": "catastro", "name": "Catastro", "group": "Catastro y urbanismo"},
+        {"id": "inundacion", "name": "Inundabilidad", "group": "Catastro y urbanismo"},
+        {"id": "siose", "name": "SIOSE (Usos del suelo)", "group": "Catastro y urbanismo"},
+        {"id": "calificacion", "name": "Calificación urbanística", "group": "Catastro y urbanismo"},
+        {"id": "t10", "name": "T10 (10 años)", "group": "Riesgos hídricos"},
+        {"id": "t100", "name": "T100 (100 años)", "group": "Riesgos hídricos"},
+        {"id": "t500", "name": "T500 (500 años)", "group": "Riesgos hídricos"},
+        {"id": "natura", "name": "Red Natura 2000", "group": "Medio ambiente"},
+        {"id": "vias", "name": "Vías pecuarias", "group": "Medio ambiente"},
+        {"id": "montes", "name": "Montes de utilidad pública", "group": "Medio ambiente"},
+    ]
+
+
+@app.get("/api/v1/ajustes/capas")
+async def get_ajustes_capas():
+    cfg_data = _load_ajustes_config()
+    capas_locales = _list_capas_files_for_ajustes()
+    capas_postgis: List[Dict[str, Any]] = []
+    if GIS_DB_AVAILABLE and db_gis is not None and db_gis.test_connection():
+        capas_postgis = db_gis.get_available_layers(schemas=["capas", "public", "afecciones"])
+
+    return {
+        "status": "success",
+        "config": cfg_data,
+        "catalog": {
+            "wms": _visor_wms_catalog(),
+            "locales": capas_locales,
+            "postgis": capas_postgis,
+        },
+        "layers_dir": str(LAYERS_DIR),
+    }
+
+
+@app.post("/api/v1/ajustes/capas")
+async def save_ajustes_capas(payload: AjustesCapasPayload):
+    cfg_data = {
+        "max_visible_layers": max(1, min(50, int(payload.max_visible_layers))),
+        "visibles_wms": list(dict.fromkeys(payload.visibles_wms or [])),
+        "visibles_locales": list(dict.fromkeys(payload.visibles_locales or [])),
+        "vectoriales_gis": list(dict.fromkeys(payload.vectoriales_gis or [])),
+    }
+    _save_ajustes_config(cfg_data)
+    return {"status": "success", "config": cfg_data}
 
 
 @app.get("/api/v1/capas/list")
@@ -683,25 +811,51 @@ async def get_referencia_geojson(ref: str):
                 coords_poligono = downloader.extraer_coordenadas_gml(str(gml_path))
 
         if coords_poligono:
-            # coords_poligono ahora es una lista de anillos
-            # Tomamos el primer anillo (perímetro exterior) para el GeoJSON
             if len(coords_poligono) > 0:
-                anillo_exterior = coords_poligono[0]  # Primer anillo (usualmente el exterior)
-                
-                # Las coordenadas ya vienen como (lat, lon), convertimos a (lon, lat) para GeoJSON
-                polygon_geojson = [[lon, lat] for lat, lon in anillo_exterior]
-                
-                # Validar que las coordenadas estén en España
-                if polygon_geojson:
-                    sample_lon, sample_lat = polygon_geojson[0]
-                    if not (-11 <= sample_lon <= 5 and 35 <= sample_lat <= 45):
-                        print(f"⚠️ Coordenadas fuera de España: {sample_lat}, {sample_lon}")
-                        # Si están fuera de rango, probablemente están invertidas
-                        if (-11 <= sample_lat <= 5 and 35 <= sample_lon <= 45):
-                             polygon_geojson = [[lat, lon] for lat, lon in anillo_exterior]
-                             print(f"✅ Coordenadas invertidas forzosamente en GML")
-                
-                # Cerrar el polígono si no lo está
+                anillo_exterior = coords_poligono[0]
+
+                def _is_lon_lat(lon: float, lat: float) -> bool:
+                    return (-11 <= lon <= 5) and (35 <= lat <= 45)
+
+                polygon_geojson = None
+
+                if anillo_exterior:
+                    a0, b0 = anillo_exterior[0]
+
+                    cand_lon_lat_1 = [(lon, lat) for lat, lon in anillo_exterior]
+                    if cand_lon_lat_1 and _is_lon_lat(cand_lon_lat_1[0][0], cand_lon_lat_1[0][1]):
+                        polygon_geojson = [[lon, lat] for lon, lat in cand_lon_lat_1]
+                    else:
+                        cand_lon_lat_2 = [(lon, lat) for lon, lat in anillo_exterior]
+                        if cand_lon_lat_2 and _is_lon_lat(cand_lon_lat_2[0][0], cand_lon_lat_2[0][1]):
+                            polygon_geojson = [[lon, lat] for lon, lat in cand_lon_lat_2]
+
+                if polygon_geojson is None and anillo_exterior:
+                    from pyproj import Transformer
+
+                    def _try_epsg(epsg: int, swap_xy: bool = False):
+                        transformer = Transformer.from_crs(epsg, 4326, always_xy=True)
+                        pts = []
+                        for x, y in anillo_exterior:
+                            if swap_xy:
+                                x, y = y, x
+                            lon, lat = transformer.transform(x, y)
+                            pts.append([lon, lat])
+                        if pts and _is_lon_lat(pts[0][0], pts[0][1]):
+                            return pts
+                        return None
+
+                    for epsg in (25830, 25829, 25831):
+                        polygon_geojson = _try_epsg(epsg, swap_xy=False)
+                        if polygon_geojson:
+                            break
+                        polygon_geojson = _try_epsg(epsg, swap_xy=True)
+                        if polygon_geojson:
+                            break
+
+                if not polygon_geojson:
+                    raise HTTPException(status_code=500, detail="No se pudo transformar la geometría a WGS84")
+
                 if polygon_geojson[0] != polygon_geojson[-1]:
                     polygon_geojson.append(polygon_geojson[0])
 
@@ -786,8 +940,8 @@ async def procesar_completo(request: ProcesoRequest):
                     
                     if coords_poligono:
                         # Convertir a formato de anillos para urbanismo.py
-                        anillos = [coords_poligono]  # Primer anillo es el exterior
-                        print(f"✅ Geometría extraída: {len(coords_poligono)} puntos")
+                        anillos = coords_poligono # Ya viene como lista de anillos desde catastro4
+                        print(f"✅ Geometría extraída: {len(coords_poligono)} anillos")
                     else:
                         print("⚠️ No se pudieron extraer coordenadas del GML")
                 except Exception as e:
@@ -807,8 +961,8 @@ async def procesar_completo(request: ProcesoRequest):
             afecciones_detectadas = []
             if ref_dir.exists():
                 # Revisar archivos de afecciones generados
-                for tipo in ['hidrografia']:
-                    afeccion_file = ref_dir / f"afeccion_{tipo}.png"
+                for tipo in ['hidrografia', 'planeamiento', 'catastro_parcelas']:
+                    afeccion_file = ref_dir / f"{ref}_afeccion_{tipo}.png"
                     if afeccion_file.exists() and afeccion_file.stat().st_size > 1500:
                         afecciones_detectadas.append({
                             "tipo": tipo,
@@ -1243,7 +1397,7 @@ async def analizar_afecciones(request: AfeccionesRequest):
             db = GISDatabase()
             
             # Obtener capas del esquema afecciones
-            capas_db = db.get_available_layers(schema='afecciones')
+            capas_db = db.get_available_layers(schemas=['afecciones'])
             if capas_db:
                 print(f"🔍 Analizando {len(capas_db)} capas en PostGIS...")
                 # Aquí llamaríamos a una función de intersección espacial directa

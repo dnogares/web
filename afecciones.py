@@ -8,6 +8,8 @@ import contextily as cx
 from datetime import datetime
 from pathlib import Path
 
+from typing import List, Dict, Any
+
 # Configuración simplificada para el test
 CONFIG_TITULOS = {
     "Red Natura 2000": "ANÁLISIS DE AFECCIÓN: RED NATURA 2000",
@@ -87,6 +89,19 @@ def cargar_config_titulos():
 
 from gis_db import GISDatabase
 
+
+def _load_vectoriales_gis_from_ajustes() -> List[str]:
+    try:
+        if os.path.exists("ajustes_config.json"):
+            with open("ajustes_config.json", "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            capas = cfg.get("vectoriales_gis", [])
+            if isinstance(capas, list):
+                return [str(x) for x in capas if x]
+    except Exception:
+        pass
+    return []
+
 def procesar_parcelas(capas_locales, capas_wfs, capas_wms, crs_objetivo, config_titulos, ruta_input=None, output_dir_base="resultados"):
     """
     Versión refactorizada para usar PostGIS.
@@ -97,8 +112,22 @@ def procesar_parcelas(capas_locales, capas_wfs, capas_wms, crs_objetivo, config_
     
     if use_db:
         print("🔗 Usando base de datos PostGIS para análisis de afecciones")
-        tablas_db = db.get_available_layers(schema="afecciones")
-        print(f"📊 {len(tablas_db)} capas detectadas en el esquema afecciones")
+
+        # 1) Si hay selección en Ajustes, usar SOLO esas capas
+        seleccion = _load_vectoriales_gis_from_ajustes()
+        selected_pairs: List[Dict[str, str]] = []
+        for full_name in seleccion:
+            if "." in full_name:
+                schema, table = full_name.split(".", 1)
+                selected_pairs.append({"schema": schema, "name": table, "full_name": full_name})
+
+        if selected_pairs:
+            tablas_db = selected_pairs
+            print(f"📊 Usando {len(tablas_db)} capas seleccionadas en Ajustes")
+        else:
+            # 2) Fallback: usar todas las capas del esquema afecciones
+            tablas_db = db.get_available_layers(schemas=["afecciones"])
+            print(f"📊 {len(tablas_db)} capas detectadas en el esquema afecciones")
     else:
         print("⚠️ No hay conexión a DB GIS. Usando modo tradicional (SHP/WMS)")
         # Lógica original o simplificada si no hay DB
@@ -130,8 +159,13 @@ def procesar_parcelas(capas_locales, capas_wfs, capas_wms, crs_objetivo, config_
                 # Análisis contra cada tabla del esquema afecciones
                 for tabla in tablas_db:
                     try:
+                        schema = tabla.get("schema", "afecciones") if isinstance(tabla, dict) else "afecciones"
+                        table = tabla.get("name") if isinstance(tabla, dict) else str(tabla)
+                        if not table:
+                            continue
+
                         # Consultar directamente la intersección en la base de datos
-                        interseccion_gdf = db.query_intersection("afecciones", tabla, geom_parcela_wkt)
+                        interseccion_gdf = db.query_intersection(schema, table, geom_parcela_wkt)
                         
                         if interseccion_gdf.empty:
                             continue
@@ -149,13 +183,14 @@ def procesar_parcelas(capas_locales, capas_wfs, capas_wms, crs_objetivo, config_
                             perc = (area_afectada / area_parcela) * 100 if area_parcela > 0 else 0
                             
                             if perc > 0.01: # Umbral mínimo de relevancia
+                                capa_label = tabla.get("full_name") if isinstance(tabla, dict) and tabla.get("full_name") else table
                                 resultados.append({
                                     "parcela": archivo_parcela,
-                                    "capa": tabla,
+                                    "capa": capa_label,
                                     "porcentaje": round(perc, 2),
                                     "origen": "PostGIS (Intersección Directa)"
                                 })
-                                print(f"  ✓ Afección hallada: {tabla} ({perc:.2f}%)")
+                                print(f"  ✓ Afección hallada: {capa_label} ({perc:.2f}%)")
                                 
                                 # Generar mapa para esta afección
                                 fig, ax = plt.subplots(figsize=(8, 6))
@@ -177,8 +212,9 @@ def procesar_parcelas(capas_locales, capas_wfs, capas_wms, crs_objetivo, config_
                                 except: pass
                                 
                                 ax.legend()
-                                ax.set_title(f"Afección: {tabla} ({perc:.2f}%)")
-                                plt.savefig(os.path.join(carpeta_resultados, f"mapa_{tabla}.jpg"), bbox_inches='tight')
+                                ax.set_title(f"Afección: {capa_label} ({perc:.2f}%)")
+                                safe_name = str(capa_label).replace("/", "_").replace("\\", "_").replace(":", "_")
+                                plt.savefig(os.path.join(carpeta_resultados, f"mapa_{safe_name}.jpg"), bbox_inches='tight')
                                 plt.close()
 
                     except Exception as e:

@@ -423,7 +423,9 @@ class CatastroDownloader:
                     
                     # Dibujar contorno si es posible
                     if PILLOW_AVAILABLE and coords_poligono:
-                        self._dibujar_contorno_en_imagen(filepath, filepath, coords_poligono, bbox)
+                        # Pasar solo el primer anillo (exterior) para dibujar
+                        anillo_exterior = coords_poligono[0] if isinstance(coords_poligono[0], list) else coords_poligono
+                        self._dibujar_contorno_en_imagen(filepath, filepath, anillo_exterior, bbox)
                         
                 else:
                     print(f"  ⚠ Error descargando ortofoto {nombre}")

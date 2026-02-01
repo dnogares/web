@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ajustes</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card {
+            background: rgba(255,255,255,0.9);
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 16px;
+            padding: 24px;
+            width: min(980px, 95vw);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+        }
+        h1 {
+            margin: 0 0 8px 0;
+            color: #2c3e50;
+            font-size: 1.8rem;
+        }
+        p { color: #5f6b7a; margin: 0 0 18px 0; }
+        .topbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .row { display: grid; grid-template-columns: 1fr; gap: 12px; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        .item {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e9ecef;
+            padding: 14px;
+        }
+        .item h2 { margin: 0 0 6px 0; font-size: 1rem; color: #34495e; }
+        .item small { color: #7f8c8d; }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 220px;
+            gap: 10px;
+            align-items: center;
+            margin-top: 12px;
+        }
+
+        @media (max-width: 900px) {
+            .controls { grid-template-columns: 1fr; }
+        }
+
+        input[type="text"], input[type="number"] {
+            border: 1px solid #dfe6ee;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .list {
+            margin-top: 10px;
+            max-height: 55vh;
+            overflow: auto;
+            border: 1px solid #eef2f5;
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .group {
+            border: 1px solid #eef2f5;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #fbfcfd;
+        }
+
+        .group-title {
+            font-weight: 800;
+            color: #2c3e50;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .row-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 6px 4px;
+            border-bottom: 1px dashed #eef2f5;
+        }
+
+        .row-item:last-child { border-bottom: none; }
+
+        .row-item label {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            cursor: pointer;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .row-item .meta {
+            color: #7f8c8d;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .status {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #5f6b7a;
+            min-height: 18px;
+        }
+        .actions { display: flex; gap: 10px; margin-top: 16px; }
+        .btn {
+            border: none;
+            border-radius: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+        .btn.primary { background: #3498db; color: white; }
+        .btn.secondary { background: #ecf0f1; color: #2c3e50; }
+        a { text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1><i class="fa-solid fa-gear"></i> Ajustes</h1>
+        <p>Este será el panel general de configuración del visor. Iremos añadiendo aquí las opciones que me vayas indicando.</p>
+
+        <div class="controls">
+            <input id="search" type="text" placeholder="Buscar capa por nombre...">
+            <input id="maxVisible" type="number" min="1" max="50" value="6" placeholder="Máx. capas visibles">
+        </div>
+
+        <div class="grid" style="margin-top: 12px;">
+            <div class="item">
+                <h2>Capas visibles (visor)</h2>
+                <small>Se mostrarán en el visor (Catastro y futuros visores).</small>
+                <div class="list" id="visiblesList"></div>
+            </div>
+
+            <div class="item">
+                <h2>Capas vectoriales (análisis)</h2>
+                <small>Se usarán para cálculos (afecciones/urbanismo) desde la base GIS.</small>
+                <div class="list" id="vectorialesList"></div>
+            </div>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="actions">
+            <a href="/static/index.html"><button class="btn secondary"><i class="fa-solid fa-arrow-left"></i> Volver</button></a>
+            <button class="btn secondary" id="btnReload"><i class="fa-solid fa-rotate"></i> Recargar</button>
+            <button class="btn primary" id="btnSave"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+        </div>
+    </div>
+
+    <script>
+        let catalog = null;
+        let currentConfig = null;
+
+        function setStatus(text, isError = false) {
+            const el = document.getElementById('status');
+            if (!el) return;
+            el.style.color = isError ? '#e74c3c' : '#5f6b7a';
+            el.textContent = text || '';
+        }
+
+        function normalize(s) {
+            return (s || '').toString().toLowerCase().trim();
+        }
+
+        function isMatch(name, q) {
+            if (!q) return true;
+            return normalize(name).includes(q);
+        }
+
+        function buildRow({ id, label, meta, checked, onChange }) {
+            const div = document.createElement('div');
+            div.className = 'row-item';
+            div.dataset.name = normalize(label);
+            div.innerHTML = `
+                <label>
+                    <input type="checkbox" id="${id}">
+                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${label}</span>
+                </label>
+                <span class="meta">${meta || ''}</span>
+            `;
+            const cb = div.querySelector('input');
+            cb.checked = !!checked;
+            cb.addEventListener('change', (e) => onChange(e.target.checked));
+            return div;
+        }
+
+        function render() {
+            const q = normalize(document.getElementById('search')?.value);
+
+            const visiblesEl = document.getElementById('visiblesList');
+            const vectEl = document.getElementById('vectorialesList');
+            if (!visiblesEl || !vectEl || !catalog || !currentConfig) return;
+
+            visiblesEl.innerHTML = '';
+            vectEl.innerHTML = '';
+
+            const visiblesWms = new Set(currentConfig.visibles_wms || []);
+            const visiblesLocales = new Set(currentConfig.visibles_locales || []);
+            const vectoriales = new Set(currentConfig.vectoriales_gis || []);
+
+            const wmsByGroup = {};
+            (catalog.wms || []).forEach(w => {
+                const g = w.group || 'WMS';
+                if (!wmsByGroup[g]) wmsByGroup[g] = [];
+                wmsByGroup[g].push(w);
+            });
+
+            Object.keys(wmsByGroup).sort().forEach(groupName => {
+                const group = document.createElement('div');
+                group.className = 'group';
+                group.innerHTML = `<div class="group-title">${groupName} (WMS)</div>`;
+
+                let any = false;
+                wmsByGroup[groupName].forEach(w => {
+                    if (!isMatch(w.name, q) && !isMatch(w.id, q)) return;
+                    any = true;
+                    group.appendChild(buildRow({
+                        id: `wms-${w.id}`,
+                        label: w.name,
+                        meta: w.id,
+                        checked: visiblesWms.has(w.id),
+                        onChange: (checked) => {
+                            if (checked) visiblesWms.add(w.id); else visiblesWms.delete(w.id);
+                            currentConfig.visibles_wms = Array.from(visiblesWms);
+                        }
+                    }));
+                });
+
+                if (any) visiblesEl.appendChild(group);
+            });
+
+            const localGroup = document.createElement('div');
+            localGroup.className = 'group';
+            localGroup.innerHTML = `<div class="group-title">Capas locales (${catalog.locales?.length || 0})</div>`;
+
+            let anyLocal = false;
+            (catalog.locales || []).forEach(l => {
+                if (!isMatch(l.name, q) && !isMatch(l.id, q)) return;
+                anyLocal = true;
+                localGroup.appendChild(buildRow({
+                    id: `loc-${l.id}`,
+                    label: l.name,
+                    meta: l.type,
+                    checked: visiblesLocales.has(l.id),
+                    onChange: (checked) => {
+                        if (checked) visiblesLocales.add(l.id); else visiblesLocales.delete(l.id);
+                        currentConfig.visibles_locales = Array.from(visiblesLocales);
+                    }
+                }));
+            });
+
+            if (anyLocal) visiblesEl.appendChild(localGroup);
+
+            const postgisGroup = document.createElement('div');
+            postgisGroup.className = 'group';
+            postgisGroup.innerHTML = `<div class="group-title">PostGIS (${catalog.postgis?.length || 0})</div>`;
+
+            let anyPg = false;
+            (catalog.postgis || []).forEach(p => {
+                const label = p.full_name || `${p.schema}.${p.name}`;
+                if (!isMatch(label, q) && !isMatch(p.name, q)) return;
+                anyPg = true;
+                postgisGroup.appendChild(buildRow({
+                    id: `pg-${label}`.replace(/[^a-zA-Z0-9_-]/g, '_'),
+                    label: label,
+                    meta: 'vector',
+                    checked: vectoriales.has(label),
+                    onChange: (checked) => {
+                        if (checked) vectoriales.add(label); else vectoriales.delete(label);
+                        currentConfig.vectoriales_gis = Array.from(vectoriales);
+                    }
+                }));
+            });
+
+            if (anyPg) vectEl.appendChild(postgisGroup);
+
+            if (!visiblesEl.children.length) {
+                visiblesEl.innerHTML = '<div style="color:#999; font-size:0.9rem;">Sin resultados</div>';
+            }
+            if (!vectEl.children.length) {
+                vectEl.innerHTML = '<div style="color:#999; font-size:0.9rem;">Sin resultados</div>';
+            }
+        }
+
+        async function loadData() {
+            setStatus('Cargando catálogo...');
+            const res = await fetch('/api/v1/ajustes/capas');
+            const data = await res.json();
+            if (data.status !== 'success') {
+                throw new Error(data.message || 'Error cargando catálogo');
+            }
+            catalog = data.catalog;
+            currentConfig = data.config;
+
+            const maxVisibleEl = document.getElementById('maxVisible');
+            if (maxVisibleEl) {
+                maxVisibleEl.value = currentConfig.max_visible_layers || 6;
+            }
+
+            render();
+            setStatus('');
+        }
+
+        async function saveConfig() {
+            const maxVisibleEl = document.getElementById('maxVisible');
+            const maxVisible = parseInt(maxVisibleEl?.value || '6', 10);
+
+            const payload = {
+                max_visible_layers: isNaN(maxVisible) ? 6 : maxVisible,
+                visibles_wms: currentConfig.visibles_wms || [],
+                visibles_locales: currentConfig.visibles_locales || [],
+                vectoriales_gis: currentConfig.vectoriales_gis || []
+            };
+
+            setStatus('Guardando...');
+            const res = await fetch('/api/v1/ajustes/capas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.status !== 'success') {
+                throw new Error(data.message || 'Error guardando');
+            }
+            currentConfig = data.config;
+            setStatus('Guardado correctamente.');
+            setTimeout(() => setStatus(''), 1200);
+        }
+
+        document.getElementById('search')?.addEventListener('input', () => render());
+        document.getElementById('btnReload')?.addEventListener('click', (e) => { e.preventDefault(); loadData().catch(err => setStatus(err.message, true)); });
+        document.getElementById('btnSave')?.addEventListener('click', (e) => { e.preventDefault(); saveConfig().catch(err => setStatus(err.message, true)); });
+
+        loadData().catch(err => setStatus(err.message, true));
+    </script>
+</body>
+</html>

@@ -117,6 +117,90 @@
             margin-block-end: 25px;
         }
 
+        details.layer-accordion {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-block-end: 12px;
+            background: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+            overflow: hidden;
+        }
+
+        details.layer-accordion > summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 10px 12px;
+            font-weight: 700;
+            color: #2c3e50;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-block-end: 1px solid #eee;
+        }
+
+        details.layer-accordion > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        details.layer-accordion > summary::after {
+            content: '▾';
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        details.layer-accordion[open] > summary::after {
+            content: '▴';
+        }
+
+        .accordion-body {
+            padding: 10px 12px;
+        }
+
+        .progress-wrap {
+            display: none;
+            margin-block-start: 10px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .progress {
+            block-size: 10px;
+            background: #e9ecef;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            block-size: 10px;
+            inline-size: 0%;
+            background: linear-gradient(90deg, #3498db, #2ecc71);
+            border-radius: 999px;
+            transition: inline-size 0.25s ease;
+        }
+
+        .right-box {
+            margin-block-end: 12px;
+            padding: 12px;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+        }
+
+        .right-box h4 {
+            margin: 0 0 10px 0;
+            font-size: 0.95rem;
+            color: #2c3e50;
+        }
+
+        #legend-panel img {
+            max-inline-size: 100%;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+
         .layer-group h4 {
             margin: 0 0 10px 0;
             color: #7f8c8d;
@@ -431,7 +515,14 @@
         <div class="module">
             <h3><i class="fa-solid fa-magnifying-glass"></i> Referencia Catastral</h3>
             <input type="text" id="ref-input" placeholder="Introduce referencia (14 o 20 caracteres)" style="margin-block-end: 8px;">
-            <button class="action-btn" onclick="cargarReferencia()">Buscar Referencia</button>
+            <div style="display:flex; gap:8px;">
+                <button class="action-btn" style="flex: 1;" onclick="cargarReferencia()">Buscar Referencia</button>
+                <button class="action-btn" id="btn-cancelar-busqueda" style="inline-size:auto; background:#e74c3c; display:none;" onclick="cancelarBusquedaCatastral()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="progress-wrap" id="ref-progress">
+                <div id="ref-progress-text" style="font-size: 0.85rem; color:#2c3e50; margin-block-end: 6px;">Procesando...</div>
+                <div class="progress"><div class="progress-bar" id="ref-progress-bar"></div></div>
+            </div>
             <div id="ref-results-checklist" style="display:none; margin-block-start:10px; font-size:0.85rem; background:#f8f9fa; padding:10px; border-radius:4px;"></div>
         </div>
 
@@ -496,67 +587,83 @@
 
     <!-- DERECHA: CAPAS -->
     <div class="right-panel">
-        <div class="layer-group">
-            <h4>Mapas Base</h4>
-            <div class="layer-item">
-                <input type="checkbox" checked onchange="toggleBaseLayer('osm', this.checked)"> OSM (Callejero)
-            </div>
-            <div class="layer-item">
-                <input type="checkbox" onchange="toggleBaseLayer('satelite', this.checked)"> Satélite (Google)
-            </div>
+        <div class="right-box" id="parcel-info" style="display:none;"></div>
+
+        <div class="right-box" id="legend-panel">
+            <h4><i class="fa-solid fa-map"></i> Leyenda</h4>
+            <div id="legend-content" style="font-size: 0.85rem; color:#666;">Selecciona una capa para ver su leyenda.</div>
         </div>
 
-        <div class="layer-group">
-            <h4>Mezcla de Capas</h4>
-            <div class="layer-item">
-                <input type="checkbox" id="mezclar-capas" onchange="toggleMezclaCapas(this.checked)"> Activar Mezcla
+        <details class="layer-accordion" open>
+            <summary>Mapas base</summary>
+            <div class="accordion-body">
+                <div class="layer-item">
+                    <input type="checkbox" checked onchange="toggleBaseLayer('osm', this.checked)"> OSM (Callejero)
+                </div>
+                <div class="layer-item">
+                    <input type="checkbox" onchange="toggleBaseLayer('satelite', this.checked)"> Satélite (Google)
+                </div>
             </div>
-            <div class="layer-item">
-                <label style="font-size: 0.85rem;">Opacidad Catastro:</label>
-                <input type="range" id="opacidad-catastro" min="0" max="100" value="70" onchange="actualizarOpacidadCatastro(this.value)" style="inline-size: 100%;">
-            </div>
-        </div>
+        </details>
 
-        <div class="layer-group">
-            <h4>Capas Locales (/app/capas)</h4>
-            <div id="dynamic-layers-container">
-                <div style="font-size:0.8rem; color:#666;">Cargando...</div>
+        <details class="layer-accordion" open>
+            <summary>Catastro y urbanismo</summary>
+            <div class="accordion-body">
+                <div class="layer-item">
+                    <input type="checkbox" id="layer-catastro" checked onchange="toggleLayer('catastro', this.checked)"> Catastro
+                </div>
+                <div class="layer-item">
+                    <input type="checkbox" id="layer-inundacion" onchange="toggleLayer('inundacion', this.checked)"> Inundabilidad
+                </div>
+                <div class="layer-item">
+                    <input type="checkbox" id="layer-siose" onchange="toggleLayer('siose', this.checked)"> SIOSE (Usos del suelo)
+                </div>
+                <div class="layer-item">
+                    <input type="checkbox" id="layer-calificacion" onchange="toggleLayer('calificacion', this.checked)"> Calificación urbanística
+                </div>
             </div>
-        </div>
+        </details>
 
-        <div class="layer-group">
-            <h4>Superposiciones</h4>
-            <div class="layer-item">
-                <input type="checkbox" checked onchange="toggleLayer('catastro', this.checked)"> Catastro
+        <details class="layer-accordion">
+            <summary>Capas locales</summary>
+            <div class="accordion-body">
+                <div class="layer-item" style="font-size: 0.8rem; color:#666; margin-block-end: 6px;">/app/capas</div>
+                <div id="dynamic-layers-container">
+                    <div style="font-size:0.8rem; color:#666;">Cargando...</div>
+                </div>
             </div>
-            <div class="layer-item">
-                <input type="checkbox" onchange="toggleLayer('inundacion', this.checked)"> Inundabilidad
-            </div>
-            <div class="layer-item">
-                <input type="checkbox" onchange="toggleLayer('siose', this.checked)"> SIOSE (Usos Suelo)
-            </div>
-            <div class="layer-item">
-                <input type="checkbox" onchange="toggleLayer('calificacion', this.checked)"> Calif. Urbanística
-            </div>
-        </div>
+        </details>
 
-        <div class="layer-group">
-            <h4>Riesgos Hídricos</h4>
-            <div class="layer-item"><input type="checkbox" id="layer-t10" onchange="toggleLayer('t10', this.checked)"> T10 (10 años)</div>
-            <div class="layer-item"><input type="checkbox" id="layer-t100" onchange="toggleLayer('t100', this.checked)"> T100 (100 años)</div>
-            <div class="layer-item"><input type="checkbox" id="layer-t500" onchange="toggleLayer('t500', this.checked)"> T500 (500 años)</div>
-        </div>
+        <details class="layer-accordion">
+            <summary>Riesgos hídricos</summary>
+            <div class="accordion-body">
+                <div class="layer-item"><input type="checkbox" id="layer-t10" onchange="toggleLayer('t10', this.checked)"> T10 (10 años)</div>
+                <div class="layer-item"><input type="checkbox" id="layer-t100" onchange="toggleLayer('t100', this.checked)"> T100 (100 años)</div>
+                <div class="layer-item"><input type="checkbox" id="layer-t500" onchange="toggleLayer('t500', this.checked)"> T500 (500 años)</div>
+            </div>
+        </details>
 
-        <div class="layer-group">
-            <h4>Medio Ambiente</h4>
-            <div class="layer-item"><input type="checkbox" id="layer-natura" onchange="toggleLayer('natura', this.checked)"> Red Natura 2000</div>
-            <div class="layer-item"><input type="checkbox" id="layer-vias" onchange="toggleLayer('vias', this.checked)"> Vías Pecuarias</div>
-        </div>
+        <details class="layer-accordion">
+            <summary>Medio ambiente</summary>
+            <div class="accordion-body">
+                <div class="layer-item"><input type="checkbox" id="layer-natura" onchange="toggleLayer('natura', this.checked)"> Red Natura 2000</div>
+                <div class="layer-item"><input type="checkbox" id="layer-vias" onchange="toggleLayer('vias', this.checked)"> Vías pecuarias</div>
+                <div class="layer-item"><input type="checkbox" id="layer-montes" onchange="toggleLayer('montes', this.checked)"> Montes de utilidad pública</div>
+            </div>
+        </details>
 
-        <div class="layer-group">
-            <h4>Forestal</h4>
-            <div class="layer-item"><input type="checkbox" id="layer-montes" onchange="toggleLayer('montes', this.checked)"> Montes UP</div>
-        </div>
+        <details class="layer-accordion">
+            <summary>Mezcla</summary>
+            <div class="accordion-body">
+                <div class="layer-item">
+                    <input type="checkbox" id="mezclar-capas" onchange="toggleMezclaCapas(this.checked)"> Activar mezcla
+                </div>
+                <div class="layer-item">
+                    <label style="font-size: 0.85rem;">Opacidad Catastro:</label>
+                    <input type="range" id="opacidad-catastro" min="0" max="100" value="70" onchange="actualizarOpacidadCatastro(this.value)" style="inline-size: 100%;">
+                </div>
+            </div>
+        </details>
     </div>
 
     <!-- DIÁLOGO MODAL PARA GENERAR PDF -->
@@ -616,6 +723,13 @@
         var savedZoom = localStorage.getItem('visor_map_zoom');
         var initialCenter = savedCenter ? JSON.parse(savedCenter) : [40.4168, -3.7038];
         var initialZoom = savedZoom ? parseInt(savedZoom) : 6;
+
+        var busquedaController = null;
+        var ultimaReferencia = null;
+
+        var MAX_VISIBLE_LAYERS = 6;
+        var allowedWms = null;
+        var allowedLocal = null;
 
         var map = L.map('map', { zoomControl: false }).setView(initialCenter, initialZoom);
         L.control.zoom({ position: 'topright' }).addTo(map);
@@ -781,7 +895,87 @@
         });
 
         // Cargar capas al inicio
-        cargarCapasDinamicas();
+        cargarConfiguracionCapas().finally(() => {
+            cargarCapasDinamicas();
+        });
+
+        async function cargarConfiguracionCapas() {
+            try {
+                const res = await fetch('/api/v1/ajustes/capas');
+                const data = await res.json();
+                if (!data || data.status !== 'success') return;
+
+                const cfg = data.config || {};
+                MAX_VISIBLE_LAYERS = parseInt(cfg.max_visible_layers || 6, 10);
+                if (isNaN(MAX_VISIBLE_LAYERS) || MAX_VISIBLE_LAYERS < 1) MAX_VISIBLE_LAYERS = 6;
+
+                allowedWms = new Set(cfg.visibles_wms || []);
+                allowedLocal = new Set(cfg.visibles_locales || []);
+
+                // WMS: ocultar los checkboxes no permitidos (sin eliminar lógica)
+                if (allowedWms) {
+                    const wmsIds = ['catastro','inundacion','siose','calificacion','t10','t100','t500','natura','vias','montes'];
+                    wmsIds.forEach(id => {
+                        const cb = document.getElementById(`layer-${id}`);
+                        if (!cb) return;
+                        const row = cb.closest('.layer-item');
+                        const visible = allowedWms.has(id);
+                        if (row) row.style.display = visible ? 'flex' : 'none';
+                        if (!visible) {
+                            cb.checked = false;
+                            toggleLayer(id, false);
+                        }
+                    });
+                }
+
+                // Aplicar límite inicial
+                aplicarLimiteCapasVisibles();
+
+            } catch (e) {
+                // Silencioso: si falla Ajustes, el visor seguirá funcionando con defaults
+            }
+        }
+
+        function contarCapasVisiblesActivas() {
+            let count = 0;
+            const ids = ['catastro','inundacion','siose','calificacion','t10','t100','t500','natura','vias','montes'];
+            ids.forEach(id => {
+                const cb = document.getElementById(`layer-${id}`);
+                if (cb && cb.checked) count += 1;
+            });
+            // dinámicas
+            Object.keys(dynamicLayers || {}).forEach(id => {
+                const cb = document.getElementById(`chk-dyn-${id}`);
+                if (cb && cb.checked) count += 1;
+            });
+            return count;
+        }
+
+        function aplicarLimiteCapasVisibles() {
+            const selected = contarCapasVisiblesActivas();
+            const remaining = Math.max(0, MAX_VISIBLE_LAYERS - selected);
+
+            const ids = ['catastro','inundacion','siose','calificacion','t10','t100','t500','natura','vias','montes'];
+            ids.forEach(id => {
+                const cb = document.getElementById(`layer-${id}`);
+                if (!cb) return;
+                if (!cb.checked) {
+                    cb.disabled = (remaining === 0);
+                } else {
+                    cb.disabled = false;
+                }
+            });
+
+            Object.keys(dynamicLayers || {}).forEach(id => {
+                const cb = document.getElementById(`chk-dyn-${id}`);
+                if (!cb) return;
+                if (!cb.checked) {
+                    cb.disabled = (remaining === 0);
+                } else {
+                    cb.disabled = false;
+                }
+            });
+        }
 
         function cargarCapasDinamicas() {
             const container = document.getElementById('dynamic-layers-container');
@@ -794,6 +988,10 @@
                     
                     if (data.status === 'success' && data.files.length > 0) {
                         data.files.forEach(file => {
+                            // Si hay configuración desde Ajustes, ocultar lo no permitido
+                            if (allowedLocal && !allowedLocal.has(file.id)) {
+                                return;
+                            }
                             var group = L.featureGroup();
                             group.options.isDynamicLayer = true;
                             group.options.fileName = file.name;
@@ -831,6 +1029,8 @@
 
                             dynamicLayers[file.id || file.name] = group;
                         });
+
+                        aplicarLimiteCapasVisibles();
                     } else {
                         if (container) container.innerHTML = '<div style="font-size:0.8rem; color:#999; padding:5px;">No se encontraron capas locales.</div>';
                     }
@@ -842,6 +1042,23 @@
         }
 
         function toggleDynamicLayer(id, checked) {
+            if (allowedLocal && checked && !allowedLocal.has(id)) {
+                const cb = document.getElementById(`chk-dyn-${id}`);
+                if (cb) cb.checked = false;
+                alert('Esta capa no está habilitada en Ajustes.');
+                return;
+            }
+
+            if (checked) {
+                const already = contarCapasVisiblesActivas();
+                if (already >= MAX_VISIBLE_LAYERS) {
+                    const cb = document.getElementById(`chk-dyn-${id}`);
+                    if (cb) cb.checked = false;
+                    alert(`Máximo de capas visibles alcanzado (${MAX_VISIBLE_LAYERS}). Puedes cambiarlo en Ajustes.`);
+                    return;
+                }
+            }
+
             var group = dynamicLayers[id];
             if (!group) return;
 
@@ -853,6 +1070,8 @@
             } else {
                 map.removeLayer(group);
             }
+
+            aplicarLimiteCapasVisibles();
         }
 
         function cargarDatosCapaDinamica(layerGroup) {
@@ -969,12 +1188,118 @@
         }
 
         function toggleLayer(name, checked) {
+            // Límite de capas visibles simultáneas
+            if (checked) {
+                const already = contarCapasVisiblesActivas();
+                if (already >= MAX_VISIBLE_LAYERS) {
+                    const cb = document.getElementById(`layer-${name}`);
+                    if (cb) cb.checked = false;
+                    alert(`Máximo de capas visibles alcanzado (${MAX_VISIBLE_LAYERS}). Puedes cambiarlo en Ajustes.`);
+                    return;
+                }
+            }
+
             // La capa 'catastro' no depende del zoom, se gestiona directamente.
             if (name === 'catastro') {
                 checked ? map.addLayer(layers.catastro) : map.removeLayer(layers.catastro);
+                actualizarPanelParcela();
+                if (checked) {
+                    actualizarLeyenda('catastro');
+                }
             }
             // Para el resto de capas, la visibilidad depende del zoom y el checkbox.
             updateLayersVisibility();
+
+            if (checked && name !== 'catastro') {
+                actualizarLeyenda(name);
+            }
+
+            aplicarLimiteCapasVisibles();
+        }
+
+        function isCatastroActivo() {
+            const cb = document.getElementById('layer-catastro');
+            return cb ? cb.checked : map.hasLayer(layers.catastro);
+        }
+
+        function actualizarPanelParcela() {
+            const box = document.getElementById('parcel-info');
+            if (!box) return;
+
+            if (!ultimaReferencia) {
+                box.style.display = 'none';
+                return;
+            }
+
+            if (!isCatastroActivo()) {
+                box.style.display = 'block';
+                box.innerHTML = `
+                    <h4><i class="fa-solid fa-circle-info"></i> Parcela</h4>
+                    <div style="font-size:0.85rem; color:#666;">Activa la capa <b>Catastro</b> para ver la información de la parcela.</div>
+                `;
+                return;
+            }
+
+            box.style.display = 'block';
+            box.innerHTML = `
+                <h4><i class="fa-solid fa-circle-info"></i> Parcela</h4>
+                <div style="font-size:0.9rem;"><b>Referencia catastral:</b> ${ultimaReferencia}</div>
+            `;
+        }
+
+        function setProgress(visible, text, pct) {
+            const wrap = document.getElementById('ref-progress');
+            const bar = document.getElementById('ref-progress-bar');
+            const txt = document.getElementById('ref-progress-text');
+            const btnCancel = document.getElementById('btn-cancelar-busqueda');
+            if (!wrap || !bar || !txt || !btnCancel) return;
+
+            wrap.style.display = visible ? 'block' : 'none';
+            btnCancel.style.display = visible ? 'inline-flex' : 'none';
+            txt.innerText = text || '';
+            bar.style.inlineSize = `${Math.max(0, Math.min(100, pct || 0))}%`;
+        }
+
+        function cancelarBusquedaCatastral() {
+            if (busquedaController) {
+                busquedaController.abort();
+                busquedaController = null;
+            }
+            setProgress(false, '', 0);
+            const resultsEl = document.getElementById('ref-results-checklist');
+            if (resultsEl) {
+                resultsEl.style.display = 'block';
+                resultsEl.innerHTML = '<span style="color:#e67e22;">Operación cancelada.</span>';
+            }
+        }
+
+        function actualizarLeyenda(capa) {
+            const el = document.getElementById('legend-content');
+            if (!el) return;
+
+            const legends = {
+                catastro: 'https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx?request=GetLegendGraphic&version=1.1.1&format=image/png&layer=Catastro',
+                inundacion: 'https://wms.mapama.gob.es/sig/agua/ZI_LaminasQ100/wms.aspx?request=GetLegendGraphic&version=1.1.1&format=image/png&layer=NZ.RiskZone',
+                t10: 'https://wms.mapama.gob.es/sig/agua/ZI_LaminasQ10/wms.aspx?request=GetLegendGraphic&version=1.1.1&format=image/png&layer=NZ.RiskZone',
+                t100: 'https://wms.mapama.gob.es/sig/agua/ZI_LaminasQ100/wms.aspx?request=GetLegendGraphic&version=1.1.1&format=image/png&layer=NZ.RiskZone',
+                t500: 'https://wms.mapama.gob.es/sig/agua/ZI_LaminasQ500/wms.aspx?request=GetLegendGraphic&version=1.1.1&format=image/png&layer=NZ.RiskZone',
+                natura: 'https://wms.mapama.gob.es/sig/Biodiversidad/RedNatura/wms.aspx?request=GetLegendGraphic&version=1.1.1&format=image/png&layer=PS.ProtectedSite',
+                vias: 'https://wms.mapama.gob.es/sig/Biodiversidad/ViasPecuarias/wms.aspx?request=GetLegendGraphic&version=1.1.1&format=image/png&layer=Vias_Pecuarias',
+                montes: 'https://wms.mapama.gob.es/sig/Biodiversidad/MontesPublicos/wms.aspx?request=GetLegendGraphic&version=1.1.1&format=image/png&layer=Montes_Publicos',
+                siose: 'https://servicios.idee.es/wms-inspire/ocupacion-suelo?request=GetLegendGraphic&version=1.3.0&format=image/png&layer=LU.ExistingLandUse',
+                calificacion: 'https://servicios.idee.es/wms-inspire/uso-suelo?request=GetLegendGraphic&version=1.3.0&format=image/png&layer=EL.LandUse'
+            };
+
+            const url = legends[capa];
+            if (!url) {
+                el.innerHTML = `<div style="color:#999; font-size:0.85rem;">Leyenda no disponible para "${capa}"</div>`;
+                return;
+            }
+
+            el.innerHTML = `
+                <div style="font-size:0.85rem; color:#2c3e50; margin-block-end: 6px;"><b>${capa}</b></div>
+                <img src="${url}" alt="Leyenda ${capa}" onerror="this.remove(); this.parentElement.insertAdjacentHTML('beforeend','<div style=\'color:#e74c3c; font-size:0.85rem;\'>Error cargando la leyenda</div>');">
+            `;
         }
 
         function centrarMapa() {
@@ -990,9 +1315,15 @@
             resultsEl.style.display = 'block';
             resultsEl.innerHTML = 'Cargando contorno...';
 
+            if (busquedaController) {
+                busquedaController.abort();
+            }
+            busquedaController = new AbortController();
+            setProgress(true, 'Cargando contorno...', 15);
+
             // 1. Cargar contorno
             try {
-                var res = await fetch(`/api/v1/referencia/${ref}/geojson`);
+                var res = await fetch(`/api/v1/referencia/${ref}/geojson`, { signal: busquedaController.signal });
                 var data = await res.json();
 
                 // Verificar si hay error en la respuesta
@@ -1006,18 +1337,29 @@
                 if (layer.getBounds().isValid()) {
                     map.fitBounds(layer.getBounds());
                 }
+                ultimaReferencia = ref;
+                actualizarPanelParcela();
+                setProgress(true, 'Contorno cargado. Iniciando proceso...', 35);
                 resultsEl.innerHTML = '✅ Contorno cargado.<br>Iniciando proceso completo...';
             } catch(e) { 
+                if (e.name === 'AbortError') {
+                    resultsEl.innerHTML = '<span style="color:#e67e22;">Operación cancelada.</span>';
+                    setProgress(false, '', 0);
+                    return;
+                }
                 resultsEl.innerHTML = `<span style="color:red;">Error cargando contorno: ${e.message}</span>`;
+                setProgress(false, '', 0);
                 return; // Detener si no se puede cargar el contorno
             }
 
             // 2. Iniciar proceso completo
             try {
+                setProgress(true, 'Ejecutando proceso completo...', 55);
                 const processRes = await fetch('/api/v1/procesar-completo', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ referencia: ref })
+                    body: JSON.stringify({ referencia: ref }),
+                    signal: busquedaController.signal
                 });
 
                 if (!processRes.ok) {
@@ -1028,6 +1370,7 @@
                 const processData = await processRes.json();
                 
                 if (processData.status === 'success') {
+                    setProgress(true, 'Proceso finalizado', 100);
                     // Generar lista de verificación
                     let checklist = '<ul style="list-style:none; padding:0; margin:10px 0; font-size:0.85rem; color:#333;">';
                     const items = [
@@ -1050,12 +1393,21 @@
                         <a href="${processData.zip_path}" download>
                             <button class="action-btn" style="margin-block-start:10px;">Descargar ZIP</button>
                         </a>`;
+                    setTimeout(() => setProgress(false, '', 0), 800);
                 } else {
                     throw new Error(processData.error || 'Fallo en el proceso');
                 }
 
             } catch (e) {
+                if (e.name === 'AbortError') {
+                    resultsEl.innerHTML = '<span style="color:#e67e22;">Operación cancelada.</span>';
+                    setProgress(false, '', 0);
+                    return;
+                }
                 resultsEl.innerHTML = `<span style="color:red;">Error: ${e.message}</span>`;
+                setProgress(false, '', 0);
+            } finally {
+                busquedaController = null;
             }
         }
 
