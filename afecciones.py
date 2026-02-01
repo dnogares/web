@@ -28,13 +28,8 @@ def get_capas_dir():
     # 2. Volumen persistente EasyPanel
     if os.path.exists("/app/capas"):
         return "/app/capas"
-        
-    # 3. Ruta de red para pruebas locales (Windows)
-    z_path = r"Z:\compartidaconeasypanel\files3\proyecto_gis\capas"
-    if os.path.exists(z_path):
-        return z_path
-        
-    # 4. Fallback local
+
+    # 3. Fallback local
     return "capas"
 
 def listar_capas_locales():

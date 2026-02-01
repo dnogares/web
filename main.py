@@ -38,12 +38,10 @@ MAPA_FILE = "mapa_municipios.json"
 
 # --- CONFIGURACIÓN DE RUTAS DE CAPAS ---
 # Prioridad:
-# 1. Ruta Z: (Entorno local específico del usuario)
-# 2. Ruta /app/capas (Entorno Docker/Producción)
-# 3. Ruta ./capas (Entorno local relativo)
+# 1. Ruta /app/capas (Entorno Docker/Producción)
+# 2. Ruta ./capas (Entorno local relativo)
 
 POSSIBLE_LAYERS_DIRS = [
-    Path(r"Z:\compartidaconeasypanel\files3\proyecto_gis\capas"),
     Path("/app/capas"),
     Path("capas")
 ]
