@@ -1652,6 +1652,7 @@ async def get_visor_page():
 
 # Montar archivos estáticos
 try:
+    Path("static").mkdir(exist_ok=True) # Asegurar que existe para evitar error en mount
     app.mount("/outputs", StaticFiles(directory=outputs_dir), name="outputs")
     app.mount("/static", StaticFiles(directory="static"), name="static")
     # Montar directorios de capas para acceso directo a FlatGeobuf (.fgb)
