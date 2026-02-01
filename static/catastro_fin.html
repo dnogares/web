@@ -568,7 +568,7 @@
         
         <div id="map-container">
             <div class="map-toolbar">
-                <button class="tool-btn" id="catastro-toggle" onclick="toggleCatastroLayer()" title="Activar/Desactivar Catastro" style="background: #2c3e50; color: white;"><i class="fa-solid fa-map"></i></button>
+                <button class="tool-btn" id="location-toggle" onclick="toggleLocationTracking()" title="Activar/Desactivar GPS en tiempo real" style="background: white; color: #444;"><i class="fa-solid fa-location-crosshairs"></i></button>
                 <button class="tool-btn" onclick="activarMedicion('distancia')" title="Medir Distancia"><i class="fa-solid fa-ruler"></i></button>
                 <button class="tool-btn" onclick="activarMedicion('area')" title="Medir Área"><i class="fa-solid fa-draw-polygon"></i></button>
                 <button class="tool-btn danger" onclick="limpiarMapa()" title="Limpiar Mapa"><i class="fa-solid fa-trash"></i></button>
@@ -1134,6 +1134,151 @@
         function isCatastroActivo() {
             const cb = document.getElementById('layer-catastro');
             return cb ? cb.checked : map.hasLayer(layers.catastro);
+        }
+
+        function toggleLocationTracking() {
+            const btn = document.getElementById('location-toggle');
+            const isActive = window.locationTrackingActive;
+            
+            if (isActive) {
+                // Detener seguimiento
+                window.locationTrackingActive = false;
+                if (window.locationWatchId) {
+                    navigator.geolocation.clearWatch(window.locationWatchId);
+                    window.locationWatchId = null;
+                }
+                if (window.locationMarker) {
+                    map.removeLayer(window.locationMarker);
+                    window.locationMarker = null;
+                }
+                if (window.locationCircle) {
+                    map.removeLayer(window.locationCircle);
+                    window.locationCircle = null;
+                }
+                btn.style.background = 'white';
+                btn.style.color = '#444';
+                btn.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i>';
+                console.log('📍 Seguimiento GPS detenido');
+            } else {
+                // Iniciar seguimiento
+                if (!navigator.geolocation) {
+                    alert('Tu navegador no soporta geolocalización');
+                    return;
+                }
+                
+                window.locationTrackingActive = true;
+                btn.style.background = '#e74c3c';
+                btn.style.color = 'white';
+                btn.innerHTML = '<i class="fa-solid fa-location-crosshairs fa-pulse"></i>';
+                
+                // Opciones de geolocalización
+                const options = {
+                    enableHighAccuracy: true,
+                    timeout: 5000,
+                    maximumAge: 0
+                };
+                
+                // Obtener posición inicial
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        updateLocation(position);
+                    },
+                    function(error) {
+                        console.error('❌ Error obteniendo posición:', error);
+                        alert('No se pudo obtener tu ubicación: ' + error.message);
+                        toggleLocationTracking(); // Resetear botón
+                    },
+                    options
+                );
+                
+                // Iniciar seguimiento continuo
+                window.locationWatchId = navigator.geolocation.watchPosition(
+                    function(position) {
+                        updateLocation(position);
+                    },
+                    function(error) {
+                        console.error('❌ Error en seguimiento GPS:', error);
+                        if (error.code === 3) { // TIMEOUT
+                            console.log('⏰ Timeout de GPS, reintentando...');
+                        } else {
+                            alert('Error en seguimiento GPS: ' + error.message);
+                            toggleLocationTracking();
+                        }
+                    },
+                    options
+                );
+                
+                console.log('📍 Seguimiento GPS iniciado');
+            }
+        }
+
+        function updateLocation(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
+            
+            const latlng = L.latLng(lat, lng);
+            
+            // Actualizar o crear marcador de posición
+            if (window.locationMarker) {
+                window.locationMarker.setLatLng(latlng);
+            } else {
+                window.locationMarker = L.marker(latlng, {
+                    icon: L.divIcon({
+                        className: 'location-marker',
+                        html: '<div style="background: #e74c3c; border: 3px solid white; border-radius: 50%; width: 16px; height: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></div>',
+                        iconSize: [16, 16],
+                        iconAnchor: [8, 8]
+                    })
+                }).addTo(map);
+            }
+            
+            // Actualizar o crear círculo de precisión
+            if (window.locationCircle) {
+                window.locationCircle.setLatLng(latlng);
+                window.locationCircle.setRadius(accuracy);
+            } else {
+                window.locationCircle = L.circle(latlng, {
+                    radius: accuracy,
+                    color: '#e74c3c',
+                    fillColor: '#e74c3c',
+                    fillOpacity: 0.1,
+                    weight: 2
+                }).addTo(map);
+            }
+            
+            // Centrar mapa en la posición (con suavizado)
+            if (window.locationTrackingActive) {
+                map.panTo(latlng);
+            }
+            
+            // Actualizar información en el panel de parcela
+            const parcelInfo = document.getElementById('parcel-info');
+            if (parcelInfo && window.locationTrackingActive) {
+                const accuracyText = accuracy < 10 ? 'Excelente' : accuracy < 50 ? 'Buena' : accuracy < 100 ? 'Regular' : 'Baja';
+                const locationInfo = `
+                    <div style="margin-top: 10px; padding: 8px; background: #f8f9fa; border-radius: 4px; font-size: 0.8rem;">
+                        <div style="color: #e74c3c; font-weight: bold;">
+                            <i class="fa-solid fa-location-crosshairs"></i> Tu ubicación
+                        </div>
+                        <div>Lat: ${lat.toFixed(6)}°</div>
+                        <div>Lng: ${lng.toFixed(6)}°</div>
+                        <div>Precisión: ${accuracy.toFixed(1)}m (${accuracyText})</div>
+                    </div>
+                `;
+                
+                // Si el panel ya está visible, añadir info de ubicación
+                if (parcelInfo.style.display !== 'none') {
+                    const existingLocationInfo = parcelInfo.querySelector('.location-info');
+                    if (existingLocationInfo) {
+                        existingLocationInfo.outerHTML = locationInfo;
+                    } else {
+                        parcelInfo.innerHTML += locationInfo;
+                    }
+                }
+            }
+            
+            console.log(`📍 Ubicación actualizada: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${accuracy.toFixed(1)}m)`);
         }
 
         function toggleCatastroLayer() {
@@ -1798,12 +1943,13 @@
             // Activar capa de catastro por defecto
             if (layers.catastro) {
                 map.addLayer(layers.catastro);
-                const btn = document.getElementById('catastro-toggle');
-                if (btn) {
-                    btn.style.background = '#2c3e50';
-                    btn.style.color = 'white';
-                }
             }
+            
+            // Inicializar variables de seguimiento GPS
+            window.locationTrackingActive = false;
+            window.locationWatchId = null;
+            window.locationMarker = null;
+            window.locationCircle = null;
         });
 
         // Actualizar botones CAD
