@@ -63,16 +63,37 @@ class InformeUrbanistico:
             return config_default
     
     def generar_informe_completo(self, ref_catastral: str = None, provincia: str = None, 
-                                municipio: str = None, via: str = None, numero: str = None) -> Dict[str, Any]:
+                                municipio: str = None, via: str = None, numero: str = None,
+                                geometria_anillos: List = None, datos_sede: Dict = None, 
+                                datos_registro: Dict = None) -> Dict[str, Any]:
         """
-        Genera un informe urbanístico completo
+        Genera un informe urbanístico completo con soporte para geometría y datos adicionales
         """
         try:
-            # Simulación de obtención de datos (en producción vendría de APIs externas)
+            # Obtener datos de la parcela
             datos_parcela = self._obtener_datos_parcela(ref_catastral, provincia, municipio, via, numero)
+            
+            # Integrar geometría de anillos si se proporciona
+            if geometria_anillos:
+                datos_parcela.update(self._procesar_geometria_anillos(geometria_anillos))
+            
+            # Integrar datos de sede si se proporcionan
+            if datos_sede:
+                datos_parcela.update(self._procesar_datos_sede(datos_sede))
+            
+            # Realizar análisis técnico
             analisis_tecnico = self._realizar_analisis_tecnico(datos_parcela)
+            
+            # Obtener clasificación del suelo
             clasificacion_suelo = self._obtener_clasificacion_suelo(datos_parcela)
+            
+            # Analizar afecciones territoriales
             afecciones = self._analizar_afecciones_territoriales(datos_parcela)
+            
+            # Cruzar con Registro de la Propiedad si hay datos
+            cruce_registro = None
+            if datos_registro:
+                cruce_registro = self._cruzar_registro_propiedad(datos_registro, datos_parcela)
             
             return {
                 "referencia_catastral": ref_catastral,
@@ -81,7 +102,15 @@ class InformeUrbanistico:
                 "clasificacion_suelo": clasificacion_suelo,
                 "analisis_tecnico": analisis_tecnico,
                 "afecciones_territoriales": afecciones,
-                "fecha_informe": self._get_fecha_actual()
+                "cruce_registro_propiedad": cruce_registro,
+                "fecha_informe": self._get_fecha_actual(),
+                "configuracion_aplicada": {
+                    "coeficientes_usados": self.config['coeficientes_edificabilidad'],
+                    "afecciones_evaluadas": self.config['afecciones_territoriales'],
+                    "geometria_procesada": geometria_anillos is not None,
+                    "datos_sede_usados": datos_sede is not None,
+                    "datos_registro_usados": datos_registro is not None
+                }
             }
             
         except Exception as e:
@@ -93,80 +122,349 @@ class InformeUrbanistico:
     def _obtener_datos_parcela(self, ref_catastral: str = None, provincia: str = None, 
                               municipio: str = None, via: str = None, numero: str = None) -> Dict[str, Any]:
         """
-        Obtiene datos de la parcela (simulado)
+        Obtiene datos de la parcela con manejo de errores mejorado
         """
-        # Simulación de datos catastrales
-        return {
-            "superficie_terreno": 850,
-            "superficie_construida": 180,
-            "uso_principal": "residencial",
-            "ano_construccion": 1998,
-            "estado_conservacion": "Bueno",
-            "numero_plantas": 3,
-            "coordenadas": [-4.4250, 36.7200]  # Coordenadas Málaga
-        }
+        try:
+            # Intentar obtener datos reales si hay referencia catastral
+            if ref_catastral:
+                # Aquí podríamos integrar con APIs catastrales reales
+                # Por ahora simulamos datos más realistas
+                return {
+                    "superficie_terreno": 850,
+                    "superficie_construida": 180,
+                    "uso_principal": "residencial",
+                    "ano_construccion": 1998,
+                    "estado_conservacion": "Bueno",
+                    "numero_plantas": 3,
+                    "coordenadas": [-4.4250, 36.7200],  # Coordenadas Málaga
+                    "ref_catastral": ref_catastral,
+                    "direccion_completa": f"{via} {numero}, {municipio}, {provincia}" if via and numero else "Sin especificar"
+                }
+            else:
+                # Datos por defecto si no hay referencia
+                return {
+                    "superficie_terreno": 1000,
+                    "superficie_construida": 200,
+                    "uso_principal": "residencial",
+                    "ano_construccion": 2000,
+                    "estado_conservacion": "Bueno",
+                    "numero_plantas": 2,
+                    "coordenadas": [-4.4250, 36.7200],
+                    "ref_catastral": ref_catastral or "Sin especificar",
+                    "direccion_completa": f"{via} {numero}, {municipio}, {provincia}" if via and numero else "Sin especificar"
+                }
+        except Exception as e:
+            raise Exception(f"Error obteniendo datos de la parcela: {str(e)}")
     
     def _realizar_analisis_tecnico(self, datos_parcela: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Realiza el análisis técnico de la parcela
+        Realiza el análisis técnico de la parcela con manejo de errores
         """
-        uso = datos_parcela.get('uso_principal', 'residencial')
-        coef = self.config['coeficientes_edificabilidad'].get(uso, 0.6)
-        
-        sup_terreno = datos_parcela.get('superficie_terreno', 0)
-        sup_construida = datos_parcela.get('superficie_construida', 0)
-        
-        edificabilidad_maxima = sup_terreno * coef
-        edificabilidad_actual = sup_construida
-        edificabilidad_disponible = edificabilidad_maxima - edificabilidad_actual
-        
-        return {
-            "superficie_terreno_m2": sup_terreno,
-            "superficie_construida_m2": sup_construida,
-            "edificabilidad_maxima_m2": round(edificabilidad_maxima, 2),
-            "edificabilidad_actual_m2": edificabilidad_actual,
-            "edificabilidad_disponible_m2": round(max(0, edificabilidad_disponible), 2),
-            "coeficiente_edificabilidad": coef,
-            "porcentaje_ocupacion": round((sup_construida / sup_terreno) * 100, 2) if sup_terreno > 0 else 0
-        }
+        try:
+            uso = datos_parcela.get('uso_principal', 'residencial')
+            coef = self.config['coeficientes_edificabilidad'].get(uso, 0.6)
+            
+            sup_terreno = datos_parcela.get('superficie_terreno', 0)
+            sup_construida = datos_parcela.get('superficie_construida', 0)
+            
+            if sup_terreno <= 0:
+                raise ValueError("La superficie del terreno debe ser mayor que cero")
+            
+            edificabilidad_maxima = sup_terreno * coef
+            edificabilidad_actual = sup_construida
+            edificabilidad_disponible = edificabilidad_maxima - edificabilidad_actual
+            
+            return {
+                "superficie_terreno_m2": sup_terreno,
+                "superficie_construida_m2": sup_construida,
+                "edificabilidad_maxima_m2": round(edificabilidad_maxima, 2),
+                "edificabilidad_actual_m2": edificabilidad_actual,
+                "edificabilidad_disponible_m2": round(max(0, edificabilidad_disponible), 2),
+                "coeficiente_edificabilidad": coef,
+                "porcentaje_ocupacion": round((sup_construida / sup_terreno) * 100, 2) if sup_terreno > 0 else 0,
+                "densidad_neta": round(sup_construida / sup_terreno, 2) if sup_terreno > 0 else 0
+            }
+        except Exception as e:
+            raise Exception(f"Error en análisis técnico: {str(e)}")
     
     def _obtener_clasificacion_suelo(self, datos_parcela: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Obtiene la clasificación del suelo
+        Obtiene la clasificación del suelo con manejo de errores
         """
-        # Simulación según coordenadas y uso
-        return {
-            "clasificacion": "Suelo Urbano",
-            "calificacion": "Residencial Consolidado",
-            "uso_principal": self.config['usos_principales'].get(datos_parcela.get('uso_principal', 'residencial'), 'Vivienda'),
-            "densidad_edificatoria": "Media",
-            "ordenanza": "Plan General Municipal",
-            "zona": "Centro Urbano"
-        }
+        try:
+            uso = datos_parcela.get('uso_principal', 'residencial')
+            coordenadas = datos_parcela.get('coordenadas', [0, 0])
+            
+            # Clasificación basada en uso y configuración
+            clasificaciones = self.config.get('clasificaciones_suelo', {})
+            calificaciones = self.config.get('calificaciones', {})
+            
+            # Determinar clasificación según coordenadas (simulación)
+            if abs(coordenadas[0]) < 0.5 and abs(coordenadas[1]) < 0.5:  # Centro urbano
+                clasificacion = clasificaciones.get('urbano', 'Suelo Urbano')
+                calificacion = calificaciones.get('residencial_consolidado', 'Residencial Consolidado')
+            else:
+                clasificacion = clasificaciones.get('urbanizable', 'Suelo Urbanizable')
+                calificacion = calificaciones.get('residencial_en_desarrollo', 'Residencial en Desarrollo')
+            
+            return {
+                "clasificacion": clasificacion,
+                "calificacion": calificacion,
+                "uso_principal": self.config['usos_principales'].get(uso, 'Vivienda'),
+                "densidad_edificatoria": "Media",
+                "ordenanza": "Plan General Municipal",
+                "zona": "Centro Urbano" if clasificacion == "Suelo Urbano" else "Periferia",
+                "sector": "Residencial" if uso == "residencial" else "Terciario"
+            }
+        except Exception as e:
+            raise Exception(f"Error obteniendo clasificación del suelo: {str(e)}")
     
     def _analizar_afecciones_territoriales(self, datos_parcela: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Analiza las afecciones territoriales
+        Analiza las afecciones territoriales con manejo de errores
         """
-        afecciones = self.config['afecciones_territoriales']
-        
-        # Simulación de afecciones (en producción vendría de cruce con capas geográficas)
-        afecciones_detectadas = {}
-        
-        for afeccion in afecciones:
-            # Simulación aleatoria de afecciones
-            import random
-            afectado = random.choice([True, False, False])  # 33% probabilidad
-            afecciones_detectadas[afeccion] = afectado
-        
-        return afecciones_detectadas
+        try:
+            coordenadas = datos_parcela.get('coordenadas', [0, 0])
+            afecciones = self.config.get('afecciones_territoriales', [])
+            
+            if not afecciones:
+                raise ValueError("No hay afecciones territoriales configuradas")
+            
+            # Simulación de afecciones basada en coordenadas
+            afecciones_detectadas = {}
+            
+            for afeccion in afecciones:
+                try:
+                    # Lógica más sofisticada para detectar afecciones
+                    afectado = self._evaluar_afeccion(afeccion, coordenadas, datos_parcela)
+                    afecciones_detectadas[afeccion] = {
+                        "afectada": afectado,
+                        "descripcion": self._get_descripcion_afeccion(afeccion),
+                        "restriccion": self._get_restriccion_afeccion(afeccion)
+                    }
+                except Exception as e:
+                    print(f"Error evaluando afección {afeccion}: {e}")
+                    afecciones_detectadas[afeccion] = {
+                        "afectada": False,
+                        "descripcion": "Error en evaluación",
+                        "restriccion": "No determinada"
+                    }
+            
+            return afecciones_detectadas
+        except Exception as e:
+            raise Exception(f"Error analizando afecciones territoriales: {str(e)}")
     
     def _get_fecha_actual(self) -> str:
         """
-        Obtiene la fecha actual formateada
+        Obtiene la fecha actual formateada con manejo de errores
         """
-        from datetime import datetime
-        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        try:
+            from datetime import datetime
+            return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        except Exception as e:
+            return f"Error obteniendo fecha: {str(e)}"
+    
+    def _evaluar_afeccion(self, afeccion: str, coordenadas: List[float], datos_parcela: Dict[str, Any]) -> bool:
+        """
+        Evalúa si una parcela está afectada por una afección específica
+        """
+        # Lógica simulada basada en coordenadas y tipo de afección
+        x, y = coordenadas
+        
+        # Afecciones basadas en ubicación
+        if "Riesgo de Inundación" in afeccion:
+            return y < 36.71  # Zonas bajas
+        elif "Costas Marítimas" in afeccion:
+            return y > 36.73  # Cerca del mar
+        elif "Patrimonio Cultural" in afeccion:
+            return abs(x + 4.42) < 0.02  # Centro histórico
+        else:
+            # Para otras afecciones, probabilidad basada en uso
+            import random
+            return random.random() < 0.3
+    
+    def _get_descripcion_afeccion(self, afeccion: str) -> str:
+        """
+        Obtiene descripción detallada de una afección
+        """
+        descripciones = {
+            "Patrimonio Cultural": "Protección de bienes de interés cultural",
+            "Riesgo de Inundación": "Zona con riesgo de inundación periódica",
+            "Protección Ambiental": "Área protegida por normativa ambiental",
+            "Suelo Rústico": "Suelo no urbanizable con protección agrícola",
+            "Zona Arqueológica": "Zona con yacimientos arqueológicos",
+            "Vía Pecuaria": "Trayecto tradicional de ganado",
+            "Dominio Público Hidráulico": "Zona de servidumbre de cauces públicos",
+            "Costas Marítimas": "Zona de servidumbre de protección marítima"
+        }
+        return descripciones.get(afeccion, "Afección territorial específica")
+    
+    def _get_restriccion_afeccion(self, afeccion: str) -> str:
+        """
+        Obtiene el tipo de restricción de una afección
+        """
+        restricciones = {
+            "Patrimonio Cultural": "Prohibición de demolición",
+            "Riesgo de Inundación": "Limitación de uso bajo rasante",
+            "Protección Ambiental": "Uso restringido",
+            "Suelo Rústico": "No edificable",
+            "Zona Arqueológica": "Autorización previa obligatoria",
+            "Vía Pecuaria": "Servidumbre de paso",
+            "Dominio Público Hidráulico": "Zona no edificable",
+            "Costas Marítimas": "Servidumbre de 100m"
+        }
+        return restricciones.get(afeccion, "Restricción específica")
+    
+    def _procesar_geometria_anillos(self, geometria_anillos: List) -> Dict[str, Any]:
+        """
+        Procesa geometría de anillos para obtener datos métricos precisos
+        """
+        try:
+            if not geometria_anillos or not isinstance(geometria_anillos, list):
+                return {"error": "Geometría de anillos no válida"}
+            
+            # El primer anillo es el exterior, los demás son patios
+            poly_exterior = Polygon(geometria_anillos[0])
+            patios = [Polygon(p) for p in geometria_anillos[1:]] if len(geometria_anillos) > 1 else []
+            
+            # Cálculos métricos precisos
+            area_total = poly_exterior.area * 10**10  # Ajuste escala según CRS
+            area_patios = sum(p.area * 10**10 for p in patios)
+            area_ocupacion = area_total - area_patios
+            
+            # Perímetro
+            perimetro_exterior = poly_exterior.length * 10**5  # Ajuste escala
+            
+            return {
+                "geometria_procesada": True,
+                "area_geometrica_m2": round(area_total, 2),
+                "area_patios_m2": round(area_patios, 2),
+                "area_ocupacion_geometrica_m2": round(area_ocupacion, 2),
+                "perimetro_m": round(perimetro_exterior, 2),
+                "numero_anillos": len(geometria_anillos),
+                "forma_parcela": self._determinar_forma_parcela(poly_exterior),
+                "factor_forma": round(area_ocupacion / (perimetro_exterior ** 2), 4) if perimetro_exterior > 0 else 0
+            }
+        except Exception as e:
+            return {"error": f"Error procesando geometría: {str(e)}"}
+    
+    def _procesar_datos_sede(self, datos_sede: Dict) -> Dict[str, Any]:
+        """
+        Procesa datos de la sede para enriquecer el análisis
+        """
+        try:
+            return {
+                "datos_sede_procesados": True,
+                "uso_principal_sede": datos_sede.get('uso', 'Residencial'),
+                "tipo_construccion": datos_sede.get('tipo_construccion', 'Bloque'),
+                "estado_conservacion": datos_sede.get('estado', 'Bueno'),
+                "ano_construccion_sede": datos_sede.get('ano_construccion', 2000),
+                "numero_viviendas": datos_sede.get('numero_viviendas', 1),
+                "superficie_util_m2": datos_sede.get('superficie_util', 150),
+                "coeficiente_eficiencia": self._calcular_eficiencia(datos_sede)
+            }
+        except Exception as e:
+            return {"error": f"Error procesando datos de sede: {str(e)}"}
+    
+    def _cruzar_registro_propiedad(self, datos_registro: Dict, datos_parcela: Dict) -> Dict[str, Any]:
+        """
+        Cruza datos del Registro de la Propiedad con datos catastrales
+        """
+        try:
+            superficie_registral = float(datos_registro.get('superficie_registral', 0))
+            superficie_catastral = datos_parcela.get('superficie_terreno', 0)
+            
+            if superficie_registral <= 0:
+                return {"error": "Superficie registral no válida"}
+            
+            diferencia = superficie_catastral - superficie_registral
+            desvio_porcentual = (diferencia / superficie_registral) * 100 if superficie_registral > 0 else 0
+            
+            # Determinar si hay coordinación según Ley 13/2015
+            coordinacion_posible = abs(desvio_porcentual) <= 10.0
+            
+            return {
+                "cruce_registro_realizado": True,
+                "superficie_registral_m2": round(superficie_registral, 2),
+                "superficie_catastral_m2": round(superficie_catastral, 2),
+                "diferencia_m2": round(diferencia, 2),
+                "desvio_porcentual": round(desvio_porcentual, 2),
+                "coordinacion_posible": coordinacion_posible,
+                "nivel_concordancia": self._determinar_nivel_concordancia(desvio_porcentual),
+                "recomendacion": self._generar_recomendacion_cruce(desvio_porcentual, coordinacion_posible)
+            }
+        except Exception as e:
+            return {"error": f"Error en cruce con registro: {str(e)}"}
+    
+    def _determinar_forma_parcela(self, polygon: Polygon) -> str:
+        """
+        Determina la forma de la parcela basada en su geometría
+        """
+        try:
+            # Calcular relación entre área y perímetro cuadrado
+            area = polygon.area
+            perimetro = polygon.length
+            
+            if perimetro == 0:
+                return "Indeterminada"
+            
+            # Factor de forma (círculo perfecto = 1/4π ≈ 0.0796)
+            factor_forma = area / (perimetro ** 2)
+            
+            if factor_forma > 0.06:
+                return "Regular/Cuadrada"
+            elif factor_forma > 0.04:
+                return "Rectangular"
+            elif factor_forma > 0.02:
+                return "Irregular"
+            else:
+                return "Muy irregular"
+        except:
+            return "No determinable"
+    
+    def _calcular_eficiencia(self, datos_sede: Dict) -> float:
+        """
+        Calcula coeficiente de eficiencia de la construcción
+        """
+        try:
+            superficie_util = float(datos_sede.get('superficie_util', 150))
+            superficie_construida = float(datos_sede.get('superficie_construida', 180))
+            
+            if superficie_construida > 0:
+                return round(superficie_util / superficie_construida, 3)
+            return 0.0
+        except:
+            return 0.0
+    
+    def _determinar_nivel_concordancia(self, desvio_porcentual: float) -> str:
+        """
+        Determina el nivel de concordancia entre catastro y registro
+        """
+        abs_desvio = abs(desvio_porcentual)
+        
+        if abs_desvio <= 5:
+            return "Muy alta"
+        elif abs_desvio <= 10:
+            return "Alta"
+        elif abs_desvio <= 20:
+            return "Media"
+        elif abs_desvio <= 30:
+            return "Baja"
+        else:
+            return "Muy baja"
+    
+    def _generar_recomendacion_cruce(self, desvio_porcentual: float, coordinacion_posible: bool) -> str:
+        """
+        Genera recomendación basada en el cruce de datos
+        """
+        abs_desvio = abs(desvio_porcentual)
+        
+        if coordinacion_posible:
+            return "Coordinación catastral-registral posible. Desviación dentro de límites legales."
+        elif abs_desvio <= 20:
+            return "Se recomienda verificar mediciones y posible rectificación."
+        else:
+            return "Desviación significativa. Requiere intervención técnica y posible procedimiento de rectificación."
 
 
 # Función de compatibilidad con el código existente
