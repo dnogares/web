@@ -9,9 +9,11 @@ import sys
 import socket
 import requests
 import unicodedata
+import time
+import threading
 from pathlib import Path
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, Query
 from fastapi.staticfiles import StaticFiles
@@ -19,6 +21,66 @@ from fastapi.responses import HTMLResponse, FileResponse, Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+
+# --- CONFIGURACIÓN DE RETENCIÓN DE ARCHIVOS ---
+TIEMPO_RETENCION_ARCHIVOS = 24 * 60 * 60  # 24 horas en segundos
+ENABLE_FILE_RETENTION = True  # Activar retención de archivos
+
+# Estructura para trackear timestamps de archivos
+file_timestamps = {}
+
+def registrar_archivo(ref: str, filepath: Path):
+    """Registra un archivo para retención"""
+    if ENABLE_FILE_RETENTION:
+        expiry_time = time.time() + TIEMPO_RETENCION_ARCHIVOS
+        file_timestamps[str(filepath)] = {
+            "ref": ref,
+            "expiry": expiry_time,
+            "created": time.time()
+        }
+        # Guardar timestamp en archivo para persistencia
+        timestamp_file = filepath.parent / ".retention"
+        with open(timestamp_file, "w") as f:
+            json.dump({
+                "expiry": expiry_time,
+                "ref": ref
+            }, f)
+
+def cleanup_archivos_expirados():
+    """Limpia solo archivos expirados (ejecutado en background)"""
+    while True:
+        try:
+            ahora = time.time()
+            outputs_dir = cfg.get("rutas", {}).get("outputs", "outputs")
+            outputs_path = Path(outputs_dir)
+            
+            if outputs_path.exists():
+                for ref_dir in outputs_path.iterdir():
+                    if ref_dir.is_dir() and not ref_dir.name.startswith('.'):
+                        timestamp_file = ref_dir / ".retention"
+                        if timestamp_file.exists():
+                            try:
+                                with open(timestamp_file) as f:
+                                    data = json.load(f)
+                                if ahora > data.get("expiry", 0):
+                                    print(f"🗑️ Limpiando directorio expirado: {ref_dir}")
+                                    import shutil
+                                    shutil.rmtree(ref_dir)
+                            except Exception as e:
+                                print(f"⚠️ Error limpiando {ref_dir}: {e}")
+            
+            # Ejecutar cada hora
+            time.sleep(3600)
+            
+        except Exception as e:
+            print(f"❌ Error en cleanup: {e}")
+            time.sleep(300)  # Reintentar en 5 minutos
+
+# Iniciar cleanup en background
+if ENABLE_FILE_RETENTION:
+    cleanup_thread = threading.Thread(target=cleanup_archivos_expirados, daemon=True)
+    cleanup_thread.start()
+    print(f"✅ Sistema de retención de archivos activado ({TIEMPO_RETENCION_ARCHIVOS/3600:.1f} horas)")
 
 # --- CORRECCIÓN DE RUTAS ---
 # Asegurar que el servidor siempre trabaje en el directorio del script
@@ -1470,6 +1532,16 @@ async def procesar_completo(request: ProcesoRequest):
             buffer_metros=buffer
         )
         
+        # REGISTRAR ARCHIVOS PARA RETENCIÓN
+        if zip_path:
+            registrar_archivo(ref, Path(zip_path))
+        
+        # Registrar directorio completo para retención
+        ref_dir = Path(cfg["rutas"]["outputs"]) / ref
+        if ref_dir.exists():
+            registrar_archivo(ref, ref_dir)
+            print(f"📁 Directorio {ref} registrado para retención por 24 horas")
+        
         # Verificar que se generaron siluetas y aplicar a todas las imágenes si es necesario
         if CATASTRO_AVAILABLE:
             try:
@@ -1974,16 +2046,172 @@ async def get_visor_page():
 # Montar archivos estáticos
 try:
     Path("static").mkdir(exist_ok=True) # Asegurar que existe para evitar error en mount
+    
+    # ASEGURAR QUE outputs_dir SEA CONSISTENTE con cfg["rutas"]["outputs"]
+    outputs_dir = cfg.get("rutas", {}).get("outputs", "outputs")
+    Path(outputs_dir).mkdir(exist_ok=True)
+    
+    # Montar /outputs apuntando al directorio correcto
     app.mount("/outputs", StaticFiles(directory=outputs_dir), name="outputs")
     app.mount("/static", StaticFiles(directory="static"), name="static")
+    
     # Montar directorios de capas para acceso directo a FlatGeobuf (.fgb)
     if os.path.exists("capas"):
         app.mount("/capas", StaticFiles(directory="capas"), name="capas")
     if os.path.exists("ccnn"):
         app.mount("/ccnn", StaticFiles(directory="ccnn"), name="ccnn")
-    print("✅ Archivos estáticos montados en /static, /outputs, /capas y /ccnn")
+    
+    print(f"✅ Archivos estáticos montados:")
+    print(f"   /static -> static/")
+    print(f"   /outputs -> {outputs_dir}/")
+    if os.path.exists("capas"):
+        print(f"   /capas -> capas/")
+    if os.path.exists("ccnn"):
+        print(f"   /ccnn -> ccnn/")
+        
 except Exception as e:
     print(f"⚠️ Error montando archivos estáticos: {e}")
+
+# Añadir endpoint robusto para descargas
+@app.get("/api/v1/descargar-archivo/{ref}/{filename}")
+async def descargar_archivo_robusto(ref: str, filename: str):
+    """Endpoint robusto para descargar archivos con verificación de existencia"""
+    try:
+        # Usar la misma configuración que en el resto del código
+        outputs_dir = cfg.get("rutas", {}).get("outputs", "outputs")
+        file_path = Path(outputs_dir) / ref / filename
+        
+        print(f"🔍 Buscando archivo: {file_path}")
+        print(f"📁 Existe directorio ref: {file_path.parent.exists()}")
+        
+        if not file_path.exists():
+            print(f"❌ Archivo no encontrado: {file_path}")
+            
+            # Intentar buscar en ubicaciones alternativas
+            alternativas = [
+                Path(outputs_dir) / filename,  # Directo en outputs
+                Path(ref) / filename,           # En subdirectorio ref
+                Path("outputs") / ref / filename,  # outputs hardcoded
+            ]
+            
+            for alt_path in alternativas:
+                if alt_path.exists():
+                    file_path = alt_path
+                    print(f"✅ Archivo encontrado en alternativa: {file_path}")
+                    break
+            else:
+                # Listar archivos disponibles para debug
+                ref_dir = Path(outputs_dir) / ref
+                if ref_dir.exists():
+                    archivos = list(ref_dir.glob("*"))
+                    print(f"📋 Archivos disponibles en {ref_dir}:")
+                    for f in archivos[:10]:  # Mostrar solo los primeros 10
+                        print(f"   - {f.name}")
+                
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"Archivo no encontrado: {filename}. Buscado en: {file_path}"
+                )
+        
+        # Verificar que el archivo no esté vacío
+        if file_path.stat().st_size == 0:
+            raise HTTPException(status_code=404, detail="El archivo está vacío")
+        
+        print(f"✅ Sirviendo archivo: {file_path} ({file_path.stat().st_size} bytes)")
+        
+        return FileResponse(
+            file_path,
+            media_type="application/octet-stream",
+            filename=filename,
+            headers={
+                "Cache-Control": "no-cache",
+                "Access-Control-Allow-Origin": "*"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error en descarga: {e}")
+        raise HTTPException(status_code=500, detail=f"Error descargando archivo: {str(e)}")
+
+@app.get("/api/v1/descargar-global/{ref}")
+async def descargar_global(ref: str):
+    """Genera y sirve el ZIP completo de una referencia"""
+    try:
+        outputs_dir = cfg.get("rutas", {}).get("outputs", "outputs")
+        zip_path = Path(outputs_dir) / f"{ref}_completo.zip"
+        
+        print(f"🔍 Buscando ZIP global: {zip_path}")
+        
+        if not zip_path.exists():
+            print(f"📦 Generando ZIP para {ref}...")
+            
+            # Generar ZIP si no existe
+            from src.core.catastro_engine import CatastroEngine
+            engine = CatastroEngine(outputs_dir)
+            zip_generado = engine.crear_zip_referencia(ref, outputs_dir)
+            
+            if not zip_generado:
+                raise HTTPException(status_code=404, detail="No se pudo generar el ZIP")
+            
+            zip_path = Path(zip_generado)  # Usar la ruta devuelta
+        
+        if not zip_path.exists():
+            raise HTTPException(status_code=404, detail="ZIP no encontrado después de generar")
+        
+        file_size = zip_path.stat().st_size
+        print(f"✅ Sirviendo ZIP global: {zip_path} ({file_size/1024/1024:.1f} MB)")
+        
+        return FileResponse(
+            zip_path,
+            media_type="application/zip",
+            filename=f"{ref}_completo.zip",
+            headers={
+                "Cache-Control": "no-cache",
+                "Access-Control-Allow-Origin": "*"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error en descarga global: {e}")
+        raise HTTPException(status_code=500, detail=f"Error descargando ZIP global: {str(e)}")
+
+@app.get("/api/v1/listar-archivos/{ref}")
+async def listar_archivos_ref(ref: str):
+    """Lista todos los archivos disponibles para una referencia"""
+    try:
+        outputs_dir = cfg.get("rutas", {}).get("outputs", "outputs")
+        ref_dir = Path(outputs_dir) / ref
+        
+        if not ref_dir.exists():
+            return {"status": "error", "message": "Directorio no encontrado", "archivos": []}
+        
+        archivos = []
+        for file_path in ref_dir.rglob("*"):
+            if file_path.is_file():
+                rel_path = file_path.relative_to(outputs_dir)
+                download_url = f"/api/v1/descargar-archivo/{ref}/{file_path.name}"
+                
+                archivos.append({
+                    "nombre": file_path.name,
+                    "ruta": str(rel_path),
+                    "url": download_url,
+                    "tamano": file_path.stat().st_size,
+                    "tipo": file_path.suffix.lower()
+                })
+        
+        return {
+            "status": "success",
+            "referencia": ref,
+            "total_archivos": len(archivos),
+            "archivos": sorted(archivos, key=lambda x: x["nombre"])
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e), "archivos": []}
 
 if __name__ == "__main__":
     print("🚀 Iniciando servidor FastAPI para visor catastral con Glassmorphism...")

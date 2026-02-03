@@ -1440,7 +1440,15 @@
                 <div class="info-card">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="m-0"><i class="fas fa-folder-open"></i> Documentación Generada</h5>
-                        ${zipPath ? `<a href="${zipPath}" download class="btn btn-primary btn-sm"><i class="fas fa-file-archive"></i> Descargar Todo (ZIP)</a>` : ''}
+                        <div class="btn-group" role="group">
+                            ${zipPath ? `<a href="${zipPath}" download class="btn btn-primary btn-sm"><i class="fas fa-file-archive"></i> ZIP Catastro</a>` : ''}
+                            <button onclick="descargarGlobal('${ref}')" class="btn btn-success btn-sm" title="Descargar todos los archivos generados">
+                                <i class="fas fa-download"></i> Descargar Global
+                            </button>
+                            <button onclick="listarArchivos('${ref}')" class="btn btn-info btn-sm" title="Ver todos los archivos disponibles">
+                                <i class="fas fa-list"></i> Listar Archivos
+                            </button>
+                        </div>
                     </div>
                     <div class="row g-2">
             `;
@@ -1925,6 +1933,169 @@
 
             // Scroll a resultados
             resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Función para descargar ZIP global
+        async function descargarGlobal(ref) {
+            try {
+                showProgress('Generando ZIP global...', 50);
+                
+                const response = await fetch(`/api/v1/descargar-global/${ref}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+                
+                // Obtener el blob y descargar
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${ref}_completo.zip`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                showProgress('✅ ZIP global descargado', 100);
+                setTimeout(hideProgress, 2000);
+                
+            } catch (error) {
+                console.error('Error descargando ZIP global:', error);
+                alert(`Error descargando ZIP global: ${error.message}`);
+                hideProgress();
+            }
+        }
+
+        // Función para listar todos los archivos
+        async function listarArchivos(ref) {
+            try {
+                showProgress('Listando archivos...', 30);
+                
+                const response = await fetch(`/api/v1/listar-archivos/${ref}`);
+                const data = await response.json();
+                
+                if (data.status !== 'success') {
+                    throw new Error(data.message || 'Error listando archivos');
+                }
+                
+                showProgress('Mostrando archivos...', 80);
+                
+                // Crear modal para mostrar archivos
+                const modal = document.createElement('div');
+                modal.className = 'modal fade';
+                modal.innerHTML = `
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">
+                                    <i class="fas fa-folder-open"></i> Archivos de ${ref} (${data.total_archivos})
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Nombre</th>
+                                                <th>Tipo</th>
+                                                <th>Tamaño</th>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${data.archivos.map(archivo => `
+                                                <tr>
+                                                    <td>
+                                                        <i class="fas fa-file-${getFileIcon(archivo.tipo)}"></i>
+                                                        ${archivo.nombre}
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-${getTypeColor(archivo.tipo)}">${archivo.tipo}</span>
+                                                    </td>
+                                                    <td>${formatFileSize(archivo.tamano)}</td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm">
+                                                            <a href="${archivo.url}" target="_blank" class="btn btn-outline-primary btn-sm" title="Ver">
+                                                                <i class="fas fa-eye"></i>
+                                                            </a>
+                                                            <a href="${archivo.url}" download class="btn btn-outline-success btn-sm" title="Descargar">
+                                                                <i class="fas fa-download"></i>
+                                                            </a>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                                <button type="button" class="btn btn-primary" onclick="descargarGlobal('${ref}')">
+                                    <i class="fas fa-download"></i> Descargar Todo (ZIP)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                const bsModal = new bootstrap.Modal(modal);
+                bsModal.show();
+                
+                // Limpiar modal al cerrar
+                modal.addEventListener('hidden.bs.modal', () => {
+                    document.body.removeChild(modal);
+                });
+                
+                hideProgress();
+                
+            } catch (error) {
+                console.error('Error listando archivos:', error);
+                alert(`Error listando archivos: ${error.message}`);
+                hideProgress();
+            }
+        }
+
+        // Funciones auxiliares
+        function getFileIcon(extension) {
+            const icons = {
+                '.pdf': 'pdf',
+                '.png': 'image',
+                '.jpg': 'image',
+                '.jpeg': 'image',
+                '.zip': 'archive',
+                '.xml': 'code',
+                '.kml': 'map',
+                '.geojson': 'map',
+                '.csv': 'csv'
+            };
+            return icons[extension.toLowerCase()] || 'alt';
+        }
+
+        function getTypeColor(extension) {
+            const colors = {
+                '.pdf': 'danger',
+                '.png': 'info',
+                '.jpg': 'info',
+                '.jpeg': 'info',
+                '.zip': 'primary',
+                '.xml': 'warning',
+                '.kml': 'success',
+                '.geojson': 'success',
+                '.csv': 'secondary'
+            };
+            return colors[extension.toLowerCase()] || 'secondary';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
     </script>
 </body>
