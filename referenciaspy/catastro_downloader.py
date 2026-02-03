@@ -286,46 +286,53 @@ class CatastroDownloader:
 
     # --------- NUEVO: utilidades de geometría / contorno ---------
 
-    def extraer_coordenadas_gml(self, gml_file):
-        """Extrae las coordenadas del polígono desde el archivo GML."""
+    def extraer_coordenadas_gml(self, gml_file: str) -> Optional[List[List[Tuple[float, float]]]]:
+        """
+        Extrae los anillos de coordenadas (exterior e interiores) de un archivo GML.
+        Devuelve una lista de anillos, donde cada anillo es una lista de tuplas (coordenadas).
+        El primer anillo suele ser el exterior.
+        """
         try:
             tree = ET.parse(gml_file)
             root = tree.getroot()
+            
+            namespaces = {
+                'gml': 'http://www.opengis.net/gml/3.2',
+                'cp': 'http://inspire.ec.europa.eu/schemas/cp/4.0'
+            }
+            
+            all_rings = []
+            
+            # Encuentra todos los polígonos en el GML
+            for polygon in root.findall('.//gml:Polygon', namespaces):
+                
+                def parse_ring(pos_list_element):
+                    ring = []
+                    if pos_list_element is not None and pos_list_element.text:
+                        parts = pos_list_element.text.strip().split()
+                        step = 3 if len(parts) > 2 and len(parts) % 3 == 0 else 2
+                        for i in range(0, len(parts), step):
+                            if i + 1 < len(parts):
+                                ring.append((float(parts[i]), float(parts[i+1])))
+                    return ring
 
-            coords = []
+                # Anillo exterior
+                exterior_poslist = polygon.find('.//gml:exterior/gml:LinearRing/gml:posList', namespaces)
+                exterior_ring = parse_ring(exterior_poslist)
+                if exterior_ring:
+                    all_rings.append(exterior_ring)
+                
+                # Anillos interiores (huecos)
+                for interior_poslist in polygon.findall('.//gml:interior/gml:LinearRing/gml:posList', namespaces):
+                    interior_ring = parse_ring(interior_poslist)
+                    if interior_ring:
+                        all_rings.append(interior_ring)
 
-            # posList GML 3.2 (Lat Lon)
-            for pos_list in root.findall(
-                ".//{http://www.opengis.net/gml/3.2}posList"
-            ):
-                parts = pos_list.text.strip().split()
+            if all_rings:
+                print(f"  ✓ Extraídos {len(all_rings)} anillos del GML")
+                return all_rings
 
-                # Manejar posList con coordenadas 2D o 3D (x y [z])
-                if len(parts) % 3 == 0:
-                    # asume triples (x,y,z) y descarta z
-                    for i in range(0, len(parts), 3):
-                        if i + 1 < len(parts):
-                            coords.append((float(parts[i]), float(parts[i + 1])))
-                else:
-                    for i in range(0, len(parts), 2):
-                        if i + 1 < len(parts):
-                            # Almacenamos el par como está. Asumimos que es Lat/Lon o Lon/Lat.
-                            coords.append((float(parts[i]), float(parts[i + 1])))
-
-            # pos individuales si no hay posList
-            if not coords:
-                for pos in root.findall(
-                    ".//{http://www.opengis.net/gml/3.2}pos"
-                ):
-                    parts = pos.text.strip().split()
-                    if len(parts) >= 2:
-                        coords.append((float(parts[0]), float(parts[1])))
-
-            if coords:
-                print(f"  ✓ Extraídas {len(coords)} coordenadas del GML")
-                return coords
-
-            print("  ⚠ No se encontraron coordenadas en el GML")
+            print("  ⚠ No se encontraron anillos de polígono en el GML")
             return None
 
         except Exception as e:
@@ -383,9 +390,7 @@ class CatastroDownloader:
             print(f"  ⚠ Error convirtiendo coordenadas a píxeles: {e}")
             return None
 
-    def dibujar_contorno_en_imagen(
-        self, imagen_path, pixels, output_path, color=(255, 0, 0), width=4
-    ):
+    def dibujar_contorno_en_imagen(self, imagen_path, pixels_or_rings, output_path, color=(255, 0, 0), width=4):
         """Dibuja el contorno de la parcela sobre una imagen existente."""
         if not PILLOW_AVAILABLE:
             print("  ⚠ Pillow no disponible, no se puede dibujar contorno")
@@ -396,11 +401,21 @@ class CatastroDownloader:
             overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
             draw = ImageDraw.Draw(overlay)
 
-            if len(pixels) > 2:
-                # Cerrar el polígono
-                if pixels[0] != pixels[-1]:
-                    pixels = pixels + [pixels[0]]
-                draw.line(pixels, fill=color + (255,), width=width)
+            # Detectar si es lista de anillos o lista de puntos
+            rings = []
+            if pixels_or_rings and isinstance(pixels_or_rings[0], (list, tuple)) and len(pixels_or_rings[0]) > 0 and isinstance(pixels_or_rings[0][0], (int, float)):
+                 # Es un solo anillo (lista de puntos [(x,y), ...])
+                 rings = [pixels_or_rings]
+            else:
+                 # Se asume lista de anillos [[(x,y)...], ...]
+                 rings = pixels_or_rings
+
+            for pixels in rings:
+                if len(pixels) > 2:
+                    # Cerrar el polígono
+                    if pixels[0] != pixels[-1]:
+                        pixels = pixels + [pixels[0]]
+                    draw.line(pixels, fill=color + (255,), width=width)
 
             # Combina la imagen original con la capa de contorno
             result = Image.alpha_composite(img, overlay).convert("RGB")
@@ -432,8 +447,8 @@ class CatastroDownloader:
             print("  ⚠ No existe GML de parcela, no se puede dibujar contorno")
             return False
 
-        coords = self.extraer_coordenadas_gml(gml_file)
-        if not coords:
+        coords_rings = self.extraer_coordenadas_gml(gml_file)
+        if not coords_rings:
             return False
 
         exito = False
@@ -458,11 +473,16 @@ class CatastroDownloader:
                 try:
                     with Image.open(in_path) as img:
                         w, h = img.size
-                    pixels = self.convertir_coordenadas_a_pixel(
-                        coords, bbox_wgs84, w, h
-                    )
-                    if pixels and self.dibujar_contorno_en_imagen(
-                        in_path, pixels, out_path
+                    
+                    # Convertir cada anillo a píxeles
+                    all_rings_pixels = []
+                    for ring in coords_rings:
+                        pixels = self.convertir_coordenadas_a_pixel(ring, bbox_wgs84, w, h)
+                        if pixels:
+                            all_rings_pixels.append(pixels)
+
+                    if all_rings_pixels and self.dibujar_contorno_en_imagen(
+                        in_path, all_rings_pixels, out_path
                     ):
                         exito = True
                 except Exception as e:
@@ -479,17 +499,18 @@ class CatastroDownloader:
             # Calcular BBOX global
             min_lon, min_lat, max_lon, max_lat = 180, 90, -180, -90
             
-            for coords in all_coords:
-                for v1, v2 in coords:
-                    # Heurística simple para Lat/Lon vs Lon/Lat (España Lat 36-44, Lon -10-5)
-                    lat, lon = v1, v2
-                    if 35 < v1 < 45: lat, lon = v1, v2
-                    else: lon, lat = v1, v2
-                    
-                    if lat < min_lat: min_lat = lat
-                    if lat > max_lat: max_lat = lat
-                    if lon < min_lon: min_lon = lon
-                    if lon > max_lon: max_lon = lon
+            for parcel_rings in all_coords:
+                for ring in parcel_rings:
+                    for v1, v2 in ring:
+                        # Heurística simple para Lat/Lon vs Lon/Lat (España Lat 36-44, Lon -10-5)
+                        lat, lon = v1, v2
+                        if 35 < v1 < 45: lat, lon = v1, v2
+                        else: lon, lat = v1, v2
+                        
+                        if lat < min_lat: min_lat = lat
+                        if lat > max_lat: max_lat = lat
+                        if lon < min_lon: min_lon = lon
+                        if lon > max_lon: max_lon = lon
             
             # Margen del 10%
             lat_margin = max((max_lat - min_lat) * 0.1, 0.001)
@@ -530,13 +551,14 @@ class CatastroDownloader:
                     
                     width, height = img.size
                     
-                    for coords in all_coords:
-                        pixels = self.convertir_coordenadas_a_pixel(coords, bbox_wgs84, width, height)
-                        if pixels and len(pixels) > 2:
-                             if pixels[0] != pixels[-1]:
-                                pixels.append(pixels[0])
-                             draw.line(pixels, fill=(255, 0, 0, 255), width=3)
-                             draw.polygon(pixels, fill=(255, 0, 0, 40))
+                    for parcel_rings in all_coords:
+                        for ring in parcel_rings:
+                            pixels = self.convertir_coordenadas_a_pixel(ring, bbox_wgs84, width, height)
+                            if pixels and len(pixels) > 2:
+                                 if pixels[0] != pixels[-1]:
+                                    pixels.append(pixels[0])
+                                 draw.line(pixels, fill=(255, 0, 0, 255), width=3)
+                                 draw.polygon(pixels, fill=(255, 0, 0, 40))
 
                     result = Image.alpha_composite(img, overlay).convert("RGB")
                     result.save(output_path)

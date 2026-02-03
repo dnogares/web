@@ -340,6 +340,19 @@
             <div class="row">
                 <!-- Columna Izquierda: Mapa + Descargas -->
                 <div class="col-lg-7">
+                    <!-- Barra de progreso (Movido encima del mapa) -->
+                    <div class="progress-container mb-3" id="progressContainer">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span id="progressText">Procesando...</span>
+                            <button class="btn btn-sm btn-danger" id="cancelBtn">
+                                <i class="fas fa-times"></i> Cancelar
+                            </button>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar" id="progressBar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
                     <div class="map-wrapper mb-4">
                             <div class="map-container" id="map"></div>
                             
@@ -359,19 +372,6 @@
                             
                             <!-- Resultado medición -->
                             <div id="measurementResult" style="position: absolute; top: 10px; left: 60px; z-index: 1000; background: white; padding: 5px 10px; border-radius: 5px; display: none; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-weight: bold; color: #667eea;"></div>
-                    </div>
-
-                    <!-- Barra de progreso (Debajo del mapa) -->
-                    <div class="progress-container mb-4" id="progressContainer">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span id="progressText">Procesando...</span>
-                            <button class="btn btn-sm btn-danger" id="cancelBtn">
-                                <i class="fas fa-times"></i> Cancelar
-                            </button>
-                        </div>
-                        <div class="progress">
-                            <div class="progress-bar" id="progressBar" role="progressbar" style="width: 0%"></div>
-                        </div>
                     </div>
 
                     <div class="catastro-section mb-4" id="catastroSection" style="display: none;">
@@ -548,6 +548,7 @@
         // Variables globales
         let map = null;
         let currentParcel = null;
+        let currentParcelPoly = null;
         let activeLayers = new Set();
         let layerControls = {};
         let currentRequest = null;
@@ -1174,6 +1175,23 @@
                 currentParcel = L.marker(coordinates).addTo(map);
                 currentParcel.bindPopup(`<b>Parcela Encontrada</b><br>RC: ${data.referencia_catastral || data.referencia}<br>${data.direccion || data.domicilio || 'Sin dirección'}`).openPopup();
 
+                // --- NUEVO: Dibujar geometría GML en el mapa ---
+                const ref = data.referencia_catastral || data.referencia;
+                if (ref) {
+                    fetch(`/api/v1/referencia/${ref}/geojson`)
+                        .then(r => r.json())
+                        .then(geojson => {
+                            if (geojson.type && (geojson.geometry || geojson.features)) {
+                                if (window.currentParcelPoly) map.removeLayer(window.currentParcelPoly);
+                                window.currentParcelPoly = L.geoJSON(geojson, {
+                                    style: { color: '#ff0000', weight: 3, fillOpacity: 0.1 }
+                                }).addTo(map);
+                                map.fitBounds(window.currentParcelPoly.getBounds());
+                            }
+                        })
+                        .catch(e => console.warn("No se pudo cargar geometría:", e));
+                }
+
                 // Centrar mapa
                 map.setView(coordinates, 18);
 
@@ -1249,6 +1267,10 @@
                 </div>
             `;
             
+            // 1. Primero añadir al DOM para que existan los elementos
+            batchContainer.appendChild(batchResults);
+            
+            // 2. Ahora sí podemos buscar el tbody
             const tbody = document.getElementById('batchTableBody');
             
             // Procesar cada referencia
@@ -1668,7 +1690,8 @@
         }
 
         function openSettings() {
-            alert('Panel de ajustes en desarrollo. Aquí podrá configurar qué archivos incluir en el ZIP generado.');
+            // Redireccionar al panel de ajustes
+            window.location.href = '/static/ajustes.html';
         }
 
         function showProgress(text, progress) {

@@ -829,79 +829,58 @@ async def get_referencia_geojson(ref: str):
 
         downloader = CatastroDownloader(output_dir=cfg["rutas"]["outputs"])
         
-        # 1. Intentar obtener la geometría real del GML
-        gml_descargado = downloader.descargar_parcela_gml(ref)
-        coords_poligono = None
-        
-        if gml_descargado:
-            # Intentar encontrar el archivo en la carpeta de la referencia o en la raíz de outputs
-            posibles_rutas = [
-                Path(cfg["rutas"]["outputs"]) / ref / f"{ref}_parcela.gml",
-                Path(cfg["rutas"]["outputs"]) / f"{ref}_parcela.gml"
-            ]
-            
-            for p in posibles_rutas:
-                if p.exists():
-                    gml_path = p
-                    print(f"✅ GML encontrado en: {p}")
-                    coords_poligono = downloader.extraer_coordenadas_gml(str(gml_path))
-                    break
-            
-            if not coords_poligono:
-                print(f"⚠️ No se pudo extraer geometría de ninguna ruta: {[str(p) for p in posibles_rutas]}")
+        # 1. 
+        if not gml_path.exists():
+            print(f"  GML no encontrado localment    if not downloader.descargar_parcela_gml(ref):
+        PException(status_code=404, detail=f"No se pudo descargar la geometría GML para {ref}")
+cosHTTPException(status_code=404, detail=f"No se pudo extraer la geometría del archivo GML para {ref}")
 
+        # 3. Convertir anillos a formato GeoJSON [lon, lat]
+        processed_rings = []
+        for ring in rings:
+            processed_ring = []
+            for p in ring:
+                # El GML de INSPIRE suele venir en (lat, lon) para EPSG:4326
+                # GeoJSON requiere (lon, lat)
+                v1, v2 = p
+                if 35 < v1 < 45 and -10 < v2 < 5: # Heurística: v1 es Lat, v2 es Lon
+                    processed_ring.append([v2, v1])
+                elif 35 < v2 < 45 and -10 < v1 < 5: # Heurística: v2 es Lat, v1 es Lon
+                    processed_ring.append([v1, v2])
+                else: # Si no está claro, asumimos que el primer valor es Lat
+                    processed_ring.append([v2, v1])
+            
+            # Cerrar el anillo si no lo está
+            if processed_ring and processed_ring[0] != processed_ring[-1]:
+                processed_ring.append(processed_ring[0])
+            
+            if processed_ring:
+                processed_rings.append(processed_ring)
+
+        if not processed_rings:suesta GeoJSON
+      return
+    "type":    "coordinates": processed_rings # Formato: [exterior_ring, interior_ring_1, ...]
+            },
+            "properties": {"referencia": ref, "fuente_ge
+ he
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/referencia/{ref}/geojson_old")
+async def get_referencia_geojson_old(ref: str):
+    """Obtener GeoJSON de una referencia catastral"""
+    try:
+        # ... (código antiguo)
+        # ...
         if coords_poligono:
+            # ...
             if len(coords_poligono) > 0:
-                anillo_exterior = coords_poligono[0]
-
-                def _is_lon_lat(lon: float, lat: float) -> bool:
-                    return (-11 <= lon <= 5) and (35 <= lat <= 45)
-
-                polygon_geojson = None
-
-                if anillo_exterior:
-                    a0, b0 = anillo_exterior[0]
-
-                    cand_lon_lat_1 = [(lon, lat) for lat, lon in anillo_exterior]
-                    if cand_lon_lat_1 and _is_lon_lat(cand_lon_lat_1[0][0], cand_lon_lat_1[0][1]):
-                        polygon_geojson = [[lon, lat] for lon, lat in cand_lon_lat_1]
-                    else:
-                        cand_lon_lat_2 = [(lon, lat) for lon, lat in anillo_exterior]
-                        if cand_lon_lat_2 and _is_lon_lat(cand_lon_lat_2[0][0], cand_lon_lat_2[0][1]):
-                            polygon_geojson = [[lon, lat] for lon, lat in cand_lon_lat_2]
-
-                if polygon_geojson is None and anillo_exterior:
-                    from pyproj import Transformer
-
-                    def _try_epsg(epsg: int, swap_xy: bool = False):
-                        transformer = Transformer.from_crs(epsg, 4326, always_xy=True)
-                        pts = []
-                        for x, y in anillo_exterior:
-                            if swap_xy:
-                                x, y = y, x
-                            lon, lat = transformer.transform(x, y)
-                            pts.append([lon, lat])
-                        if pts and _is_lon_lat(pts[0][0], pts[0][1]):
-                            return pts
-                        return None
-
-                    for epsg in (25830, 25829, 25831):
-                        polygon_geojson = _try_epsg(epsg, swap_xy=False)
-                        if polygon_geojson:
-                            break
-                        polygon_geojson = _try_epsg(epsg, swap_xy=True)
-                        if polygon_geojson:
-                            break
-
-                if not polygon_geojson:
-                    raise HTTPException(status_code=500, detail="No se pudo transformar la geometría a WGS84")
-
-                if polygon_geojson[0] != polygon_geojson[-1]:
-                    polygon_geojson.append(polygon_geojson[0])
-
+                # ...
                 return {
                     "type": "Feature",
-                    "geometry": {"type": "Polygon", "coordinates": [polygon_geojson]},
+                    "geometry": {"type": "Polygon", "coordinates": [coords_poligono]},
                     "properties": {"referencia": ref, "fuente_geometria": "GML Real", "anillos": len(coords_poligono)}
                 }
         else:
@@ -914,58 +893,10 @@ async def get_referencia_geojson(ref: str):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-
-class LoteRequest(BaseModel):
-    referencias: List[str]
-
-class ProcesoRequest(BaseModel):
-    referencia: str
-    buffer_metros: Optional[int] = None
-
-@app.post("/api/v1/procesar-completo")
-async def procesar_completo(request: ProcesoRequest):
-    """
-    Ejecuta el proceso completo de descarga para una referencia y devuelve el ZIP.
-    """
-    if not CATASTRO_AVAILABLE:
-        raise HTTPException(status_code=503, detail="El módulo 'catastro4' no está disponible.")
-    
-    ref = request.referencia
-    
-    try:
-        # Usar la función de catastro4.py
-        zip_path, resultados = procesar_y_comprimir(
-            referencia=ref,
-            directorio_base=cfg["rutas"]["outputs"],
-            buffer_metros=request.buffer_metros
-        )
-        
-        if zip_path and resultados.get('exitosa'):
-            # Recuperar geometría para análisis urbanístico
-            ref_dir = Path(cfg["rutas"]["outputs"]) / ref
-            
-            # Extraer anillos del GML de parcela
-            anillos = None
-            parcela_gml_path = ref_dir / f"{ref}_parcela.gml"
-            
-            if parcela_gml_path.exists():
-                try:
-                    # Usar CatastroDownloader para extraer coordenadas
-                    downloader = CatastroDownloader(output_dir=str(ref_dir))
-                    coords_poligono = downloader.extraer_coordenadas_gml(str(parcela_gml_path))
-                    
-                    if coords_poligono:
-                        # Convertir a formato de anillos para urbanismo.py
-                        anillos = coords_poligono # Ya viene como lista de anillos desde catastro4
-                        print(f"✅ Geometría extraída: {len(coords_poligono)} anillos")
-                    else:
-                        print("⚠️ No se pudieron extraer coordenadas del GML")
-                except Exception as e:
-                    print(f"⚠️ Error extrayendo geometría: {e}")
-            
+fs
+                
             # Realizar análisis urbanístico si tenemos geometría
-            datos_urbanisticos = None
-            if anillos and URBANISMO_AVAILABLE:
+            datos_urbanisticos = N
                 try:
                     datos_urbanisticos = urbanismo.realizar_analisis_urbanistico(anillos)
                     print(f"✅ Análisis urbanístico completado")
