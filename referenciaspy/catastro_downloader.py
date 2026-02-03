@@ -563,6 +563,147 @@ class CatastroDownloader:
         except Exception as e:
             print(f"  ⚠ Error generando GML Global: {e}")
             return False
+
+    def generar_xml_lote(self, datos_lote, lote_id, output_path):
+        """Genera un XML resumen con los datos de todo el lote."""
+        try:
+            from datetime import datetime
+            xml_content = [
+                '<?xml version="1.0" encoding="UTF-8"?>',
+                f'<lote_catastral id="{lote_id}" fecha_generacion="{datetime.now().isoformat()}">',
+                '  <metadatos>',
+                f'    <total_referencias>{len(datos_lote)}</total_referencias>',
+                f'    <fecha_procesamiento>{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</fecha_procesamiento>',
+                '  </metadatos>',
+                '  <referencias>'
+            ]
+            
+            for dato in datos_lote:
+                ref = dato.get('referencia', '')
+                geom = dato.get('geometria', [])
+                xml_content.append(f'    <referencia>')
+                xml_content.append(f'      <codigo>{ref}</codigo>')
+                xml_content.append(f'      <geometria>')
+                xml_content.append(f'        <anillos>{len(geom) if geom else 0}</anillos>')
+                xml_content.append(f'      </geometria>')
+                xml_content.append(f'    </referencia>')
+            
+            xml_content.append('  </referencias>')
+            xml_content.append('</lote_catastral>')
+            
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(xml_content))
+            print(f"  ✓ XML Lote generado: {output_path}")
+            return True
+        except Exception as e:
+            print(f"  ⚠ Error generando XML Lote: {e}")
+            return False
+
+    def generar_geojson_lote(self, todas_geometrias, output_path):
+        """Genera un GeoJSON combinado con todas las geometrías."""
+        try:
+            features = []
+            for geom in todas_geometrias:
+                coords_raw = geom.get('coordenadas', [])
+                coords_geojson = []
+                
+                for p in coords_raw:
+                    v1, v2 = p
+                    # Heurística simple: España Lat 36-44, Lon -10-5
+                    if 35 < v1 < 45: # v1 es Lat
+                        coords_geojson.append([v2, v1])
+                    else: # v1 es Lon
+                        coords_geojson.append([v1, v2])
+                
+                feature = {
+                    "type": "Feature",
+                    "properties": {
+                        "referencia": geom.get('referencia'),
+                        "anillo": geom.get('anillo'),
+                        "tipo": "parcela_catastral"
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [coords_geojson]
+                    }
+                }
+                features.append(feature)
+            
+            geojson_obj = {
+                "type": "FeatureCollection",
+                "features": features
+            }
+            
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(geojson_obj, f, ensure_ascii=False, indent=2)
+            print(f"  ✓ GeoJSON Lote generado: {output_path}")
+            return True
+        except Exception as e:
+            print(f"  ⚠ Error generando GeoJSON Lote: {e}")
+            return False
+
+    def organizar_lote(self, lote_dir, lote_id, referencias):
+        """Organiza los archivos del lote en carpetas temáticas y crea el ZIP."""
+        import shutil
+        lote_path = Path(lote_dir)
+        
+        # Estructura de carpetas
+        dirs = {
+            'Documentacion': ['pdf', 'html', 'xml'],
+            'Imagenes': ['jpg', 'png'],
+            'Geometria': ['gml', 'kml', 'geojson'],
+            'Informes': ['csv', 'json']
+        }
+        
+        for d in dirs:
+            (lote_path / d).mkdir(exist_ok=True)
+            
+        # Mover archivos de referencias individuales
+        for ref in referencias:
+            ref_dir = lote_path / ref
+            if ref_dir.exists():
+                for f in ref_dir.iterdir():
+                    if f.is_file():
+                        ext = f.suffix.lower().replace('.', '')
+                        dest_folder = None
+                        for d, exts in dirs.items():
+                            if ext in exts:
+                                dest_folder = d
+                                break
+                        
+                        if dest_folder:
+                            shutil.copy2(f, lote_path / dest_folder / f.name)
+                
+                try:
+                    shutil.rmtree(ref_dir)
+                except Exception as e:
+                    print(f"  ⚠ No se pudo eliminar carpeta {ref_dir}: {e}")
+
+        # Mover archivos globales del lote
+        for f in lote_path.glob(f"{lote_id}_*"):
+            if f.is_file():
+                ext = f.suffix.lower().replace('.', '')
+                dest_folder = None
+                for d, exts in dirs.items():
+                    if ext in exts:
+                        dest_folder = d
+                        break
+                
+                if dest_folder:
+                    shutil.move(str(f), str(lote_path / dest_folder / f.name))
+        
+        # Crear ZIP
+        zip_path = lote_path / f"{lote_id}.zip"
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for folder in dirs:
+                folder_path = lote_path / folder
+                if folder_path.exists():
+                    for f in folder_path.rglob('*'):
+                        if f.is_file():
+                            zipf.write(f, f.relative_to(lote_path))
+                            
+        print(f"  📦 Lote organizado y comprimido: {zip_path}")
+        return str(zip_path)
     
     # --------- resto de métodos: HTML, descargas, etc. ---------
 
@@ -1034,7 +1175,8 @@ class CatastroDownloader:
             'parcela_gml': parcela_gml_descargado, 
             'edificio_gml': self.descargar_edificio_gml(ref),
             'kml': self.generar_kml(ref),
-            'datos_xml': self.descargar_datos_xml(ref)
+            'datos_xml': self.descargar_datos_xml(ref),
+            'contorno_superpuesto': (self.output_dir / f"{ref}_plano_con_ortofoto_contorno.png").exists()
         }
 
         self.output_dir = old_dir # Se restaura el directorio de salida

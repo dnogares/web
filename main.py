@@ -1114,37 +1114,27 @@ async def procesar_lote(request: LoteRequest):
                     'error': str(e)
                 })
         
-        # 2. Crear XML unificado
-        xml_content = crear_xml_unificado(xml_datos, lote_id)
-        xml_path = lote_dir / f"{lote_id}_informacion.xml"
-        with open(xml_path, 'w', encoding='utf-8') as f:
-            f.write(xml_content)
-        
-        # 3. Crear GeoJSON combinado y GML Global
-        geojson_combinado = crear_geojson_combinado(todas_geometrias)
-        geojson_path = lote_dir / f"{lote_id}_geometrias_combinadas.geojson"
-        with open(geojson_path, 'w', encoding='utf-8') as f:
-            json.dump(geojson_combinado, f, ensure_ascii=False, indent=2)
-        
-        # Generar GML Global y Mapa Global
+        # Instanciar downloader para operaciones de lote
         downloader = CatastroDownloader(output_dir=str(lote_dir))
-        downloader.generar_gml_global(xml_datos, lote_dir / f"{lote_id}_global.gml")
+
+        # 2. Crear XML unificado
+        xml_loader.generar_xml_lote(xml_datos, lote_id, xml_path)
+        Nojson_path = lote_dir / f"{lote_id}_geometrias_combinadas.geojson"
+        downloader.generar_geojson_lote(todas_geometrias, geojson_path)
         
-        mapa_global_creado = False
-        if lista_coords_para_mapa:
+        # Generaer.generar_gml_global(xml_datos, lote_dir / f"{lote_id}_global.gml")
+        l lista_coords_para_mapa:
             if downloader.generar_mapa_lote(lista_coords_para_mapa, lote_dir / f"{lote_id}_mapa_global.jpg"):
                 mapa_global_creado = True
-
-        # 4. Organizar carpetas del ZIP final
-        zip_final_path = organizar_zip_lote(lote_dir, lote_id, referencias, resultados_individuales)
+izar carpetas del ZIP final
+        zip_final_path = downloader.organizar_lote(lote_dir, lote_id, referencias)
         
         mapa_global_url = None
         if mapa_global_creado:
              mapa_global_url = f"/outputs/{lote_id}/Imagenes/{lote_id}_mapa_global.jpg".replace('\\', '/')
 
         return {
-            "status": "success",
-            "message": f"Lote procesado: {len(referencias)} referencias",
+            "status": "sute procesado: {len(referencias)} referencias",
             "lote_id": lote_id,
             "zip_path": f"/outputs/{lote_id}/{lote_id}.zip".replace('\\', '/'),
             "geometrias_combinadas": len(todas_geometrias),
@@ -1157,220 +1147,14 @@ async def procesar_lote(request: LoteRequest):
         print(f"❌ Error en procesamiento de lote: {e}")
         raise HTTPException(status_code=500, detail=f"Error procesando lote: {str(e)}")
 
-def crear_xml_unificado(datos_xml, lote_id):
-    """Crear XML unificado con información de todas las referencias"""
-    xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<lote_catastral id="{lote_id}" fecha_generacion="{datetime.now().isoformat()}">
-    <metadatos>
-        <total_referencias>{len(datos_xml)}</total_referencias>
-        <fecha_procesamiento>{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</fecha_procesamiento>
-    </metadatos>
-    <referencias>"""
-    
-    for dato in datos_xml:
-        xml_content += f"""
-        <referencia>
-            <codigo>{dato['referencia']}</codigo>
-            <geometria>
-                <anillos>{len(dato['geometria'])}</anillos>
-            </geometria>
-        </referencia>"""
-    
-    xml_content += """
-    </referencias>
-</lote_catastral>"""
-    
-    return xml_content
-
-def crear_geojson_combinado(geometrias):
-    """Crear GeoJSON con todas las geometrías combinadas"""
-    features = []
-    
-    for geom in geometrias:
-        # Convertir coordenadas de (lat, lon) a (lon, lat) para GeoJSON
-        coords = [[lon, lat] for lat, lon in geom['coordenadas']]
-        
-        feature = {
-            "type": "Feature",
-            "properties": {
-                "referencia": geom['referencia'],
-                "anillo": geom['anillo'],
-                "tipo": "parcela_catastral"
-            },
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [coords]
-            }
-        }
-        features.append(feature)
-    
-    return {
-        "type": "FeatureCollection",
-        "features": features
-    }
-
-def organizar_zip_lote(lote_dir, lote_id, referencias, resultados):
-    """Organizar carpetas y crear ZIP final del lote"""
-    import zipfile
-    import shutil
-    
-    # Crear estructura de carpetas
-    dirs = {
-        'Documentacion': ['pdf', 'html', 'xml'],
-        'Imagenes': ['jpg', 'png'],
-        'Geometria': ['gml', 'kml', 'geojson'],
-        'Informes': ['csv', 'json']
-    }
-    
-    for d in dirs:
-        (lote_dir / d).mkdir(exist_ok=True)
-    
-    # Mover archivos a carpetas correspondientes
-    for ref in referencias:
-        ref_dir = lote_dir / ref
-        if ref_dir.exists():
-            for f in ref_dir.iterdir():
-                if f.is_file():
-                    ext = f.suffix.lower().replace('.', '')
-                    for d, exts in dirs.items():
-                        if ext in exts:
-                            shutil.copy2(f, lote_dir / d / f.name)
-                            break
-            
-            # Limpiar carpeta individual
-            shutil.rmtree(ref_dir)
-
-    # Mover archivos globales
-    for f in lote_dir.glob(f"{lote_id}_*"):
-        if f.suffix.lower() == '.gml':
-            shutil.move(str(f), str(lote_dir / 'Geometria' / f.name))
-        elif f.suffix.lower() in ['.jpg', '.png']:
-            shutil.move(str(f), str(lote_dir / 'Imagenes' / f.name))
-        elif f.suffix.lower() == '.xml':
-            shutil.move(str(f), str(lote_dir / 'Documentacion' / f.name))
-        elif f.suffix.lower() == '.geojson':
-             shutil.move(str(f), str(lote_dir / 'Geometria' / f.name))
-    
-    # Crear ZIP final
-    zip_path = lote_dir / f"{lote_id}.zip"
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for item in lote_dir.rglob('*'):
-            if item.is_file() and item != zip_path:
-                arc_path = item.relative_to(lote_dir)
-                zipf.write(item, arc_path)
-    
-    return str(zip_path)
 
 @app.get("/api/v1/logs")
 async def get_logs():
     """
     Endpoint para obtener logs del servidor (compatibilidad con visor)
     """
-    # Simular logs para compatibilidad con el visor
-    mock_logs = [
-        f"Servidor iniciado - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        "Módulo catastro4 cargado correctamente",
-        "Conexión GIS establecida",
-        "Sistema listo para procesar solicitudes"
-    ]
-    
-    return {
-        "status": "success",
-        "logs": mock_logs
-    }
-
-# Worker para procesar en segundo plano
-def background_lote_worker(referencias, exp_base, exp_id):
-    from expedientes.catastro_exp import procesar_expediente
-    import shutil
-    import traceback
-    
-    try:
-        print(f"🚀 Iniciando procesamiento de lote {exp_id} con {len(referencias)} referencias")
-        
-        # 1. Procesar referencias con manejo de errores robusto
-        try:
-            resultado = procesar_expediente(referencias, exp_base, expediente_id=exp_id)
-            print(f"✅ Procesamiento completado para lote {exp_id}")
-        except Exception as e:
-            print(f"❌ Error en procesamiento de lote {exp_id}: {str(e)}")
-            traceback.print_exc()
-            
-            # Actualizar manifiesto con error
-            exp_dir = exp_base / f"expediente_{exp_id}"
-            manifest_path = exp_dir / "manifest.json"
-            if manifest_path.exists():
-                with open(manifest_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                data["estado"] = "error"
-                data["error"] = str(e)
-                data["progreso"] = 0
-                with open(manifest_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-            return
-        
-        # 2. Organizar archivos para el ZIP final
-        exp_dir = exp_base / f"expediente_{exp_id}"
-        zip_path = exp_base / f"expediente_{exp_id}.zip"
-        
-        try:
-            if exp_dir.exists():
-                # Carpetas de destino dentro del expediente
-                geo_dir = exp_dir / "geometrias"
-                img_dir = exp_dir / "imagenes"
-                inf_dir = exp_dir / "informes"
-                
-                for d in [geo_dir, img_dir, inf_dir]:
-                    d.mkdir(exist_ok=True)
-                
-                print(f"📂 Organizando archivos para el ZIP de lote {exp_id}...")
-                
-                # Definir patrones de búsqueda (recursivos para encontrar archivos dentro de referencia_REF/REF/...)
-                # 1. Geometrías (GML y KML)
-                for f in exp_dir.rglob("*.gml"):
-                    if "geometrias" not in f.parts:  # Evitar copiar lo ya copiado
-                        shutil.copy2(f, geo_dir / f.name)
-                for f in exp_dir.rglob("*.kml"):
-                    if "geometrias" not in f.parts:
-                        shutil.copy2(f, geo_dir / f.name)
-                
-                # 2. Imágenes (Solo composición plano + ortofoto + contorno)
-                # Buscamos archivos que contengan 'plano_con_ortofoto'
-                for f in exp_dir.rglob("*plano_con_ortofoto*.png"):
-                    if "imagenes" not in f.parts:
-                        # Si hay versión con contorno, la preferimos.
-                        # Pero en este punto, simplemente copiamos todo lo que encaje con la descripción del usuario.
-                        # Para evitar duplicados (plano_con_ortofoto vs plano_con_ortofoto_contorno), filtramos:
-                        if "contorno" in f.name:
-                            shutil.copy2(f, img_dir / f.name)
-                        else:
-                            # Solo copiar si no existe ya la versión con contorno para esta referencia
-                            contorno_ver = f.parent / f.name.replace(".png", "_contorno.png")
-                            if not contorno_ver.exists():
-                                shutil.copy2(f, img_dir / f.name)
-                
-                # 3. Informes (PDF)
-                for f in exp_dir.rglob("*.pdf"):
-                    if "informes" not in f.parts:
-                        shutil.copy2(f, inf_dir / f.name)
-                
-                # Crear ZIP
-                print(f"📦 Creando ZIP organizado para lote {exp_id}...")
-                
-                # Creamos el ZIP incluyendo solo las carpetas organizadas y el manifest
-                import zipfile
-                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                    # Añadir manifest al ROOT del ZIP
-                    manifest_file = exp_dir / "manifest.json"
-                    if manifest_file.exists():
-                        zipf.write(manifest_file, "manifest.json")
-                    
-                    # Añadir subcarpetas organizadas
-                    for folder in [geo_dir, img_dir, inf_dir]:
-                        for f in folder.glob("*"):
-                            if f.is_file():
-                                # Guardamos como 'geometrias/archivo.gml' etc.
-                                zipf.write(f, folder.name + "/" + f.name)
+    # Simular logs para compatibilidad con el visor     ff .dse f.b   rmlel eas)                            # Guardamos como 'geometrias/archivo.gml' etc.
+        zipf.write(f, folder.name + "/" + f.name)
                 
                 print(f"✅ ZIP creado: {zip_path}")
             else:
