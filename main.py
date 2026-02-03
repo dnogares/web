@@ -19,6 +19,8 @@ from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from src.utils.auto_detect_layers import inicializar_capas, obtener_capas
+from src.utils.cruzador_capas import CruzadorCapas
 from pydantic import BaseModel
 import uvicorn
 
@@ -2353,6 +2355,16 @@ try:
     # Montar /outputs apuntando al directorio correcto
     app.mount("/outputs", StaticFiles(directory=outputs_dir), name="outputs")
     app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# ==========================================
+# INICIALIZAR DETECCIÓN DE CAPAS
+# ==========================================
+print("\n🚀 INICIANDO SERVIDOR CON DETECCIÓN DE CAPAS...\n")
+
+CAPAS_SISTEMA = inicializar_capas(Path(outputs_dir).parent)
+cruzador = CruzadorCapas(CAPAS_SISTEMA)
+
+print(f"\n✅ SERVIDOR LISTO CON {CAPAS_SISTEMA['total']} CAPAS DETECTADAS\n")
     
     # Montar directorios de capas para acceso directo a FlatGeobuf (.fgb)
     if os.path.exists("capas"):
@@ -2511,6 +2523,39 @@ async def listar_archivos_ref(ref: str):
         
     except Exception as e:
         return {"status": "error", "message": str(e), "archivos": []}
+
+
+# ==========================================
+# ENDPOINTS DE CAPAS Y AFECCIONES
+# ==========================================
+
+@app.get("/api/v1/capas/disponibles")
+async def obtener_capas_disponibles():
+    """Retorna lista de todas las capas disponibles"""
+    capas = obtener_capas()
+    return {
+        "status": "success",
+        "total": capas["total"],
+        "por_tipo": capas["por_tipo"],
+        "capas": capas["capas"]
+    }
+
+@app.get("/api/v1/expedientes/{expediente_id}/afecciones")
+async def obtener_afecciones_expediente(expediente_id: str):
+    """Obtiene las afecciones detectadas para un expediente"""
+    try:
+        exp_dir = Path(outputs_dir) / "expedientes" / f"expediente_{expediente_id}"
+        afecciones_path = exp_dir / "afecciones.json"
+        
+        if afecciones_path.exists():
+            with open(afecciones_path, "r", encoding="utf-8") as f:
+                afecciones = json.load(f)
+            return {"status": "success", "afecciones": afecciones}
+        else:
+            return {"status": "processing", "message": "Afecciones en procesamiento"}
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     print("🚀 Iniciando servidor FastAPI para visor catastral con Glassmorphism...")
