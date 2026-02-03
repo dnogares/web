@@ -884,6 +884,8 @@
 
                 const res = await response.json();
                 const data = res.data;
+                
+                console.log('Datos recibidos del backend:', data);
 
                 if (!data || data.coordenadas_y === undefined) {
                     throw new Error('No se encontraron coordenadas para esta referencia');
@@ -898,7 +900,7 @@
 
                 // Añadir marcador de parcela
                 currentParcel = L.marker(coordinates).addTo(map);
-                currentParcel.bindPopup(`<b>Parcela Encontrada</b><br>RC: ${data.referencia}<br>${data.direccion}`).openPopup();
+                currentParcel.bindPopup(`<b>Parcela Encontrada</b><br>RC: ${data.referencia_catastral || data.referencia}<br>${data.direccion || data.domicilio || 'Sin dirección'}`).openPopup();
 
                 // Centrar mapa
                 map.setView(coordinates, 18);
@@ -908,11 +910,11 @@
 
                 // Guardar datos de la parcela para el informe
                 window.currentParcelData = {
-                    ref_catastral: data.referencia,
-                    coordenadas: [data.coordenadas.lon, data.coordenadas.lat], // Long, Lat para el backend
-                    provincia: '', // Se obtendrá en el backend
-                    municipio: data.municipio,
-                    via: data.direccion,
+                    ref_catastral: data.referencia_catastral || data.referencia,
+                    coordenadas: [data.coordenadas_x || data.coordenadas?.lon || 0, data.coordenadas_y || data.coordenadas?.lat || 0], // Long, Lat para el backend
+                    provincia: data.provincia || '', // Se obtendrá en el backend
+                    municipio: data.municipio || '',
+                    via: data.direccion || data.domicilio || '',
                     numero: ''
                 };
 

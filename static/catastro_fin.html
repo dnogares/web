@@ -2361,72 +2361,59 @@
 
 
 
-        /*
-        // Inicializar control de opacidad
-        document.addEventListener('DOMContentLoaded', function() {
-            const opacidadSlider = document.getElementById('opacidad-catastro');
-            if (opacidadSlider) {
-                opacidadSlider.addEventListener('input', function() {
-                    actualizarOpacidadCatastro(this.value);
-                });
-            }
-        });
+            const AVAILABLE_THEMES = [
+                { name: 'Estándar', url: '/static/index2.html', icon: 'fa-desktop' },
+                { name: 'Dark Pro', url: '/static/index_modern_dark.html', icon: 'fa-moon' },
+                { name: 'Corporate', url: '/static/index_top_nav.html', icon: 'fa-building' },
+                { name: 'Split View', url: '/static/index_split_right.html', icon: 'fa-columns' }
+            ];
 
-        // --- CAMBIO DE TEMA DINÁMICO ---
-        const AVAILABLE_THEMES = [
-            { name: 'Estándar', url: '/static/index2.html', icon: 'fa-desktop' },
-            { name: 'Dark Pro', url: '/static/index_modern_dark.html', icon: 'fa-moon' },
-            { name: 'Corporate', url: '/static/index_top_nav.html', icon: 'fa-building' },
-            { name: 'Split View', url: '/static/index_split_right.html', icon: 'fa-columns' }
-        ];
+            function injectThemeSwitcher() {
+                if (document.getElementById('theme-switcher')) return;
 
-        function injectThemeSwitcher() {
-            if (document.getElementById('theme-switcher')) return;
-
-            const switcher = document.createElement('div');
-            switcher.id = 'theme-switcher';
-            switcher.style.cssText = 'position:fixed; inset-block-end:20px; inset-inline-start:20px; z-index:9999; font-family:sans-serif;';
-            
-            const btn = document.createElement('button');
-            btn.innerHTML = '<i class="fa-solid fa-palette"></i>';
-            btn.title = "Cambiar Tema";
-            btn.style.cssText = 'inline-size:40px; block-size:40px; border-radius:50%; border:none; background:#2c3e50; color:white; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.3); font-size:16px; transition:transform 0.2s;';
-            btn.onmouseover = () => btn.style.transform = 'scale(1.1)';
-            btn.onmouseout = () => btn.style.transform = 'scale(1)';
-            btn.onclick = () => {
-                const menu = document.getElementById('theme-menu');
-                menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-            };
-            
-            const menu = document.createElement('div');
-            menu.id = 'theme-menu';
-            menu.style.cssText = 'display:none; position:absolute; inset-block-end:50px; inset-inline-start:0; background:white; padding:5px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2); inline-size:160px; overflow:hidden;';
-            
-            AVAILABLE_THEMES.forEach(theme => {
-                const item = document.createElement('div');
-                item.style.cssText = 'padding:10px; cursor:pointer; border-block-end:1px solid #eee; font-size:13px; color:#333; display:flex; align-items:center; gap:10px; transition:background 0.2s;';
-                item.innerHTML = `<i class="fa-solid ${theme.icon}" style="inline-size:15px; text-align:center;"></i> ${theme.name}`;
-                item.onclick = () => { 
-                    if (typeof map !== 'undefined') {
-                        localStorage.setItem('visor_map_center', JSON.stringify(map.getCenter()));
-                        localStorage.setItem('visor_map_zoom', map.getZoom());
-                    }
-                    localStorage.setItem('visor_theme', theme.url); 
-                    window.location.href = theme.url; 
+                const switcher = document.createElement('div');
+                switcher.id = 'theme-switcher';
+                switcher.style.cssText = 'position:fixed; inset-block-end:20px; inset-inline-start:20px; z-index:9999; font-family:sans-serif;';
+                
+                const btn = document.createElement('button');
+                btn.innerHTML = '<i class="fa-solid fa-palette"></i>';
+                btn.title = "Cambiar Tema";
+                btn.style.cssText = 'inline-size:40px; block-size:40px; border-radius:50%; border:none; background:#2c3e50; color:white; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.3); font-size:16px; transition:transform 0.2s;';
+                btn.onmouseover = () => btn.style.transform = 'scale(1.1)';
+                btn.onmouseout = () => btn.style.transform = 'scale(1)';
+                btn.onclick = () => {
+                    const menu = document.getElementById('theme-menu');
+                    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
                 };
-                item.onmouseover = () => item.style.background = '#f8f9fa';
-                item.onmouseout = () => item.style.background = 'white';
-                menu.appendChild(item);
-            });
-            
-            if(menu.lastChild) menu.lastChild.style.borderBottom = 'none';
-            switcher.appendChild(menu);
-            switcher.appendChild(btn);
-            document.body.appendChild(switcher);
-        }
-        // Inyectar botón al cargar
-        injectThemeSwitcher();
-        */
+                
+                const menu = document.createElement('div');
+                menu.id = 'theme-menu';
+                menu.style.cssText = 'display:none; position:absolute; inset-block-end:50px; inset-inline-start:0; background:white; padding:5px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2); inline-size:160px; overflow:hidden;';
+                
+                AVAILABLE_THEMES.forEach(theme => {
+                    const item = document.createElement('div');
+                    item.style.cssText = 'padding:10px; cursor:pointer; border-block-end:1px solid #eee; font-size:13px; color:#333; display:flex; align-items:center; gap:10px; transition:background 0.2s;';
+                    item.innerHTML = `<i class="fa-solid ${theme.icon}" style="inline-size:15px; text-align:center;"></i> ${theme.name}`;
+                    item.onclick = () => { 
+                        if (typeof map !== 'undefined') {
+                            localStorage.setItem('visor_map_center', JSON.stringify(map.getCenter()));
+                            localStorage.setItem('visor_map_zoom', map.getZoom());
+                        }
+                        localStorage.setItem('visor_theme', theme.url); 
+                        window.location.href = theme.url; 
+                    };
+                    item.onmouseover = () => item.style.background = '#f8f9fa';
+                    item.onmouseout = () => item.style.background = 'white';
+                    menu.appendChild(item);
+                });
+                
+                if(menu.lastChild) menu.lastChild.style.borderBottom = 'none';
+                switcher.appendChild(menu);
+                switcher.appendChild(btn);
+                document.body.appendChild(switcher);
+            }
+            // Inyectar botón al cargar
+            injectThemeSwitcher();
 
         function getWMSGetFeatureInfoUrl(layer, latlng) {
             const point = map.latLngToContainerPoint(latlng, map.getZoom());
