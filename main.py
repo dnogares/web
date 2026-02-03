@@ -988,8 +988,7 @@ async def procesar_lote(request: LoteRequest):
     - Todos los GML juntos en la misma vista
     - ZIP con carpetas organizadas (documentos, geometrías, imágenes, etc.)
     """
-    if not CATASTRO_AVAILABLE:
-        raise HTTPException(status_code=503, detail="El módulo 'catastro4' no está disponible.")
+    print(f" Iniciando procesamiento de lote con {len(request.referencias)} referencias")
     
     referencias = request.referencias
     if not referencias:
@@ -1000,16 +999,16 @@ async def procesar_lote(request: LoteRequest):
     lote_dir = Path(cfg["rutas"]["outputs"]) / lote_id
     lote_dir.mkdir(exist_ok=True)
     
-    print(f"🚀 Iniciando procesamiento de lote {lote_id} con {len(referencias)} referencias")
+    print(f" Directorio del lote: {lote_dir}")
     
     try:
         # 1. Procesar cada referencia individualmente
-        todas_geometrias = []
         resultados_individuales = []
+        todas_geometrias = []
         xml_datos = []
         
         for i, ref in enumerate(referencias):
-            print(f"📋 Procesando referencia {i+1}/{len(referencias)}: {ref}")
+            print(f" [{i+1}/{len(referencias)}] Procesando referencia: {ref}")
             
             try:
                 # Procesar referencia individual
@@ -1018,44 +1017,86 @@ async def procesar_lote(request: LoteRequest):
                     directorio_base=str(lote_dir)
                 )
                 
+                print(f"  Resultado procesar_y_comprimir: zip_path={zip_path}, exitosa={resultados.get('exitosa')}")
+                
                 if zip_path and resultados.get('exitosa'):
                     # Extraer geometría
                     ref_dir = lote_dir / ref
                     parcela_gml_path = ref_dir / f"{ref}_parcela.gml"
+                    
+                    print(f"  Buscando GML: {parcela_gml_path}")
                     
                     if parcela_gml_path.exists():
                         try:
                             downloader = CatastroDownloader(output_dir=str(ref_dir))
                             coords_poligono = downloader.extraer_coordenadas_gml(str(parcela_gml_path))
                             
+                            print(f"  Coordenadas extraídas: {type(coords_poligono)} - {coords_poligono}")
+                            
                             if coords_poligono:
-                                # Añadir a la lista de geometrías combinadas
-                                for j, anillo in enumerate(coords_poligono):
-                                    todas_geometrias.append({
+                                # coords_poligono puede ser una lista de coordenadas o None
+                                # Si es una lista de tuplas, la usamos directamente
+                                if isinstance(coords_poligono, list) and len(coords_poligono) > 0:
+                                    # Añadir a la lista de geometrías combinadas
+                                    for j, anillo in enumerate(coords_poligono):
+                                        todas_geometrias.append({
+                                            'referencia': ref,
+                                            'anillo': j,
+                                            'coordenadas': anillo
+                                        })
+                                    
+                                    # Añadir datos para XML
+                                    xml_datos.append({
                                         'referencia': ref,
-                                        'anillo': j,
-                                        'coordenadas': anillo
+                                        'geometria': coords_poligono,
+                                        'resultados': resultados
                                     })
-                                
-                                # Añadir datos para XML
+                                    
+                                    print(f" Geometría extraída para {ref}: {len(coords_poligono)} anillos")
+                                else:
+                                    # Añadir datos para XML sin geometría
+                                    xml_datos.append({
+                                        'referencia': ref,
+                                        'geometria': None,
+                                        'resultados': resultados
+                                    })
+                                    
+                            else:
+                                print(f"  No se encontraron coordenadas para {ref}")
+                                # Añadir datos para XML sin geometría
                                 xml_datos.append({
                                     'referencia': ref,
-                                    'geometria': coords_poligono,
+                                    'geometria': None,
                                     'resultados': resultados
                                 })
-                                
-                                print(f"✅ Geometría extraída para {ref}: {len(coords_poligono)} anillos")
-                            else:
-                                print(f"⚠️ No se pudieron extraer coordenadas del GML para {ref}")
                         except Exception as e:
-                            print(f"⚠️ Error extrayendo geometría para {ref}: {e}")
+                            print(f"  Error extrayendo geometría para {ref}: {e}")
+                            traceback.print_exc()
+                            # Añadir datos para XML con error
+                            xml_datos.append({
+                                'referencia': ref,
+                                'geometria': None,
+                                'resultados': resultados,
+                                'error_geometria': str(e)
+                            })
+                    else:
+                        print(f"  No existe GML para {ref}")
+                        # Añadir datos para XML sin geometría
+                        xml_datos.append({
+                            'referencia': ref,
+                            'geometria': None,
+                            'resultados': resultados
+                        })
                     
                     resultados_individuales.append({
                         'referencia': ref,
                         'exitosa': True,
+                        'zip_path': zip_path,
                         'resultados': resultados
                     })
+                    
                 else:
+                    print(f"  Falló procesamiento de {ref}")
                     resultados_individuales.append({
                         'referencia': ref,
                         'exitosa': False,
@@ -1063,7 +1104,8 @@ async def procesar_lote(request: LoteRequest):
                     })
                     
             except Exception as e:
-                print(f"❌ Error procesando referencia {ref}: {e}")
+                print(f"  Error procesando referencia {ref}: {e}")
+                traceback.print_exc()
                 resultados_individuales.append({
                     'referencia': ref,
                     'exitosa': False,

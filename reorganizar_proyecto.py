@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Script para automatizar la reorganización del proyecto web6
+VERSION AUTOMATICA - SIN CONFIRMACION
 """
 
 import os
@@ -16,16 +17,16 @@ def print_header(text):
     print(f"{'='*60}\n")
 
 def print_success(text):
-    print(f"OK {text}")
+    print(f"[OK] {text}")
 
 def print_warning(text):
-    print(f"WARN {text}")
+    print(f"[WARN] {text}")
 
 def print_error(text):
-    print(f"ERROR {text}")
+    print(f"[ERROR] {text}")
 
 def print_info(text):
-    print(f"INFO {text}")
+    print(f"[INFO] {text}")
 
 def create_folder(path):
     Path(path).mkdir(parents=True, exist_ok=True)
@@ -60,17 +61,6 @@ def delete_file(path):
         print_error(f"Error eliminando {path}: {e}")
     return False
 
-def delete_folder(path):
-    try:
-        p = Path(path)
-        if p.exists() and p.is_dir():
-            shutil.rmtree(p)
-            print_success(f"Eliminada carpeta: {path}")
-            return True
-    except Exception as e:
-        print_error(f"Error eliminando carpeta {path}: {e}")
-    return False
-
 def backup_project(root_dir):
     print_header("CREANDO BACKUP")
     
@@ -79,8 +69,9 @@ def backup_project(root_dir):
     backup_path = Path(root_dir).parent / backup_name
     
     try:
+        print_info(f"Creando backup en: {backup_path}")
         shutil.copytree(root_dir, backup_path)
-        print_success(f"Backup creado en: {backup_path}")
+        print_success(f"Backup completado")
         return True
     except Exception as e:
         print_error(f"Error creando backup: {e}")
@@ -108,7 +99,7 @@ def create_structure(root_dir):
     for folder in folders:
         folder_path = Path(root_dir) / folder
         if create_folder(folder_path):
-            print_success(f"Carpeta creada: {folder}")
+            print_success(f"Carpeta: {folder}")
 
 def move_core_files(root_dir):
     print_header("MOVIENDO ARCHIVOS CORE")
@@ -166,6 +157,8 @@ def move_scripts(root_dir):
         "list_layers_util.py",
         "repro_coords.py",
         "verificarservidor.py",
+        "servidor_botones.py",
+        "servidor_final.py",
     ]
     
     for script in scripts:
@@ -193,7 +186,7 @@ def move_tests(root_dir):
             move_file(src_path, dst_path)
 
 def move_config_files(root_dir):
-    print_header("MOVIENDO ARCHIVOS DE CONFIGURACION")
+    print_header("MOVIENDO CONFIGURACION")
     
     config_files = [
         ("config.json", "src/config/config.json"),
@@ -207,7 +200,7 @@ def move_config_files(root_dir):
             move_file(src_path, dst_path)
 
 def move_data_files(root_dir):
-    print_header("MOVIENDO ARCHIVOS DE DATOS")
+    print_header("MOVIENDO DATOS")
     
     data_files = [
         ("mapa_municipios.json", "data/geodata/mapa_municipios.json"),
@@ -221,20 +214,20 @@ def move_data_files(root_dir):
             move_file(src_path, dst_path)
 
 def delete_log_files(root_dir):
-    print_header("ELIMINANDO ARCHIVOS DE LOG")
+    print_header("ELIMINANDO LOGS")
     
-    log_files = []
+    count = 0
     root_path = Path(root_dir)
     
     for f in root_path.glob("*.txt"):
         if f.name not in ["check_fgb.txt", "estructura.txt"]:
-            log_files.append(f)
+            delete_file(f)
+            count += 1
     
-    for log_file in log_files:
-        delete_file(log_file)
+    print_info(f"Archivos de log eliminados: {count}")
 
 def delete_duplicates(root_dir):
-    print_header("ELIMINANDO ARCHIVOS DUPLICADOS")
+    print_header("ELIMINANDO DUPLICADOS")
     
     files_to_delete = [
         "catastro4.py",
@@ -275,11 +268,7 @@ def main():
     
     print_header("REORGANIZADOR DE PROYECTO WEB6")
     print_info(f"Directorio raiz: {root_dir}")
-    
-    response = input("\nWARN Se van a reorganizar los archivos. Continuar? (s/n): ")
-    if response.lower() != 's':
-        print_warning("Operacion cancelada")
-        return
+    print_info("Iniciando reorganizacion...")
     
     if not backup_project(root_dir):
         print_error("No se pudo crear backup. Abortando.")
@@ -298,11 +287,12 @@ def main():
     delete_log_files(root_dir)
     
     print_header("REORGANIZACION COMPLETADA")
+    print_success("Estructura del proyecto reorganizada exitosamente")
     print_info("Proximos pasos:")
-    print("1. Revisar imports en main.py")
-    print("2. Ejecutar: python -m pytest tests/")
-    print("3. Ejecutar: python main.py")
-    print("4. Hacer commit: git add . && git commit -m 'refactor: restructure project'")
+    print("  1. Revisar imports en main.py")
+    print("  2. Ejecutar: python -m pytest tests/")
+    print("  3. Ejecutar: python main.py")
+    print("  4. Hacer commit: git add . && git commit -m 'refactor: restructure project'")
     
 if __name__ == "__main__":
     main()

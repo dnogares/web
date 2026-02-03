@@ -1717,7 +1717,16 @@
                     }
 
                     // Botón para cargar todas
-                    refsFileList.innerHTML += '<br><br><button class="action-btn" style="font-size:12px; padding:6px 12px;" onclick="cargarLoteReferencias(' + JSON.stringify(referencias) + ')">🚀 Cargar todas las referencias</button>';
+                    const refsButton = document.createElement('button');
+                    refsButton.className = 'action-btn';
+                    refsButton.style.cssText = 'font-size:12px; padding:6px 12px;';
+                    refsButton.innerHTML = '🚀 Cargar todas las referencias';
+                    refsButton.onclick = function() {
+                        cargarLoteReferencias(referencias);
+                    };
+                    refsFileList.appendChild(document.createElement('br'));
+                    refsFileList.appendChild(document.createElement('br'));
+                    refsFileList.appendChild(refsButton);
 
                 } catch (error) {
                     console.error('Error procesando archivo de referencias:', error);
@@ -2206,7 +2215,10 @@
 
             try {
                 const ref = document.getElementById('ref-input').value.trim().toUpperCase();
+                console.log('DEBUG: Referencia en cargarContenidosDisponibles:', ref);
+                
                 if (!ref) {
+                    console.log('DEBUG: No hay referencia, mostrando error');
                     contenedor.innerHTML = '<div style="text-align: center; color: #e74c3c; padding: 20px;"><i class="fa-solid fa-exclamation-triangle"></i> Introduce una referencia catastral primero</div>';
                     return;
                 }
@@ -2271,7 +2283,11 @@
             const empresa = document.getElementById('empresa-nombre').value.trim();
             const colegiado = document.getElementById('colegiado-numero').value.trim();
 
+            console.log('DEBUG: Referencia en generarPDFSeleccionado:', ref);
+            console.log('DEBUG: Valor del input ref-input:', document.getElementById('ref-input').value);
+
             if (!ref) {
+                console.log('DEBUG: No hay referencia, mostrando alerta');
                 alert('Introduce una referencia catastral primero');
                 return;
             }
