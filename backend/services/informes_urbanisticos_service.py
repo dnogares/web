@@ -157,7 +157,8 @@ class InformeUrbanistico:
             ref_dir = Path(self.output_dir) / ref
             if ref_dir.exists():
                 # Priorizar composición y planos
-                for nombre in [f"{ref}_plano_con_ortofoto
+                for nombre in [f"{ref}_plano_con_ortofoto_contorno.png", f"{ref}_plano_con_ortofoto.png", f"{ref}_plano_catastro.png", f"{ref}_ortofoto_pnoa.jpg"]:
+                    p = ref_dir / nombre
                     if p.exists():
                         mapas.append(str(p))
             

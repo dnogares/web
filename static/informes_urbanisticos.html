@@ -1259,7 +1259,7 @@
                 
                 try {
                     // 1. Asegurar descarga de datos (mapas, etc.)
-                    await fetch('/api/v1/procesar-completo', {
+                    const catastroRes = await fetch('/api/v1/procesar-completo', {
                         method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({referencia: ref})
                     });
                     
@@ -1380,7 +1380,7 @@
 
             // Mostrar checklist de archivos generados
             const items = [
-                { k: 'consulta_descriptiva', l: 'Ficha Catastral', icon: 'fa-file-pdf', color: '#e74c3c', file: `${ref}_consulta_oficial.html` },
+                { k: 'consulta_descriptiva', l: 'Ficha Catastral', icon: 'fa-file-pdf', color: '#e74c3c', file: `${ref}_consulta_oficial.pdf` },
                 { k: 'plano_ortofoto', l: 'Plano Catastral', icon: 'fa-map', color: '#3498db', file: `${ref}_plano_catastro.png` },
                 { k: 'plano_ortofoto', l: 'Ortofoto PNOA', icon: 'fa-image', color: '#2ecc71', file: `${ref}_ortofoto_pnoa.jpg` },
                 { k: 'plano_ortofoto', l: 'Composición', icon: 'fa-layer-group', color: '#9b59b6', file: `${ref}_plano_con_ortofoto.png` },

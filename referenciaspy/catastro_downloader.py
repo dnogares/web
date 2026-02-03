@@ -251,7 +251,7 @@ class CatastroDownloader:
         url = f"https://www1.sedecatastro.gob.es/CYCBienInmueble/SECImprimirCroquisYDatos.aspx?del={del_code}&mun={mun_code}&refcat={ref}"
         
         # Corrección de la ruta de guardado
-        filename = self.output_dir / f"{ref}_consulta_oficial.html"
+        filename = self.output_dir / f"{ref}_consulta_oficial.pdf"
         
         if os.path.exists(filename):
             print(f"  ↩ Ficha oficial ya existe")
@@ -733,42 +733,42 @@ class CatastroDownloader:
         if not bbox_wgs84:
             gml_path = self.output_dir / f"{ref}_parcela.gml"
             if gml_path.exists():
-            try:
-                coords_gml = self.extraer_coordenadas_gml(gml_path)
-                if coords_gml:
-                    lats = []
-                    lons = []
-                    for v1, v2 in coords_gml:
-                        # Heurística: España Lat 36-44, Lon -10-5
-                        if 35 < v1 < 45: 
-                            lats.append(v1)
-                            lons.append(v2)
-                        else: 
-                            lons.append(v1)
-                            lats.append(v2)
-                    
-                    if lats and lons:
-                        min_lat, max_lat = min(lats), max(lats)
-                        min_lon, max_lon = min(lons), max(lons)
+                try:
+                    coords_gml = self.extraer_coordenadas_gml(gml_path)
+                    if coords_gml:
+                        lats = []
+                        lons = []
+                        for v1, v2 in coords_gml:
+                            # Heurística: España Lat 36-44, Lon -10-5
+                            if 35 < v1 < 45: 
+                                lats.append(v1)
+                                lons.append(v2)
+                            else: 
+                                lons.append(v1)
+                                lats.append(v2)
                         
-                        # Calcular centro y dimensiones
-                        center_lat = (min_lat + max_lat) / 2
-                        center_lon = (min_lon + max_lon) / 2
-                        
-                        height = max_lat - min_lat
-                        width = max_lon - min_lon
-                        
-                        # Ajustar aspecto cuadrado (aprox España: 1 deg lat ~ 111km, 1 deg lon ~ 85km -> ratio ~ 0.76)
-                        max_dim = max(height, width * 0.76)
-                        margin = max(max_dim * 0.3, 0.002) # Margen 30% o mínimo ~200m
-                        
-                        span_lat = max_dim + (margin * 2)
-                        span_lon = span_lat / 0.76
-                        
-                        bbox_wgs84 = f"{center_lon - span_lon/2},{center_lat - span_lat/2},{center_lon + span_lon/2},{center_lat + span_lat/2}"
-                        print(f"  ✓ BBOX adaptado a la parcela")
-            except Exception as e:
-                print(f"  ⚠ Error calculando BBOX adaptativo: {e}")
+                        if lats and lons:
+                            min_lat, max_lat = min(lats), max(lats)
+                            min_lon, max_lon = min(lons), max(lons)
+                            
+                            # Calcular centro y dimensiones
+                            center_lat = (min_lat + max_lat) / 2
+                            center_lon = (min_lon + max_lon) / 2
+                            
+                            height = max_lat - min_lat
+                            width = max_lon - min_lon
+                            
+                            # Ajustar aspecto cuadrado (aprox España: 1 deg lat ~ 111km, 1 deg lon ~ 85km -> ratio ~ 0.76)
+                            max_dim = max(height, width * 0.76)
+                            margin = max(max_dim * 0.3, 0.002) # Margen 30% o mínimo ~200m
+                            
+                            span_lat = max_dim + (margin * 2)
+                            span_lon = span_lat / 0.76
+                            
+                            bbox_wgs84 = f"{center_lon - span_lon/2},{center_lat - span_lat/2},{center_lon + span_lon/2},{center_lat + span_lat/2}"
+                            print(f"  ✓ BBOX adaptado a la parcela")
+                except Exception as e:
+                    print(f"  ⚠ Error calculando BBOX adaptativo: {e}")
 
         if not bbox_wgs84:
             bbox_wgs84 = self.calcular_bbox(lon, lat, buffer_metros=200)
@@ -878,8 +878,7 @@ class CatastroDownloader:
                                 img_ortofoto = img_ortofoto.resize(img_catastro.size, Image.LANCZOS)
 
                             # Simple alpha blend:
-                            resultado = Image.blend(img_ortofoto.convert("RGB"), img_catastro.convert("RGB"), alpha=0.6)
-
+                            resultado = Image.alpha_composite(img_ortofoto, img_catastro)
 
                             filename_composicion = (
                                 self.output_dir / f"{ref}_plano_con_ortofoto.png"

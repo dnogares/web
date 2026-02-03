@@ -1151,15 +1151,22 @@ async def procesar_lote(request: LoteRequest):
         downloader = CatastroDownloader(output_dir=str(lote_dir))
 
         # 2. Crear XML unificado
-        xml_loader.generar_xml_lote(xml_datos, lote_id, xml_path)
-        Nojson_path = lote_dir / f"{lote_id}_geometrias_combinadas.geojson"
+        xml_path = lote_dir / f"{lote_id}_informacion.xml"
+        downloader.generar_xml_lote(xml_datos, lote_id, xml_path)
+        
+        # 3. Crear GeoJSON combinado y GML Global
+        geojson_path = lote_dir / f"{lote_id}_geometrias_combinadas.geojson"
         downloader.generar_geojson_lote(todas_geometrias, geojson_path)
         
-        # Generaer.generar_gml_global(xml_datos, lote_dir / f"{lote_id}_global.gml")
-        l lista_coords_para_mapa:
+        # Generar GML Global y Mapa Global
+        downloader.generar_gml_global(xml_datos, lote_dir / f"{lote_id}_global.gml")
+        
+        mapa_global_creado = False
+        if lista_coords_para_mapa:
             if downloader.generar_mapa_lote(lista_coords_para_mapa, lote_dir / f"{lote_id}_mapa_global.jpg"):
                 mapa_global_creado = True
-izar carpetas del ZIP final
+
+        # 4. Organizar carpetas del ZIP final
         zip_final_path = downloader.organizar_lote(lote_dir, lote_id, referencias)
         
         mapa_global_url = None
@@ -1167,7 +1174,8 @@ izar carpetas del ZIP final
              mapa_global_url = f"/outputs/{lote_id}/Imagenes/{lote_id}_mapa_global.jpg".replace('\\', '/')
 
         return {
-            "status": "sute procesado: {len(referencias)} referencias",
+            "status": "success",
+            "message": f"Lote procesado: {len(referencias)} referencias",
             "lote_id": lote_id,
             "zip_path": f"/outputs/{lote_id}/{lote_id}.zip".replace('\\', '/'),
             "geometrias_combinadas": len(todas_geometrias),
@@ -1186,55 +1194,8 @@ async def get_logs():
     """
     Endpoint para obtener logs del servidor (compatibilidad con visor)
     """
-    # Simular logs para compatibilidad con el visor     ff .dse f.b   rmlel eas)                            # Guardamos como 'geometrias/archivo.gml' etc.
-        zipf.write(f, folder.name + "/" + f.name)
-                
-                print(f"✅ ZIP creado: {zip_path}")
-            else:
-                print(f"❌ Directorio del expediente no existe: {exp_dir}")
-        except Exception as e:
-            print(f"❌ Error organizando/creando ZIP para lote {exp_id}: {str(e)}")
-            traceback.print_exc()
-        
-        # 3. Actualizar manifiesto con URL del ZIP y estado final
-        manifest_path = exp_dir / "manifest.json"
-        if manifest_path.exists():
-            with open(manifest_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            
-            # Añadir URL del ZIP si existe
-            if zip_path.exists():
-                data["zip_url"] = f"/outputs/expedientes/{zip_path.name}"
-                data["zip_size"] = zip_path.stat().st_size
-            
-            # Actualizar estado final
-            if data.get("estado") != "error":
-                data["estado"] = "completado"
-                data["fecha_finalizacion"] = datetime.now().isoformat()
-            
-            with open(manifest_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-            
-            print(f"📋 Manifiesto actualizado para lote {exp_id}")
-        
-    except Exception as e:
-        print(f"❌ Error crítico en background_lote_worker para {exp_id}: {str(e)}")
-        traceback.print_exc()
-        
-        # Intentar actualizar manifiesto con error crítico
-        try:
-            exp_dir = exp_base / f"expediente_{exp_id}"
-            manifest_path = exp_dir / "manifest.json"
-            if manifest_path.exists():
-                with open(manifest_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                data["estado"] = "error_critico"
-                data["error"] = str(e)
-                data["fecha_error"] = datetime.now().isoformat()
-                with open(manifest_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-        except:
-            pass
+    # Simular logs para compatibilidad con el visor
+    return {"status": "success", "logs": ["Servidor iniciado.", "Esperando peticiones..."]}
 
 @app.post("/api/v1/procesar-lote")
 async def procesar_lote_endpoint(request: LoteRequest, background_tasks: BackgroundTasks):
