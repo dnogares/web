@@ -538,15 +538,46 @@ async def list_capas_files():
         print(f"Error listando capas: {e}")
         return {"status": "error", "message": str(e), "files": []}
 
+@app.post("/api/v1/db/reconnect")
+async def reconnect_db():
+    """Forzar reconexión a la base de datos GIS"""
+    global db_gis
+    if not GIS_DB_AVAILABLE:
+        return {"status": "error", "message": "Módulo GIS DB no disponible"}
+    
+    try:
+        print("🔄 Intentando restablecer conexión con GIS DB...")
+        # Re-instanciar la clase de base de datos
+        temp_db = GISDatabase()
+        if temp_db.test_connection():
+            db_gis = temp_db
+            print("✅ Conexión GIS restablecida exitosamente")
+            return {"status": "success", "message": "Conexión restablecida"}
+        else:
+            print("⚠️ Intento de reconexión fallido")
+            return {"status": "error", "message": "No se pudo conectar a la base de datos"}
+    except Exception as e:
+        print(f"❌ Error al intentar reconectar: {e}")
+        return {"status": "error", "message": f"Error de conexión: {str(e)}"}
+
 @app.get("/api/v1/capas-disponibles")
 async def get_capas_disponibles():
     """Obtener lista de capas disponibles desde PostGIS"""
+    global db_gis
     try:
-        if not GIS_DB_AVAILABLE or db_gis is None:
+        if not GIS_DB_AVAILABLE:
             return {"status": "error", "message": "Módulo GIS DB no disponible"}
             
-        if not db_gis.test_connection():
-             return {"status": "success", "message": "Conectado a GIS (Simulado para pruebas o BD vacía)", "capas": []}
+        # Intentar inicializar o reconectar si es necesario
+        if db_gis is None or not db_gis.test_connection():
+             print("⚠️ Conexión DB inestable o nula, intentando reconectar...")
+             try:
+                 db_gis = GISDatabase()
+                 if not db_gis.test_connection():
+                     return {"status": "error", "message": "Base de datos desconectada", "capas": []}
+             except Exception as e:
+                 print(f"❌ Falló reconexión automática: {e}")
+                 return {"status": "error", "message": "Base de datos desconectada", "capas": []}
              
         # Consultar esquemas 'capas' y 'public'
         layers = db_gis.get_available_layers(schemas=["capas", "public"])

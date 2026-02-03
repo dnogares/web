@@ -273,6 +273,16 @@
             background: #667eea;
             color: white;
         }
+
+        .file-card {
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .file-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+            border-color: #667eea !important;
+        }
     </style>
 </head>
 
@@ -287,7 +297,7 @@
                 <i class="fas fa-city"></i> Informes Urbanísticos
             </h1>
 
-            <div class="controls-section">
+            <div class="controls-section mb-4">
                 <div class="row">
                     <div class="col-md-8">
                         <h4 class="mb-3">
@@ -325,11 +335,12 @@
 
                 <!-- Contenedor de Resultados de Lote (Encima del mapa) -->
                 <div id="batchContainer" class="mb-3"></div>
+            </div>
 
-                <div class="row">
-                    <!-- Columna Izquierda: Mapa Cuadrado -->
-                    <div class="col-lg-8">
-                        <div class="map-wrapper">
+            <div class="row">
+                <!-- Columna Izquierda: Mapa + Descargas -->
+                <div class="col-lg-7">
+                    <div class="map-wrapper mb-4">
                             <div class="map-container" id="map"></div>
                             
                             <!-- Herramientas integradas -->
@@ -348,12 +359,33 @@
                             
                             <!-- Resultado medición -->
                             <div id="measurementResult" style="position: absolute; top: 10px; left: 60px; z-index: 1000; background: white; padding: 5px 10px; border-radius: 5px; display: none; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-weight: bold; color: #667eea;"></div>
+                    </div>
+
+                    <!-- Barra de progreso (Debajo del mapa) -->
+                    <div class="progress-container mb-4" id="progressContainer">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span id="progressText">Procesando...</span>
+                            <button class="btn btn-sm btn-danger" id="cancelBtn">
+                                <i class="fas fa-times"></i> Cancelar
+                            </button>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar" id="progressBar" role="progressbar" style="width: 0%"></div>
                         </div>
                     </div>
 
-                    <!-- Columna Derecha: Capas -->
-                    <div class="col-lg-4">
-                        <div class="controls-section h-100" style="margin-bottom: 0; overflow-y: auto; max-height: 100%;">
+                    <div class="catastro-section mb-4" id="catastroSection" style="display: none;">
+                        <!-- Los archivos de catastro se cargarán aquí dinámicamente -->
+                    </div>
+
+                    <div class="results-section" id="resultsSection">
+                        <!-- Los resultados se cargarán aquí dinámicamente -->
+                    </div>
+                </div>
+
+                <!-- Columna Derecha: Capas -->
+                <div class="col-lg-5">
+                    <div class="controls-section" style="height: auto; min-height: 600px; overflow-y: auto;">
                             <h4 class="mb-3"><i class="fas fa-layer-group"></i> Capas</h4>
                             <div id="layersList"></div>
                             
@@ -367,30 +399,8 @@
                                     <label class="form-check-label small" for="showShaded">Sombrear sin info</label>
                                 </div>
                             </div>
-                        </div>
                     </div>
                 </div>
-
-                <!-- Barra de progreso -->
-                <div class="progress-container" id="progressContainer">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span id="progressText">Procesando...</span>
-                        <button class="btn btn-sm btn-danger" id="cancelBtn">
-                            <i class="fas fa-times"></i> Cancelar
-                        </button>
-                    </div>
-                    <div class="progress">
-                        <div class="progress-bar" id="progressBar" role="progressbar" style="width: 0%"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="catastro-section" id="catastroSection" style="display: none;">
-                <!-- Los archivos de catastro se cargarán aquí dinámicamente -->
-            </div>
-
-            <div class="results-section" id="resultsSection">
-                <!-- Los resultados se cargarán aquí dinámicamente -->
             </div>
 
             <!-- Búsqueda de Municipios (Movido al final) -->
@@ -1361,47 +1371,49 @@
             
             let html = `
                 <div class="info-card">
-                    <h5><i class="fas fa-download"></i> Archivos Generados por Catastro</h5>
-                    <div class="row">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="m-0"><i class="fas fa-folder-open"></i> Documentación Generada</h5>
+                        ${zipPath ? `<a href="${zipPath}" download class="btn btn-primary btn-sm"><i class="fas fa-file-archive"></i> Descargar Todo (ZIP)</a>` : ''}
+                    </div>
+                    <div class="row g-2">
             `;
 
             // Mostrar checklist de archivos generados
             const items = [
-                { k: 'consulta_descriptiva', l: 'Ficha Catastral (Web)', icon: '📋', file: `${ref}_consulta_oficial.html` },
-                { k: 'plano_ortofoto', l: 'Plano Catastral (PNG)', icon: '🗺️', file: `${ref}_plano_catastro.png` },
-                { k: 'plano_ortofoto', l: 'Ortofoto PNOA (JPG)', icon: '📷', file: `${ref}_ortofoto_pnoa.jpg` },
-                { k: 'plano_ortofoto', l: 'Composición (PNG)', icon: '🖼️', file: `${ref}_plano_con_ortofoto.png` },
-                { k: 'contorno_superpuesto', l: 'Composición + Perímetro', icon: '🎨', file: `${ref}_plano_con_ortofoto_contorno.png` },
-                { k: 'parcela_gml', l: 'Parcela (GML)', icon: '📄', file: `${ref}_parcela.gml` },
-                { k: 'edificio_gml', l: 'Edificio (GML)', icon: '🏢', file: `${ref}_edificio.gml` },
-                { k: 'kml', l: 'Archivo KML', icon: '📍', file: `${ref}.kml` },
-                { k: 'datos_xml', l: 'Datos (XML)', icon: '💾', file: `${ref}_datos.xml` },
-                { k: 'datos_urbanisticos', l: 'Datos Urbanísticos', icon: '📊', noFile: true },
-                { k: 'afecciones_detectadas', l: 'Análisis Afecciones', icon: '⚠️', noFile: true }
+                { k: 'consulta_descriptiva', l: 'Ficha Catastral', icon: 'fa-file-pdf', color: '#e74c3c', file: `${ref}_consulta_oficial.html` },
+                { k: 'plano_ortofoto', l: 'Plano Catastral', icon: 'fa-map', color: '#3498db', file: `${ref}_plano_catastro.png` },
+                { k: 'plano_ortofoto', l: 'Ortofoto PNOA', icon: 'fa-image', color: '#2ecc71', file: `${ref}_ortofoto_pnoa.jpg` },
+                { k: 'plano_ortofoto', l: 'Composición', icon: 'fa-layer-group', color: '#9b59b6', file: `${ref}_plano_con_ortofoto.png` },
+                { k: 'contorno_superpuesto', l: 'Plano + Perímetro', icon: 'fa-vector-square', color: '#e67e22', file: `${ref}_plano_con_ortofoto_contorno.png` },
+                { k: 'parcela_gml', l: 'Parcela GML', icon: 'fa-code', color: '#34495e', file: `${ref}_parcela.gml` },
+                { k: 'edificio_gml', l: 'Edificio GML', icon: 'fa-building', color: '#7f8c8d', file: `${ref}_edificio.gml` },
+                { k: 'kml', l: 'Google Earth (KML)', icon: 'fa-globe', color: '#f1c40f', file: `${ref}.kml` },
+                { k: 'datos_xml', l: 'Datos XML', icon: 'fa-database', color: '#1abc9c', file: `${ref}_datos.xml` }
             ];
 
             items.forEach(item => {
                 const disponible = resultados[item.k];
-                const icono = disponible ? '✅' : '❌';
-                let link = '';
                 
-                if (disponible && !item.noFile) {
-                    link = `<a href="/outputs/${ref}/${item.file}" target="_blank" class="ms-2 text-decoration-none" title="Ver/Descargar"><i class="fas fa-external-link-alt"></i></a>`;
+                if (disponible) {
+                    html += `
+                        <div class="col-md-6 col-lg-4">
+                            <div class="file-card p-2 border rounded d-flex align-items-center justify-content-between bg-white h-100">
+                                <div class="d-flex align-items-center overflow-hidden">
+                                    <div class="file-icon me-2 text-center" style="width: 32px; height: 32px; line-height: 32px; background: ${item.color}20; color: ${item.color}; border-radius: 6px;">
+                                        <i class="fas ${item.icon}"></i>
+                                    </div>
+                                    <div class="file-name small text-truncate fw-medium" title="${item.l}">${item.l}</div>
+                                </div>
+                                <a href="/outputs/${ref}/${item.file}" target="_blank" class="btn btn-sm btn-light text-primary border-0 ms-2" title="Ver/Descargar">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                            </div>
+                        </div>
+                    `;
                 }
-
-                html += `
-                    <div class="col-md-6 mb-2">
-                        <small>${icono} ${item.icon} ${item.l} ${link}</small>
-                    </div>
-                `;
             });
 
             html += `
-                    </div>
-                    <div class="mt-3">
-                        <a href="${zipPath}" download class="btn btn-primary btn-sm">
-                            <i class="fas fa-download"></i> Descargar ZIP Completo
-                        </a>
                     </div>
                 </div>
             `;
