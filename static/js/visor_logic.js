@@ -30,8 +30,27 @@ function initVisor() {
     satelite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { attribution: 'Google Satellite', maxZoom: 20 });
 
     layers = {
-        catastro: L.tileLayer.wms('https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx', { layers: 'Catastro', format: 'image/png', transparent: true, version: '1.1.1', styles: '', attribution: 'Catastro' }),
-        catastro_hq: L.tileLayer.wms('https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx', { layers: 'Catastro', format: 'image/png', transparent: true, version: '1.1.1', styles: '', dpi: 150, inline-size: 2048, block-size: 2048 }),
+        catastro: L.tileLayer.wms('/api/v1/wms_proxy', {
+            url: 'https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx',
+            layers: 'Catastro', 
+            format: 'image/png', 
+            transparent: true, 
+            version: '1.1.1', 
+            styles: '', 
+            attribution: 'Catastro' 
+        }),
+        catastro_hq: L.tileLayer.wms('/api/v1/wms_proxy', {
+            url: 'https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx',
+            layers: 'Catastro', 
+            format: 'image/png', 
+            transparent: true, 
+            version: '1.1.1', 
+            styles: '', 
+            dpi: 150, 
+            inline-size: 2048, 
+            block-size: 2048,
+            attribution: 'Catastro' 
+        }),
         ign_base: L.tileLayer.wms('https://www.ign.es/wms-inspire/ign-base', { layers: 'IGNBaseTodo', format: 'image/png', transparent: false, attribution: '© IGN' }),
         pnoa: L.tileLayer.wms('https://www.ign.es/wms-inspire/pnoa-ma', { layers: 'OI.OrthoimageCoverage', format: 'image/jpeg', transparent: true, attribution: '© IGN PNOA' }),
         // Red Natura 2000 (WMS - El archivo local es demasiado grande)

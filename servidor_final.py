@@ -27,10 +27,10 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 try:
     from catastro4 import CatastroDownloader, procesar_y_comprimir
     CATASTRO_AVAILABLE = True
-    print("✅ catastro4 disponible")
+    print("[OK] catastro4 disponible")
 except ImportError as e:
     CATASTRO_AVAILABLE = False
-    print(f"⚠️ catastro4 no disponible: {e}")
+    print(f"[WARNING] catastro4 no disponible: {e}")
 
 # Intentar importar generador PDF
 try:
@@ -58,11 +58,11 @@ def cargar_municipios_memoria():
     json_path = os.path.join(os.path.dirname(__file__), 'mapa_municipios.json')
     
     if not os.path.exists(json_path):
-        log_server(f"⚠️ mapa_municipios.json no encontrado en {json_path}")
+        log_server(f"[WARNING] mapa_municipios.json no encontrado en {json_path}")
         return
 
     try:
-        log_server(f"📂 Cargando municipios desde {json_path}...")
+        log_server(f"[INFO] Cargando municipios desde {json_path}...")
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
@@ -95,10 +95,10 @@ def cargar_municipios_memoria():
             })
             
         MUNICIPIOS_PROCESADOS = processed
-        log_server(f"✅ {len(MUNICIPIOS_PROCESADOS)} municipios cargados y optimizados en memoria.")
+        log_server(f"[OK] {len(MUNICIPIOS_PROCESADOS)} municipios cargados y optimizados en memoria.")
         
     except Exception as e:
-        log_server(f"❌ Error cargando municipios: {e}")
+        log_server(f"[ERROR] Error cargando municipios: {e}")
 
 # Cargar al iniciar el script
 cargar_municipios_memoria()
@@ -175,7 +175,7 @@ class Web6Handler(http.server.SimpleHTTPRequestHandler):
 
             try:
                 downloader = CatastroDownloader(output_dir="outputs")
-                log_server(f"🔍 Descargando GML para {ref}...")
+                log_server(f"[SEARCH] Descargando GML para {ref}...")
                 gml_descargado = downloader.descargar_parcela_gml(ref)
                 coords_poligono = None
                 
@@ -185,7 +185,7 @@ class Web6Handler(http.server.SimpleHTTPRequestHandler):
                     if gml_path.exists():
                         # log_server(f"📄 Extrayendo coordenadas del GML...")
                         coords_poligono = downloader.extraer_coordenadas_gml(str(gml_path))
-                        log_server(f"📍 Coordenadas extraídas: {len(coords_poligono) if coords_poligono else 0} puntos")
+                        log_server(f"[COORDS] Coordenadas extraídas: {len(coords_poligono) if coords_poligono else 0} puntos")
                         if coords_poligono:
                             # print(f"📐 Primer punto: {coords_poligono[0]}")
                             # Verificar si las coordenadas son válidas
@@ -194,26 +194,26 @@ class Web6Handler(http.server.SimpleHTTPRequestHandler):
                                 if -90 <= lat <= 90 and -180 <= lon <= 180:
                                     valid_coords.append((lat, lon))
                                 else:
-                                    log_server(f"⚠️ Coordenada inválida en posición {i}: {lat}, {lon}")
+                                    log_server(f"[WARNING] Coordenada inválida en posición {i}: {lat}, {lon}")
                             
                             if valid_coords:
                                 coords_poligono = valid_coords
                                 # log_server(f"✅ Coordenadas válidas: {len(coords_poligono)} puntos")
                             else:
-                                log_server(f"❌ No hay coordenadas válidas")
+                                log_server(f"[ERROR] No hay coordenadas válidas")
                                 coords_poligono = None
                     else:
-                        log_server(f"❌ Archivo GML no encontrado en {gml_path}")
+                        log_server(f"[ERROR] Archivo GML no encontrado en {gml_path}")
                         # Listar archivos en el directorio
                         ref_dir = Path("outputs") / ref
                         if ref_dir.exists():
-                            print(f"📂 Archivos en {ref_dir}:")
+                            print(f"[FILES] Archivos en {ref_dir}:")
                             for file in ref_dir.iterdir():
                                 print(f"   - {file.name}")
                         else:
-                            print(f"📂 Directorio {ref_dir} no existe")
+                            print(f"[INFO] Directorio {ref_dir} no existe")
                 else:
-                    log_server(f"❌ No se pudo descargar GML para {ref}")
+                    log_server(f"[ERROR] No se pudo descargar GML para {ref}")
 
                 if coords_poligono:
                     # coords_poligono viene como [(lat, lon), (lat, lon), ...]
@@ -227,9 +227,9 @@ class Web6Handler(http.server.SimpleHTTPRequestHandler):
                         "geometry": {"type": "Polygon", "coordinates": [polygon_geojson]},
                         "properties": {"referencia": ref, "fuente_geometria": "GML Real"}
                     }
-                    log_server(f"✅ Geometría GML real generada para {ref}: {len(polygon_geojson)} puntos")
+                    log_server(f"[OK] Geometría GML real generada para {ref}: {len(polygon_geojson)} puntos")
                 else:
-                    log_server(f"⚠️ No se obtuvieron coordenadas del GML, usando fallback...")
+                    log_server(f"[WARNING] No se obtuvieron coordenadas del GML, usando fallback...")
                     # Fallback a un cuadrado si el GML falla
                     coords_centro = downloader.obtener_coordenadas_unificado(ref)
                     if not coords_centro:
@@ -243,7 +243,7 @@ class Web6Handler(http.server.SimpleHTTPRequestHandler):
                         "geometry": {"type": "Polygon", "coordinates": simulated_polygon},
                         "properties": {"referencia": ref, "fuente_geometria": "Simulada"}
                     }
-                    log_server(f"🔄 Geometría simulada generada para {ref}")
+                    log_server(f"[INFO] Geometría simulada generada para {ref}")
                 self.send_json_response(response)
             except Exception as e:
                 self.send_json_response({"status": "error", "error": str(e)})
@@ -335,7 +335,7 @@ class Web6Handler(http.server.SimpleHTTPRequestHandler):
 
         # Endpoint: analizar afecciones (mock)
         if path == '/api/v1/analizar-afecciones':
-            log_server(f"⚠️ Analizando afecciones...")
+            log_server(f"[WARNING] Analizando afecciones...")
             ref = data.get('referencia', 'N/A')
             response = {
                 "status": "success",
@@ -370,7 +370,7 @@ class Web6Handler(http.server.SimpleHTTPRequestHandler):
             empresa = data.get('empresa', '')
             colegiado = data.get('colegiado', '')
 
-            log_server(f"📄 Generando PDF para {ref} con contenidos: {contenidos}")
+            log_server(f"[INFO] Generando PDF para {ref} con contenidos: {contenidos}")
 
             try:
                 downloader = CatastroDownloader(output_dir="outputs")
@@ -437,7 +437,7 @@ class Web6Handler(http.server.SimpleHTTPRequestHandler):
                 self.send_json_response({"status": "error", "error": "Referencia requerida"})
                 return
 
-            log_server(f"🔄 Procesando completo para {ref}...")
+            log_server(f"[INFO] Procesando completo para {ref}...")
             
             try:
                 # Usar catastro4 para descargar todo
@@ -472,21 +472,21 @@ class Web6Handler(http.server.SimpleHTTPRequestHandler):
             # Añadir secciones según opciones
             if data.get('incluir_referencia') and data.get('referencia'):
                 contenido_pdf["secciones"].append({
-                    "titulo": "📍 Información Catastral",
+                    "titulo": "[INFO] Información Catastral",
                     "contenido": {"referencia": data['referencia'], "estado": "Activa"},
                     "tipo": "referencia_catastral"
                 })
             
             if data.get('incluir_urbanismo'):
                 contenido_pdf["secciones"].append({
-                    "titulo": "🏙️ Análisis Urbanístico",
+                    "titulo": "[URBAN] Análisis Urbanístico",
                     "contenido": {"clasificacion": "Suelo Urbano", "restricciones": "Altura máxima: 3 plantas"},
                     "tipo": "analisis_urbanistico"
                 })
             
             if data.get('incluir_afecciones'):
                 contenido_pdf["secciones"].append({
-                    "titulo": "⚠️ Análisis de Afecciones",
+                    "titulo": "[WARNING] Análisis de Afecciones",
                     "contenido": {"afecciones": ["Riesgo inundación", "Zona protegida"]},
                     "tipo": "analisis_afecciones"
                 })
@@ -562,22 +562,22 @@ def main():
 
     local_ip = get_local_ip()
 
-    print("🚀 SERVIDOR WEB6 FINAL")
+    print("[START] SERVIDOR WEB6 FINAL")
     print("=" * 50)
-    print(f"📁 Directorio: {os.getcwd()}")
-    print(f"🌐 Puerto: {PORT}")
-    print(f"🔗 URL Local: http://localhost:{PORT}")
-    print(f"🌍 URL Red (LAN): http://{local_ip}:{PORT}")
-    print(f"📋 Visor: http://localhost:{PORT}/static/visor.html")
+    print(f"[INFO] Directorio: {os.getcwd()}")
+    print(f"[INFO] Puerto: {PORT}")
+    print(f"[URL] URL Local: http://localhost:{PORT}")
+    print(f"[URL] URL Red (LAN): http://{local_ip}:{PORT}")
+    print(f"[INFO] Visor: http://localhost:{PORT}/static/visor.html")
     print("=" * 50)
-    print("📋 Endpoints API disponibles:")
+    print("[INFO] Endpoints API disponibles:")
     print("   GET  /api/v1/buscar-municipio?q=codigo")
     print("   GET  /api/v1/referencia/{ref}/geojson  <-- ACEPTA TU FORMATO")
     print("   GET  /api/v1/capas-disponibles")
     print("   POST /api/v1/analizar-referencia")
     print("   POST /api/v1/generar-pdf-completo")
     print("=" * 50)
-    print("✅ Correcciones aplicadas:")
+    print("[INFO] Correcciones aplicadas:")
     print("   - Formato de referencia: 8884601WF4788S0020LL")
     print("   - Validación mejorada")
     print("   - Coordenadas simuladas")
@@ -587,23 +587,23 @@ def main():
     try:
         from pyngrok import ngrok
         public_url = ngrok.connect(PORT).public_url
-        print(f"🌐 Acceso Internet (ngrok): {public_url}")
+        print(f"[NGROK] Acceso Internet (ngrok): {public_url}")
     except ImportError:
-        print("ℹ️  Para acceso desde internet: pip install pyngrok")
+        print("[INFO] Para acceso desde internet: pip install pyngrok")
     except Exception:
         pass
 
-    print("⏹️ Presiona Ctrl+C para detener el servidor")
+    print("[STOP] Presiona Ctrl+C para detener el servidor")
     print()
     
     try:
         with socketserver.TCPServer(('', PORT), Web6Handler) as httpd:
-            print(f"✅ Servidor iniciado correctamente")
+            print(f"[OK] Servidor iniciado correctamente")
             httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\n🛑 Servidor detenido por el usuario")
+        print("\n[STOP] Servidor detenido por el usuario")
     except Exception as e:
-        print(f"❌ Error iniciando servidor: {e}")
+        print(f"[ERROR] Error iniciando servidor: {e}")
         return 1
     
     return 0
