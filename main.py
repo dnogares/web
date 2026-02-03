@@ -147,6 +147,10 @@ class UrbanismoRequest(BaseModel):
     archivo: Optional[str] = None
     contenido: Optional[str] = None
 
+class ProcesoRequest(BaseModel):
+    referencia: str
+    buffer_metros: Optional[int] = None
+
 class AfeccionesRequest(BaseModel):
     referencia: Optional[str] = None
     archivos: Optional[List[dict]] = None
@@ -829,11 +833,20 @@ async def get_referencia_geojson(ref: str):
 
         downloader = CatastroDownloader(output_dir=cfg["rutas"]["outputs"])
         
-        # 1. 
+        # 1. Asegurar que el GML existe
+        ref_dir = Path(cfg["rutas"]["outputs"]) / ref
+        gml_path = ref_dir / f"{ref}_parcela.gml"
+        
         if not gml_path.exists():
-            print(f"  GML no encontrado localment    if not downloader.descargar_parcela_gml(ref):
-        PException(status_code=404, detail=f"No se pudo descargar la geometría GML para {ref}")
-cosHTTPException(status_code=404, detail=f"No se pudo extraer la geometría del archivo GML para {ref}")
+            print(f"  GML no encontrado localmente, descargando para {ref}...")
+            if not downloader.descargar_parcela_gml(ref):
+                 raise HTTPException(status_code=404, detail=f"No se pudo descargar la geometría GML para {ref}")
+        
+        # 2. Extraer anillos de coordenadas
+        rings = downloader.extraer_coordenadas_gml(str(gml_path))
+        
+        if not rings:
+            raise HTTPException(status_code=404, detail=f"No se pudo extraer la geometría del archivo GML para {ref}")
 
         # 3. Convertir anillos a formato GeoJSON [lon, lat]
         processed_rings = []
@@ -857,12 +870,20 @@ cosHTTPException(status_code=404, detail=f"No se pudo extraer la geometría del 
             if processed_ring:
                 processed_rings.append(processed_ring)
 
-        if not processed_rings:suesta GeoJSON
-      return
-    "type":    "coordinates": processed_rings # Formato: [exterior_ring, interior_ring_1, ...]
+        if not processed_rings:
+            raise HTTPException(status_code=500, detail="Error procesando coordenadas GML a GeoJSON")
+
+        # 4. Construir la respuesta GeoJSON
+        return {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": processed_rings # Formato: [exterior_ring, interior_ring_1, ...]
             },
-            "properties": {"referencia": ref, "fuente_ge
- he
+            "properties": {"referencia": ref, "fuente_geometria": "GML Real", "anillos": len(rings)}
+        }
+    except HTTPException as he:
+        raise he
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -893,56 +914,6 @@ async def get_referencia_geojson_old(ref: str):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-fs
-                
-            # Realizar análisis urbanístico si tenemos geometría
-            datos_urbanisticos = N
-                try:
-                    datos_urbanisticos = urbanismo.realizar_analisis_urbanistico(anillos)
-                    print(f"✅ Análisis urbanístico completado")
-                except Exception as e:
-                    print(f"⚠️ Error en análisis urbanístico: {e}")
-                    datos_urbanisticos = {"error": str(e)}
-            
-            # Detectar afecciones reales
-            afecciones_detectadas = []
-            if ref_dir.exists():
-                # Revisar archivos de afecciones generados
-                for tipo in ['hidrografia', 'planeamiento', 'catastro_parcelas']:
-                    afeccion_file = ref_dir / f"{ref}_afeccion_{tipo}.png"
-                    if afeccion_file.exists() and afeccion_file.stat().st_size > 1500:
-                        afecciones_detectadas.append({
-                            "tipo": tipo,
-                            "descripcion": f"Afección por {tipo} detectada en la zona",
-                            "afectacion": "Directa",
-                            "archivo": str(afeccion_file)
-                        })
-                        print(f"✅ Afección detectada: {tipo}")
-            
-            # Enriquecer resultados con análisis urbanístico y afecciones
-            resultados_enriquecidos = resultados.copy()
-            if datos_urbanisticos:
-                resultados_enriquecidos['datos_urbanisticos'] = datos_urbanisticos
-            
-            if afecciones_detectadas:
-                resultados_enriquecidos['afecciones_detectadas'] = afecciones_detectadas
-            
-            # Devolver la ruta relativa para que el frontend pueda construir el enlace
-            relative_to_mount_dir = Path(zip_path).relative_to(Path(outputs_dir))
-            url_path = f"/outputs/{relative_to_mount_dir}"
-            
-            return {
-                "status": "success",
-                "message": f"Proceso completado para {ref}",
-                "zip_path": str(url_path).replace('\\', '/'), # Ensure forward slashes for URL
-                "resultados": resultados_enriquecidos
-            }
-        else:
-            error_msg = resultados.get('error', 'Error desconocido durante el procesamiento.')
-            raise HTTPException(status_code=500, detail=error_msg)
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en el servidor: {str(e)}")
 
 @app.post("/api/v1/procesar-lote")
 async def procesar_lote(request: LoteRequest):
@@ -1481,6 +1452,27 @@ async def analizar_afecciones(request: AfeccionesRequest):
 
     except Exception as e:
         return {"status": "error", "message": str(e), "data": None}
+
+@app.post("/api/v1/procesar-completo")
+async def procesar_completo(request: ProcesoRequest):
+    """Procesa una referencia completa y genera ZIP"""
+    try:
+        if not CATASTRO_AVAILABLE:
+            raise HTTPException(status_code=503, detail="Módulo catastro4 no disponible")
+            
+        ref = request.referencia
+        buffer = request.buffer_metros
+        
+        zip_path, resultados = procesar_y_comprimir(
+            referencia=ref,
+            directorio_base=cfg["rutas"]["outputs"],
+            buffer_metros=buffer
+        )
+        
+        zip_url = f"/outputs/{ref}/{os.path.basename(zip_path)}" if zip_path else ""
+        return {"status": "success", "zip_path": zip_url, "resultados": resultados}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @app.post("/api/analizar-avanzado")
