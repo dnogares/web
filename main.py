@@ -1161,6 +1161,305 @@ async def get_logs():
     # Simular logs para compatibilidad con el visor
     return {"status": "success", "logs": ["Servidor iniciado.", "Esperando peticiones..."]}
 
+# Endpoint para descargar ZIP de expediente
+@app.get("/api/v1/expedientes/{expediente_id}/download")
+async def descargar_expediente_zip(expediente_id: str):
+    """Descarga el ZIP de un expediente específico"""
+    try:
+        outputs_dir = cfg.get("rutas", {}).get("outputs", "outputs")
+        exp_dir = Path(outputs_dir) / "expedientes" / f"expediente_{expediente_id}"
+        
+        if not exp_dir.exists():
+            raise HTTPException(status_code=404, detail="Expediente no encontrado")
+        
+        # Buscar el archivo ZIP en el directorio
+        zip_files = list(exp_dir.glob("*.zip"))
+        
+        if not zip_files:
+            # Si no hay ZIP, intentar crear uno
+            try:
+                zip_path = exp_dir / f"expediente_{expediente_id}.zip"
+                import zipfile
+                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for file_path in exp_dir.rglob('*'):
+                        if file_path.is_file() and file_path.suffix != '.zip':
+                            arcname = file_path.relative_to(exp_dir)
+                            zipf.write(file_path, arcname)
+                zip_files = [zip_path]
+            except Exception as e:
+                print(f"Error creando ZIP para expediente {expediente_id}: {e}")
+        
+        if not zip_files:
+            raise HTTPException(status_code=404, detail="ZIP no disponible para este expediente")
+        
+        zip_file = zip_files[0]
+        return FileResponse(
+            path=zip_file,
+            filename=f"expediente_{expediente_id}.zip",
+            media_type='application/zip'
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error descargando ZIP expediente {expediente_id}: {e}")
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+# Endpoint para obtener estado de expediente (actualizado)
+@app.get("/api/v1/expedientes/{expediente_id}/status")
+async def obtener_estado_expediente(expediente_id: str):
+    """Obtiene el estado actual de un expediente"""
+    try:
+        outputs_dir = cfg.get("rutas", {}).get("outputs", "outputs")
+        manifest_path = Path(outputs_dir) / "expedientes" / f"expediente_{expediente_id}" / "manifest.json"
+        
+        if not manifest_path.exists():
+            raise HTTPException(status_code=404, detail="Expediente no encontrado")
+        
+        with open(manifest_path, 'r', encoding='utf-8') as f:
+            manifest = json.load(f)
+        
+        # Construir URL correcta para el ZIP
+        zip_url = f"/api/v1/expedientes/{expediente_id}/download"
+        
+        return {
+            **manifest,
+            "zip_url": zip_url  # URL correcta para descargar
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error obteniendo estado expediente {expediente_id}: {e}")
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+# Endpoint para descargar conjunto organizado por categorías
+@app.get("/api/v1/descargar-conjunto-organizado/{ref}")
+async def descargar_conjunto_organizado(ref: str):
+    """Descarga un ZIP organizado por categorías con siluetas y leyendas"""
+    try:
+        outputs_dir = cfg.get("rutas", {}).get("outputs", "outputs")
+        ref_dir = Path(outputs_dir) / ref
+        
+        if not ref_dir.exists():
+            raise HTTPException(status_code=404, detail="Referencia no encontrada")
+        
+        # Crear ZIP organizado en memoria
+        import zipfile
+        import tempfile
+        from io import BytesIO
+        
+        zip_buffer = BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # 1. Carpeta FOTOS_CONJUNTAS
+            fotos_conjuntas = []
+            
+            # Buscar imágenes con silueta
+            for img_file in ref_dir.glob("*_contorno.*"):
+                if img_file.suffix.lower() in ['.png', '.jpg', '.jpeg']:
+                    # Copiar a carpeta fotos_conjuntas
+                    arcname = f"fotos_conjuntas/{img_file.name}"
+                    zipf.write(img_file, arcname)
+                    fotos_conjuntas.append(img_file.name)
+            
+            # Añadir composiciones si existen
+            for comp_file in ref_dir.glob("*_composicion_*.png"):
+                arcname = f"fotos_conjuntas/{comp_file.name}"
+                zipf.write(comp_file, arcname)
+                fotos_conjuntas.append(comp_file.name)
+            
+            # 2. Carpeta ORTOFOTOS
+            ortofotos = []
+            for orto_file in ref_dir.glob("*ortofoto*"):
+                if orto_file.suffix.lower() in ['.png', '.jpg', '.jpeg']:
+                    # Priorizar versión con contorno
+                    contorno_file = ref_dir / f"{orto_file.stem}_contorno{orto_file.suffix}"
+                    file_to_use = contorno_file if contorno_file.exists() else orto_file
+                    
+                    arcname = f"ortofotos/{file_to_use.name}"
+                    zipf.write(file_to_use, arcname)
+                    ortofotos.append(file_to_use.name)
+            
+            # 3. Carpeta PLANOS
+            planos = []
+            for plano_file in ref_dir.glob("*plano*"):
+                if plano_file.suffix.lower() in ['.png', '.jpg', '.jpeg']:
+                    # Priorizar versión con contorno
+                    contorno_file = ref_dir / f"{plano_file.stem}_contorno{plano_file.suffix}"
+                    file_to_use = contorno_file if contorno_file.exists() else plano_file
+                    
+                    arcname = f"planos/{file_to_use.name}"
+                    zipf.write(file_to_use, arcname)
+                    planos.append(file_to_use.name)
+            
+            # 4. Carpeta CRUCES (composiciones GML + capas)
+            cruces = []
+            for cruce_file in ref_dir.glob("*composicion_gml_*.png"):
+                arcname = f"cruces/{cruce_file.name}"
+                zipf.write(cruce_file, arcname)
+                cruces.append(cruce_file.name)
+            
+            # 5. Documentación oficial
+            for doc_file in ref_dir.glob("*.pdf"):
+                arcname = f"documentacion/{doc_file.name}"
+                zipf.write(doc_file, arcname)
+            
+            # 6. Datos geográficos
+            for geo_file in ref_dir.glob("*.kml"):
+                arcname = f"datos_geograficos/{geo_file.name}"
+                zipf.write(geo_file, arcname)
+            
+            for geo_file in ref_dir.glob("*.geojson"):
+                arcname = f"datos_geograficos/{geo_file.name}"
+                zipf.write(geo_file, arcname)
+            
+            for geo_file in ref_dir.glob("*.gml"):
+                arcname = f"datos_geograficos/{geo_file.name}"
+                zipf.write(geo_file, arcname)
+            
+            # 7. Crear leyenda unificada
+            leyenda_content = crear_leyenda_unificada(ref, fotos_conjuntas, ortofotos, planos, cruces)
+            zipf.writestr("LEYENDA_UNIFICADA.txt", leyenda_content.encode('utf-8'))
+            
+            # 8. Crear README de organización
+            readme_content = crear_readme_organizacion(ref, fotos_conjuntas, ortofotos, planos, cruces)
+            zipf.writestr("README_ORGANIZACION.txt", readme_content.encode('utf-8'))
+        
+        # Preparar respuesta
+        zip_buffer.seek(0)
+        
+        return Response(
+            content=zip_buffer.getvalue(),
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename={ref}_conjunto_organizado.zip"}
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error descargando conjunto organizado {ref}: {e}")
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+def crear_leyenda_unificada(ref: str, fotos: list, ortofotos: list, planos: list, cruces: list) -> str:
+    """Crea una leyenda unificada con colores consistentes"""
+    leyenda = f"""
+═══════════════════════════════════════════════════════════════
+                  LEYENDA UNIFICADA - {ref}
+═══════════════════════════════════════════════════════════════
+
+🎨 COLORES ESTÁNDAR:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+■ FINCAS/PARCELAS:     Rojo (#FF0000) con borde blanco
+■ RED NATURA 2000:     Verde (#00AA00) 
+■ VÍAS PECUARIAS:      Azul (#0066CC)
+■ MONTES PÚBLICOS:     Verde oscuro (#006600)
+■ CAMINOS NATURALES:   Naranja (#FF8800)
+■ DOMINIO PÚBLICO:     Púrpura (#9933CC)
+■ ZONAS HÚMEDAS:       Cyan (#00CCCC)
+■ OTROS:               Gris (#666666)
+
+📁 ORGANIZACIÓN DE ARCHIVOS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📸 FOTOS_CONJUNTAS/     ({len(fotos)} archivos)
+   Todas las imágenes con silueta del recinto
+   Incluye composiciones y superposiciones
+   
+🛰️ ORTOFOTOS/           ({len(ortofotos)} archivos)
+   Imágenes satélite con silueta roja brillante
+   
+🗺️ PLANOS/              ({len(planos)} archivos)
+   Planos catastrales con silueta visible
+   
+🔄 CRUCES/              ({len(cruces)} archivos)
+   Composiciones GML + capas de intersección
+   
+📋 DOCUMENTACIÓN/       Oficial
+   PDFs catastrales y documentos legales
+   
+🌍 DATOS_GEOGRÁFICOS/    Formatos estándar
+   KML, GeoJSON, GML para SIG
+
+⚠️ INFORMACIÓN IMPORTANTE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Todas las imágenes incluyen la silueta del recinto en rojo brillante
+• Los colores de las capas son consistentes en todas las composiciones
+• Las coordenadas están en sistema ETRS89 / UTM zona 30N
+• Para análisis avanzados, use los archivos de la carpeta CRUCES
+• Los archivos KML son compatibles con Google Earth
+• Los GeoJSON funcionan con cualquier software SIG
+
+📅 Generado: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+🔧 Sistema: Análisis Territorial Automático
+═══════════════════════════════════════════════════════════════
+"""
+    return leyenda
+
+def crear_readme_organizacion(ref: str, fotos: list, ortofotos: list, planos: list, cruces: list) -> str:
+    """Crea un README explicando la organización"""
+    readme = f"""
+═══════════════════════════════════════════════════════════════
+            CONJUNTO ORGANIZADO - REFERENCIA: {ref}
+═══════════════════════════════════════════════════════════════
+
+Este ZIP contiene toda la información territorial organizada por 
+categorías para facilitar su uso y análisis.
+
+📦 ESTRUCTURA DE CARPETAS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📸 FOTOS_CONJUNTAS/
+   Imágenes con silueta del recinto siempre visible
+   - Composiciones múltiples
+   - Superposiciones de capas
+   - Vistas panorámicas
+
+🛰️ ORTOFOTOS/
+   Imágenes satélite de alta resolución
+   - Con silueta roja brillante
+   - Cobertura PNOA completa
+
+🗺️ PLANOS/
+   Planos catastrales oficiales
+   - Con silueta delimitadora
+   - Información parcelaria
+
+🔄 CRUCES/
+   Análisis de intersecciones territoriales
+   - GML + Red Natura 2000
+   - GML + Vías Pecuarias
+   - GML + Montes Públicos
+   - GML + Otras capas
+
+📋 DOCUMENTACIÓN/
+   Documentación oficial y legal
+   - Ficha catastral PDF
+   - Informes técnicos
+
+🌍 DATOS_GEOGRÁFICOS/
+   Formatos para sistemas SIG
+   - KML para Google Earth
+   - GeoJSON para web/escritorio
+   - GML original del catastro
+
+🎯 USO RECOMENDADO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Para presentación: Use FOTOS_CONJUNTAS/
+2. Para análisis territorial: Use CRUCES/
+3. Para SIG profesional: Use DATOS_GEOGRÁFICOS/
+4. Para documentación legal: Use DOCUMENTACIÓN/
+
+📞 SOPORTE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Para cualquier consulta técnica, contacte con el administrador
+del sistema de análisis territorial.
+
+📅 Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+🔗 Referencia: {ref}
+═══════════════════════════════════════════════════════════════
+"""
+    return readme
+
 @app.post("/api/v1/procesar-lote")
 async def procesar_lote_endpoint(request: LoteRequest, background_tasks: BackgroundTasks):
     """Procesa un lote de referencias y genera un expediente conjunto"""

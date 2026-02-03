@@ -1519,19 +1519,13 @@ async function procesarLoteGlobal(refsString, auto = false) {
             btn.innerHTML = originalText;
             btn.disabled = false;
         }
-    }
-}
-
-function mostrarArchivosCatastro(resultados, zipPath, ref) {
-    console.log('🎯 mostrarArchivosCatastro llamado con:', { resultados, zipPath, ref });
-            
     const catastroSection = document.getElementById('catastroSection');
-            
+    
     if (!catastroSection) {
-        console.error('❌ catastroSection no encontrado');
+        console.error(' catastroSection no encontrado');
         return;
     }
-            
+    
     let html = `
         <div class="info-card">
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -1541,10 +1535,17 @@ function mostrarArchivosCatastro(resultados, zipPath, ref) {
                     <button onclick="descargarGlobal('${ref}')" class="btn btn-success btn-sm" title="Descargar todos los archivos generados">
                         <i class="fas fa-download"></i> Descargar Global
                     </button>
+                    <button onclick="descargarConjuntoOrganizado('${ref}')" class="btn btn-warning btn-sm" title="Descargar conjunto organizado por categorías">
+                        <i class="fas fa-folder-tree"></i> Bajar Conjunto
+                    </button>
                     <button onclick="listarArchivos('${ref}')" class="btn btn-info btn-sm" title="Ver todos los archivos disponibles">
                         <i class="fas fa-list"></i> Listar Archivos
+                    </button>
+                </div>
+            </div>
+            <div class="row g-2">
     `;
-                
+
     // Mostrar checklist de archivos generados - PRIORIZAR VERSIONES CON SILUETA
     const items = [
         { k: 'consulta_descriptiva', l: 'Ficha Catastral', icon: 'fa-file-pdf', color: '#e74c3c', file: `${ref}_consulta_oficial.pdf` },
@@ -1559,10 +1560,10 @@ function mostrarArchivosCatastro(resultados, zipPath, ref) {
 
     // Siempre mostrar al menos los archivos básicos, incluso si no están en resultados
     let archivosMostrados = 0;
-                
+    
     items.forEach(item => {
         const disponible = resultados[item.k];
-                    
+        
         // Mostrar siempre archivos clave (PDF, planos) o si están disponibles
         if (disponible || ['consulta_descriptiva', 'plano_ortofoto', 'informe_pdf'].includes(item.k)) {
             // Determinar qué archivo usar (con silueta si existe, sino fallback)
@@ -1570,7 +1571,7 @@ function mostrarArchivosCatastro(resultados, zipPath, ref) {
             if (item.fallback) {
                 fileToUse = item.file; // Priorizar versión con silueta
             }
-                        
+            
             html += `
                 <div class="col-md-6 col-lg-4">
                     <div class="file-card p-2 border rounded d-flex align-items-center justify-content-between bg-white h-100">
@@ -1606,30 +1607,58 @@ function mostrarArchivosCatastro(resultados, zipPath, ref) {
     }
 
     html += `
-                    </div>
-                    
-                    <!-- Información adicional -->
-                    <div class="mt-3">
-                        <small class="text-muted">
-                            <i class="fas fa-info-circle"></i> 
-                            Los archivos se generan automáticamente. Usa "Descargar Global" para obtener el paquete completo 
-                            o "Listar Archivos" para ver todos los archivos disponibles.
-                        </small>
-                    </div>
-                </div>
-            `;
-
-            catastroSection.innerHTML = html;
-            catastroSection.style.display = 'block';
+            </div>
             
-            console.log('✅ mostrarArchivosCatastro completado, archivos mostrados:', archivosMostrados);
-        }
+            <!-- Información adicional -->
+            <div class="mt-3">
+                <small class="text-muted">
+                    <i class="fas fa-info-circle"></i> 
+                    Los archivos se generan automáticamente. Usa "Descargar Global" para obtener el paquete completo, 
+                    "Bajar Conjunto" para obtener archivos organizados por categorías, o "Listar Archivos" para ver todos los archivos disponibles.
+                </small>
+            </div>
+        </div>
+    `;
 
-                // Verificar acceso a información de parcela (solo con capas catastrales)
-                if (folderId === 'catastro' || layerId.includes('parcela') || layerId.includes('referencia')) {
-                    // Permitir acceso a información detallada
-                    layerInfo.hasInfo = true;
-                }
+    catastroSection.innerHTML = html;
+    catastroSection.style.display = 'block';
+    
+    console.log(' mostrarArchivosCatastro completado, archivos mostrados:', archivosMostrados);
+}
+
+// Función para descargar conjunto organizado por categorías
+async function descargarConjuntoOrganizado(ref) {
+    try {
+        showProgress('Generando conjunto organizado...', 30);
+        
+        const response = await fetch(`/api/v1/descargar-conjunto-organizado/${ref}`);
+        
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+        showProgress('Descargando conjunto organizado...', 80);
+        
+        // Obtener el blob y descargar
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${ref}_conjunto_organizado.zip`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        showProgress(' Conjunto organizado descargado', 100);
+        setTimeout(hideProgress, 2000);
+        
+    } catch (error) {
+        console.error('Error descargando conjunto organizado:', error);
+        alert(`Error descargando conjunto organizado: ${error.message}`);
+        hideProgress();
+    }
+}
 
                 activeLayers.add(layerId);
                 addLayerToMap(layerId, layerInfo, showShaded);

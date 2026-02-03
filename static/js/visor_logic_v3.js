@@ -570,21 +570,39 @@ async function procesarLoteActual() {
             <div style="padding: 10px; color: #e74c3c;">
                 <i class="fa-solid fa-circle-exclamation"></i> Error: ${e.message}
                 <button class="outline" style="margin-top: 10px; width: 100%;" onclick="mostrarPrevisualizacionLote(currentLoteRefs)">Reintentar</button>
-            </div>
-        `;
-    }
 }
 
-function pollProgress(expId, container) {
-    const interval = setInterval(async () => {
-        try {
-            const res = await fetch(`/api/v1/expedientes/${expId}`);
-            if (!res.ok) return;
+function mostrarPrevisualizacionLote(refs) {
+    const resBox = document.getElementById('res-catastro');
+    resBox.style.display = 'block';
 
-            const data = await res.json();
-            const pct = data.progreso || 0;
-            const estado = data.estado || 'procesando';
+    const listaHtml = refs.map((ref, index) =>
+        `<div style="border-bottom: 1px solid #eee; padding: 6px 0; font-family: monospace; font-size:0.85rem; display:flex; align-items:center;">
+            <span style="color:#999; width:25px;">${index + 1}.</span> 
+            <span style="font-weight:600; color:#2c3e50;">${ref}</span>
+        </div>`
+    ).join('');
 
+    resBox.innerHTML = `
+        <div style="padding: 5px;">
+            <div style="margin-bottom: 10px; color: var(--primary); font-weight: bold; display:flex; align-items:center; justify-content:space-between;">
+                <span><i class="fa-solid fa-list-check"></i> Referencias: ${refs.length}</span>
+                <span style="font-size:0.8rem; background:#e8f5e9; color:#27ae60; padding:2px 8px; border-radius:10px;">Listo</span>
+            </div>
+            <div style="max-height: 200px; overflow-y: auto; background: #fff; border: 1px solid #ddd; padding: 10px; margin-bottom: 15px; border-radius: 4px; box-shadow:inset 0 1px 3px rgba(0,0,0,0.05);">
+                ${listaHtml}
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="procesarLoteActual()" style="flex: 1; background:var(--secondary); border:none; color:white;">
+                    <i class="fa-solid fa-play"></i> Procesar
+                </button>
+                <button onclick="cancelarLote()" class="outline" style="flex: 1; border-color:#ccc; color:#666;">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    `;
+}
             const bar = document.getElementById('lote-progress');
             const status = document.getElementById('lote-status');
 
@@ -597,7 +615,7 @@ function pollProgress(expId, container) {
             if (estado === 'completado' || pct >= 100) {
                 clearInterval(interval);
 
-                const zipUrl = data.zip_url || `/outputs/expedientes/expediente_${expId}.zip`;
+                const zipUrl = data.zip_url; // Usar la URL correcta del backend
                 container.innerHTML = `
                     <div style="padding: 10px;">
                         <div style="color: green; font-weight: bold; margin-bottom: 5px;">
