@@ -1201,6 +1201,15 @@
                 // SIEMPRE mostrar sección de descargas, incluso si no hay resultados de catastro
                 mostrarArchivosCatastro(catastroData.resultados || {}, catastroData.zip_path, searchTerm);
                 
+                // FORZAR que la sección sea visible
+                const catastroSection = document.getElementById('catastroSection');
+                if (catastroSection) {
+                    catastroSection.style.display = 'block';
+                    console.log('✅ Sección de descargas forzada a visible');
+                } else {
+                    console.error('❌ No se encontró catastroSection');
+                }
+                
                 if (catastroData.resultados) {
                     // Mostrar archivos específicos solo si existen
                     // (el resto del código existente)
@@ -1433,90 +1442,188 @@
                 if(btn) {
                     btn.innerHTML = originalText;
                     btn.disabled = false;
+
+// Procesamiento global automático al finalizar
+if (!window.batchCancelled) {
+    procesarLoteGlobal(refs.join(','), true);
+}
+
+function cancelarLote() {
+    if(confirm("¿Está seguro de que desea detener el procesamiento del lote? Las referencias pendientes no se procesarán.")) {
+        window.batchCancelled = true;
+        const btn = document.getElementById('btnCancelarLote');
+        if(btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deteniendo...';
+        }
+    }
+}
+
+// Función auxiliar para llamar al procesado global (opcional)
+async function procesarLoteGlobal(refsString, auto = false) {
+    if(!auto && !confirm("Esto generará un mapa global y un ZIP unificado. Puede tardar unos segundos. ¿Continuar?")) return;
+            
+    // Feedback visual en el botón (si se disparó desde un evento click)
+    let btn = null;
+    if (!auto && typeof event !== 'undefined' && event && event.target) {
+        btn = event.target.closest('button');
+    }
+    const originalText = btn ? btn.innerHTML : '';
+    if(btn) {
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
+        btn.disabled = true;
+    }
+
+    const refs = refsString.split(',');
+    try {
+        const res = await fetch('/api/v1/procesar-lote', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({referencias: refs})
+        });
+        const data = await res.json();
+        if(data.status === 'success') {
+            // Mostrar vista previa si hay mapa
+            if (data.mapa_global_url) {
+                const batchContainer = document.getElementById('batchContainer');
+                let previewDiv = document.getElementById('batchGlobalPreview');
+                if (!previewDiv) {
+                    previewDiv = document.createElement('div');
+                    previewDiv.id = 'batchGlobalPreview';
+                    previewDiv.className = 'mt-3 p-3 bg-light rounded border';
+                    batchContainer.appendChild(previewDiv);
                 }
+                        
+                previewDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="m-0 text-primary"><i class="fas fa-map"></i> Mapa Global del Lote</h6>
+                        <button class="btn-close" onclick="this.parentElement.parentElement.remove()"></button>
+                    </div>
+                    <div class="text-center mb-3">
+                        <img src="${data.mapa_global_url}" class="img-fluid rounded shadow-sm" style="max-height: 500px; border: 1px solid #ddd;">
+                    </div>
+                    <div class="text-center">
+                        <a href="${data.zip_path}" class="btn btn-success me-2"><i class="fas fa-file-archive"></i> Descargar ZIP Unificado</a>
+                        <a href="${data.mapa_global_url}" download class="btn btn-outline-primary"><i class="fas fa-image"></i> Descargar Imagen</a>
+                    </div>
+                `;
+                previewDiv.scrollIntoView({behavior: 'smooth'});
+            } else {
+                alert(`Lote Global Generado.\nZIP: ${data.zip_path}`);
+                window.open(data.zip_path, '_blank');
             }
         }
+    } catch(e) { 
+        console.error(e);
+        alert("Error generando lote global"); 
+    } finally {
+        if(btn) {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+}
 
-        function mostrarArchivosCatastro(resultados, zipPath, ref) {
-            const catastroSection = document.getElementById('catastroSection');
+function mostrarArchivosCatastro(resultados, zipPath, ref) {
+    console.log('🎯 mostrarArchivosCatastro llamado con:', { resultados, zipPath, ref });
             
-            let html = `
-                <div class="info-card">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="m-0"><i class="fas fa-folder-open"></i> Documentación Generada</h5>
-                        <div class="btn-group" role="group">
-                            ${zipPath ? `<a href="${zipPath}" download class="btn btn-primary btn-sm"><i class="fas fa-file-archive"></i> ZIP Catastro</a>` : ''}
-                            <button onclick="descargarGlobal('${ref}')" class="btn btn-success btn-sm" title="Descargar todos los archivos generados">
-                                <i class="fas fa-download"></i> Descargar Global
-                            </button>
-                            <button onclick="listarArchivos('${ref}')" class="btn btn-info btn-sm" title="Ver todos los archivos disponibles">
-                                <i class="fas fa-list"></i> Listar Archivos
-                            </button>
-                        </div>
-                    </div>
-                    <div class="row g-2">
-            `;
-
-            // Mostrar checklist de archivos generados - PRIORIZAR VERSIONES CON SILUETA
-            const items = [
-                { k: 'consulta_descriptiva', l: 'Ficha Catastral', icon: 'fa-file-pdf', color: '#e74c3c', file: `${ref}_consulta_oficial.pdf` },
-                { k: 'plano_ortofoto', l: 'Plano Catastral', icon: 'fa-map', color: '#3498db', file: `${ref}_plano_catastro_contorno.png`, fallback: `${ref}_plano_catastro.png` },
-                { k: 'plano_ortofoto', l: 'Ortofoto PNOA', icon: 'fa-image', color: '#2ecc71', file: `${ref}_ortofoto_pnoa_contorno.jpg`, fallback: `${ref}_ortofoto_pnoa.jpg` },
-                { k: 'plano_ortofoto', l: 'Composición', icon: 'fa-layer-group', color: '#9b59b6', file: `${ref}_plano_con_ortofoto_contorno.png`, fallback: `${ref}_plano_con_ortofoto.png` },
-                { k: 'kml', l: 'KML', icon: 'fa-map-marker-alt', color: '#27ae60', file: `${ref}.kml` },
-                { k: 'datos_xml', l: 'Datos XML', icon: 'fa-code', color: '#f39c12', file: `${ref}_datos.xml` },
-                { k: 'geojson', l: 'GeoJSON', icon: 'fa-globe', color: '#16a085', file: `${ref}.geojson` },
-                { k: 'informe_pdf', l: 'Informe PDF', icon: 'fa-file-pdf', color: '#e67e22', file: `${ref}_informe.pdf` }
-            ];
-
-            items.forEach(item => {
-                const disponible = resultados[item.k];
+    const catastroSection = document.getElementById('catastroSection');
+            
+    if (!catastroSection) {
+        console.error('❌ catastroSection no encontrado');
+        return;
+    }
+            
+    let html = `
+        <div class="info-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="m-0"><i class="fas fa-folder-open"></i> Documentación Generada</h5>
+                <div class="btn-group" role="group">
+                    ${zipPath ? `<a href="${zipPath}" download class="btn btn-primary btn-sm"><i class="fas fa-file-archive"></i> ZIP Catastro</a>` : '<span class="text-muted small">ZIP no disponible</span>'}
+                    <button onclick="descargarGlobal('${ref}')" class="btn btn-success btn-sm" title="Descargar todos los archivos generados">
+                        <i class="fas fa-download"></i> Descargar Global
+                    </button>
+                    <button onclick="listarArchivos('${ref}')" class="btn btn-info btn-sm" title="Ver todos los archivos disponibles">
+                        <i class="fas fa-list"></i> Listar Archivos
+    `;
                 
-                if (disponible) {
-                    // Determinar qué archivo usar (con silueta si existe, sino fallback)
-                    let fileToUse = item.file;
-                    if (item.fallback) {
-                        // Intentar usar el endpoint robusto para verificar si existe el archivo con silueta
-                        fileToUse = item.file; // Priorizar versión con silueta
-                    }
+    // Mostrar checklist de archivos generados - PRIORIZAR VERSIONES CON SILUETA
+    const items = [
+        { k: 'consulta_descriptiva', l: 'Ficha Catastral', icon: 'fa-file-pdf', color: '#e74c3c', file: `${ref}_consulta_oficial.pdf` },
+        { k: 'plano_ortofoto', l: 'Plano Catastral', icon: 'fa-map', color: '#3498db', file: `${ref}_plano_catastro_contorno.png`, fallback: `${ref}_plano_catastro.png` },
+        { k: 'plano_ortofoto', l: 'Ortofoto PNOA', icon: 'fa-image', color: '#2ecc71', file: `${ref}_ortofoto_pnoa_contorno.jpg`, fallback: `${ref}_ortofoto_pnoa.jpg` },
+        { k: 'plano_ortofoto', l: 'Composición', icon: 'fa-layer-group', color: '#9b59b6', file: `${ref}_plano_con_ortofoto_contorno.png`, fallback: `${ref}_plano_con_ortofoto.png` },
+        { k: 'kml', l: 'KML', icon: 'fa-map-marker-alt', color: '#27ae60', file: `${ref}.kml` },
+        { k: 'datos_xml', l: 'Datos XML', icon: 'fa-code', color: '#f39c12', file: `${ref}_datos.xml` },
+        { k: 'geojson', l: 'GeoJSON', icon: 'fa-globe', color: '#16a085', file: `${ref}.geojson` },
+        { k: 'informe_pdf', l: 'Informe PDF', icon: 'fa-file-pdf', color: '#e67e22', file: `${ref}_informe.pdf` }
+    ];
+
+    // Siempre mostrar al menos los archivos básicos, incluso si no están en resultados
+    let archivosMostrados = 0;
+                
+    items.forEach(item => {
+        const disponible = resultados[item.k];
                     
-                    html += `
-                        <div class="col-md-6 col-lg-4">
-                            <div class="file-card p-2 border rounded d-flex align-items-center justify-content-between bg-white h-100">
-                                <div class="d-flex align-items-center overflow-hidden">
-                                    <div class="file-icon me-2 text-center" style="width: 32px; height: 32px; line-height: 32px; background: ${item.color}20; color: ${item.color}; border-radius: 6px;">
-                                        <i class="fas ${item.icon}"></i>
-                                    </div>
-                                    <div class="file-name small text-truncate fw-medium" title="${item.l}">${item.l}</div>
-                                </div>
-                                <a href="/api/v1/descargar-archivo/${ref}/${fileToUse}" target="_blank" class="btn btn-sm btn-light text-primary border-0 ms-2" title="Ver/Descargar">
-                                    <i class="fas fa-download"></i>
-                                </a>
+        // Mostrar siempre archivos clave (PDF, planos) o si están disponibles
+        if (disponible || ['consulta_descriptiva', 'plano_ortofoto', 'informe_pdf'].includes(item.k)) {
+            // Determinar qué archivo usar (con silueta si existe, sino fallback)
+            let fileToUse = item.file;
+            if (item.fallback) {
+                fileToUse = item.file; // Priorizar versión con silueta
+            }
+                        
+            html += `
+                <div class="col-md-6 col-lg-4">
+                    <div class="file-card p-2 border rounded d-flex align-items-center justify-content-between bg-white h-100">
+                        <div class="d-flex align-items-center overflow-hidden">
+                            <div class="file-icon me-2 text-center" style="width: 32px; height: 32px; line-height: 32px; background: ${item.color}20; color: ${item.color}; border-radius: 6px;">
+                                <i class="fas ${item.icon}"></i>
+                            </div>
+                            <div class="file-name small text-truncate fw-medium" title="${item.l}">
+                                ${item.l}
+                                ${!disponible ? '<span class="text-muted">(pendiente)</span>' : ''}
                             </div>
                         </div>
-                    `;
-                }
-            });
+                        <a href="/api/v1/descargar-archivo/${ref}/${fileToUse}" target="_blank" class="btn btn-sm btn-light text-primary border-0 ms-2" title="Ver/Descargar">
+                            <i class="fas fa-download"></i>
+                        </a>
+                    </div>
+                </div>
+            `;
+            archivosMostrados++;
+        }
+    });
 
-            html += `
+    // Si no hay archivos para mostrar, mostrar mensaje
+    if (archivosMostrados === 0) {
+        html += `
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> 
+                    Procesando archivos... Usa los botones de descarga global para obtener todos los resultados.
+                </div>
+            </div>
+        `;
+    }
+
+    html += `
+                    </div>
+                    
+                    <!-- Información adicional -->
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle"></i> 
+                            Los archivos se generan automáticamente. Usa "Descargar Global" para obtener el paquete completo 
+                            o "Listar Archivos" para ver todos los archivos disponibles.
+                        </small>
                     </div>
                 </div>
             `;
 
             catastroSection.innerHTML = html;
             catastroSection.style.display = 'block';
+            
+            console.log('✅ mostrarArchivosCatastro completado, archivos mostrados:', archivosMostrados);
         }
-
-        function toggleLayer(layerId, enabled, layerInfo, folderId) {
-            const maxLayers = parseInt(document.getElementById('maxLayers').value);
-            const showShaded = document.getElementById('showShaded').checked;
-
-            if (enabled) {
-                if (activeLayers.size >= maxLayers) {
-                    alert(`Máximo de ${maxLayers} capas simultáneas permitidas`);
-                    document.getElementById(`layer_${layerId}`).checked = false;
-                    return;
-                }
 
                 // Verificar acceso a información de parcela (solo con capas catastrales)
                 if (folderId === 'catastro' || layerId.includes('parcela') || layerId.includes('referencia')) {

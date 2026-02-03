@@ -887,7 +887,7 @@ class CatastroDownloader:
             return False
     
     def generar_informe_pdf(self, referencia):
-        """Genera informe PDF si ReportLab está disponible"""
+        """Genera informe PDF completo con información estructurada"""
         if not REPORTLAB_AVAILABLE:
             return False
         
@@ -895,30 +895,189 @@ class CatastroDownloader:
         pdf_file = self.output_dir / f"{ref}_informe.pdf"
         
         try:
-            # Código simplificado de generación de PDF
             from reportlab.lib.pagesizes import A4
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+            from reportlab.lib import colors
+            from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
             
-            doc = SimpleDocTemplate(str(pdf_file), pagesize=A4)
+            # Configuración del documento
+            doc = SimpleDocTemplate(str(pdf_file), pagesize=A4, 
+                                  rightMargin=72, leftMargin=72,
+                                  topMargin=72, bottomMargin=18)
+            
             styles = getSampleStyleSheet()
+            
+            # Estilos personalizados
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=18,
+                spaceAfter=30,
+                alignment=TA_CENTER,
+                textColor=colors.darkblue
+            )
+            
+            heading_style = ParagraphStyle(
+                'CustomHeading',
+                parent=styles['Heading2'],
+                fontSize=14,
+                spaceAfter=12,
+                textColor=colors.darkblue
+            )
+            
             story = []
             
-            # Título
-            story.append(Paragraph(f"Informe Catastral - {ref}", styles['Title']))
+            # 1. CABECERA
+            story.append(Paragraph("INFORME TERRITORIAL COMPLETO", title_style))
             story.append(Spacer(1, 12))
             
-            # Contenido básico
-            story.append(Paragraph(f"Referencia: {ref}", styles['Normal']))
-            story.append(Paragraph(f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
-            story.append(Paragraph("Documentación descargada del Catastro", styles['Normal']))
+            # 2. INFORMACIÓN BÁSICA
+            story.append(Paragraph("📍 DATOS CATASTRALES", heading_style))
             
+            # Obtener datos del catastro si es posible
+            datos_basicos = [
+                ['Referencia Catastral:', ref],
+                ['Fecha Informe:', datetime.now().strftime('%d/%m/%Y %H:%M')],
+                ['Tipo Informe:', 'Análisis Territorial Completo'],
+                ['Sistema Coordenadas:', 'ETRS89 / UTM zona 30N'],
+            ]
+            
+            # Intentar obtener coordenadas del GML
+            gml_file = self.output_dir / f"{ref}_parcela.gml"
+            if gml_file.exists():
+                coords = self.extraer_coordenadas_gml(str(gml_file))
+                if coords:
+                    # Calcular centroide aproximado
+                    all_coords = [coord for ring in coords for coord in ring]
+                    if all_coords:
+                        lons = [coord[0] for coord in all_coords if not self._es_latitud(coord[0])]
+                        lats = [coord[0] for coord in all_coords if self._es_latitud(coord[0])]
+                        if lons and lats:
+                            center_lon = sum(lons) / len(lons)
+                            center_lat = sum(lats) / len(lats)
+                            datos_basicos.append(['Centro Aproximado:', f'Lat: {center_lat:.6f}, Lon: {center_lon:.6f}'])
+            
+            tabla_datos = Table(datos_basicos, colWidths=[2*inch, 4*inch])
+            tabla_datos.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            story.append(tabla_datos)
+            story.append(Spacer(1, 20))
+            
+            # 3. ARCHIVOS GENERADOS
+            story.append(Paragraph("📁 ARCHIVOS GENERADOS", heading_style))
+            
+            archivos_info = [
+                ['Tipo', 'Archivo', 'Descripción'],
+                ['PDF Oficial', f'{ref}_consulta_oficial.pdf', 'Ficha catastral oficial'],
+                ['Plano Catastral', f'{ref}_plano_catastro.png', 'Plano con silueta del recinto'],
+                ['Ortofoto PNOA', f'{ref}_ortofoto_pnoa.jpg', 'Imagen satélite con silueta'],
+                ['Composición', f'{ref}_plano_con_ortofoto.png', 'Plano + ortofoto superpuestos'],
+                ['KML', f'{ref}.kml', 'Formato Google Earth'],
+                ['GeoJSON', f'{ref}.geojson', 'Formato SIG estándar'],
+                ['GML', f'{ref}_parcela.gml', 'Geometría original catastral'],
+            ]
+            
+            # Añadir composiciones si existen
+            composiciones = list(self.output_dir.glob(f"{ref}_composicion_gml_*.png"))
+            for comp in composiciones[:5]:  # Máximo 5 composiciones
+                capa_nombre = comp.stem.replace(f"{ref}_composicion_gml_", "")
+                archivos_info.append(['Composición GML', comp.name, f'GML + {capa_nombre}'])
+            
+            tabla_archivos = Table(archivos_info, colWidths=[1.5*inch, 3*inch, 2.5*inch])
+            tabla_archivos.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ]))
+            
+            story.append(tabla_archivos)
+            story.append(Spacer(1, 20))
+            
+            # 4. CARACTERÍSTICAS TÉCNICAS
+            story.append(Paragraph("🔧 CARACTERÍSTICAS TÉCNICAS", heading_style))
+            
+            tecnicas_info = [
+                ['Procesamiento:', 'Silueta aplicada a todas las imágenes'],
+                ['Calidad:', 'Alta resolución (300 DPI)'],
+                ['Formatos:', 'PDF, PNG, JPG, KML, GeoJSON, GML'],
+                ['Coordenadas:', 'WGS84 / ETRS89'],
+                ['Retención:', '24 horas desde generación'],
+                ['Composiciones:', f'{len(composiciones)} capas de intersección'],
+            ]
+            
+            for key, value in tecnicas_info:
+                story.append(Paragraph(f"<b>{key}</b> {value}", styles['Normal']))
+            
+            story.append(Spacer(1, 20))
+            
+            # 5. INSTRUCCIONES DE USO
+            story.append(Paragraph("📖 INSTRUCCIONES DE USO", heading_style))
+            
+            instrucciones = [
+                "1. Los archivos con silueta tienen el contorno del recinto en rojo brillante",
+                "2. Las composiciones combinan el GML con capas de intersección territorial",
+                "3. Use el KML para visualizar en Google Earth",
+                "4. El GeoJSON es compatible con cualquier software SIG",
+                "5. Los archivos estarán disponibles por 24 horas",
+                "6. Para análisis avanzados, use las composiciones GML + capas",
+            ]
+            
+            for instruccion in instrucciones:
+                story.append(Paragraph(f"• {instruccion}", styles['Normal']))
+            
+            story.append(Spacer(1, 20))
+            
+            # 6. PIE DE PÁGINA
+            story.append(PageBreak())
+            story.append(Paragraph("🔍 INFORMACIÓN ADICIONAL", heading_style))
+            
+            adicional_info = [
+                'Este informe ha sido generado automáticamente por el sistema de análisis territorial.',
+                'Toda la información ha sido obtenida de fuentes oficiales: Catastro, PNOA, y capas territoriales.',
+                'Las siluetas garantizan la identificación visual clara del recinto en todas las imágenes.',
+                f'Número total de archivos generados: {len(list(self.output_dir.glob(f"{ref}*")))}',
+                f'Tamaño total estimado: {sum(f.stat().st_size for f in self.output_dir.glob(f"{ref}*") if f.is_file()) / 1024 / 1024:.1f} MB',
+            ]
+            
+            for info in adicional_info:
+                story.append(Paragraph(info, styles['Normal']))
+                story.append(Spacer(1, 6))
+            
+            # 7. NOTA FINAL
+            story.append(Spacer(1, 20))
+            story.append(Paragraph("⚠️ NOTA IMPORTANTE", heading_style))
+            story.append(Paragraph(
+                "Este documento es un resumen de los archivos generados. "
+                "Para el análisis completo, utilice los archivos individuales proporcionados en el ZIP. "
+                "La información territorial está sujeta a actualizaciones periódicas de las fuentes oficiales.",
+                styles['Normal']
+            ))
+            
+            # Generar el PDF
             doc.build(story)
-            print(f"  ✓ Informe PDF generado: {pdf_file.name}")
+            print(f"  ✓ Informe PDF mejorado generado: {pdf_file.name}")
             return True
             
         except Exception as e:
-            print(f"  ⚠ Error generando PDF: {e}")
+            print(f"  ⚠ Error generando PDF mejorado: {e}")
             return False
     
     def superponer_contorno_parcela(self, referencia, bbox_wgs84):
