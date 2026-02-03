@@ -15,6 +15,11 @@ import sys
 import unicodedata
 from datetime import datetime
 
+# Configurar salida estándar a UTF-8 para evitar errores de codificación en Windows
+if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+
 # Añadir la ruta actual para encontrar catastro4
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
