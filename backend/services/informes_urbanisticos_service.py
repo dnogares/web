@@ -5,9 +5,15 @@ Servicio de Informes Urbanísticos
 
 import json
 import os
+import sys
 from typing import Dict, Any, Optional, List
 from shapely.geometry import Polygon
+from pathlib import Path
 
+# Asegurar que el directorio raíz está en el path para importar catastro4
+root_dir = str(Path(__file__).parents[2])
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
 
 class InformeUrbanistico:
     """Clase principal para generar informes urbanísticos"""
@@ -97,7 +103,7 @@ class InformeUrbanistico:
             
             return {
                 "referencia_catastral": ref_catastral,
-                "direccion": f"{via} {numero}, {municipio}, {provincia}" if via and numero else "Sin especificar",
+                "direccion": datos_parcela.get("direccion_completa", f"{via} {numero}, {municipio}, {provincia}" if via and numero else "Sin especificar"),
                 "datos_parcela": datos_parcela,
                 "clasificacion_suelo": clasificacion_suelo,
                 "analisis_tecnico": analisis_tecnico,
@@ -122,37 +128,46 @@ class InformeUrbanistico:
     def _obtener_datos_parcela(self, ref_catastral: str = None, provincia: str = None, 
                               municipio: str = None, via: str = None, numero: str = None) -> Dict[str, Any]:
         """
-        Obtiene datos de la parcela con manejo de errores mejorado
+        Obtiene datos de la parcela integrando con CatastroDownloader
         """
         try:
-            # Intentar obtener datos reales si hay referencia catastral
             if ref_catastral:
-                # Aquí podríamos integrar con APIs catastrales reales
-                # Por ahora simulamos datos más realistas
-                return {
-                    "superficie_terreno": 850,
-                    "superficie_construida": 180,
-                    "uso_principal": "residencial",
-                    "ano_construccion": 1998,
-                    "estado_conservacion": "Bueno",
-                    "numero_plantas": 3,
-                    "coordenadas": [-4.4250, 36.7200],  # Coordenadas Málaga
-                    "ref_catastral": ref_catastral,
-                    "direccion_completa": f"{via} {numero}, {municipio}, {provincia}" if via and numero else "Sin especificar"
-                }
-            else:
-                # Datos por defecto si no hay referencia
-                return {
-                    "superficie_terreno": 1000,
-                    "superficie_construida": 200,
-                    "uso_principal": "residencial",
-                    "ano_construccion": 2000,
-                    "estado_conservacion": "Bueno",
-                    "numero_plantas": 2,
-                    "coordenadas": [-4.4250, 36.7200],
-                    "ref_catastral": ref_catastral or "Sin especificar",
-                    "direccion_completa": f"{via} {numero}, {municipio}, {provincia}" if via and numero else "Sin especificar"
-                }
+                try:
+                    from catastro4 import CatastroDownloader
+                    downloader = CatastroDownloader(output_dir="outputs")
+                    
+                    # 1. Obtener datos alfanuméricos
+                    datos_xml = downloader.obtener_datos_alfanumericos(ref_catastral) or {}
+                    
+                    # 2. Obtener coordenadas
+                    coords = downloader.obtener_coordenadas_unificado(ref_catastral) or {}
+                    
+                    return {
+                        "superficie_terreno": float(datos_xml.get("superficie_parcela", 850)),
+                        "superficie_construida": float(datos_xml.get("superficie_construida", 180)),
+                        "uso_principal": datos_xml.get("uso_principal", "residencial").lower(),
+                        "ano_construccion": int(datos_xml.get("anio_construccion", 2000)) if datos_xml.get("anio_construccion", "").isdigit() else 2000,
+                        "estado_conservacion": "Bueno",
+                        "numero_plantas": 1,
+                        "coordenadas": [coords.get("lon", -4.42), coords.get("lat", 36.72)],
+                        "ref_catastral": ref_catastral,
+                        "direccion_completa": datos_xml.get("domicilio", f"{via} {numero}, {municipio}, {provincia}" if via and numero else "Sin especificar")
+                    }
+                except Exception as e_cat:
+                    print(f"Error consultando Catastro: {e_cat}")
+
+            # Fallback / Caso sin referencia
+            return {
+                "superficie_terreno": 1000,
+                "superficie_construida": 200,
+                "uso_principal": "residencial",
+                "ano_construccion": 2000,
+                "estado_conservacion": "Bueno",
+                "numero_plantas": 2,
+                "coordenadas": [-4.4250, 36.7200],
+                "ref_catastral": ref_catastral or "Sin especificar",
+                "direccion_completa": f"{via} {numero}, {municipio}, {provincia}" if via and numero else "Sin especificar"
+            }
         except Exception as e:
             raise Exception(f"Error obteniendo datos de la parcela: {str(e)}")
     
@@ -175,10 +190,10 @@ class InformeUrbanistico:
             edificabilidad_disponible = edificabilidad_maxima - edificabilidad_actual
             
             return {
-                "superficie_terreno_m2": sup_terreno,
-                "superficie_construida_m2": sup_construida,
+                "superficie_terreno_m2": round(sup_terreno, 2),
+                "superficie_construida_m2": round(sup_construida, 2),
                 "edificabilidad_maxima_m2": round(edificabilidad_maxima, 2),
-                "edificabilidad_actual_m2": edificabilidad_actual,
+                "edificabilidad_actual_m2": round(edificabilidad_actual, 2),
                 "edificabilidad_disponible_m2": round(max(0, edificabilidad_disponible), 2),
                 "coeficiente_edificabilidad": coef,
                 "porcentaje_ocupacion": round((sup_construida / sup_terreno) * 100, 2) if sup_terreno > 0 else 0,
@@ -235,7 +250,6 @@ class InformeUrbanistico:
             
             for afeccion in afecciones:
                 try:
-                    # Lógica más sofisticada para detectar afecciones
                     afectado = self._evaluar_afeccion(afeccion, coordenadas, datos_parcela)
                     afecciones_detectadas[afeccion] = {
                         "afectada": afectado,
@@ -268,18 +282,14 @@ class InformeUrbanistico:
         """
         Evalúa si una parcela está afectada por una afección específica
         """
-        # Lógica simulada basada en coordenadas y tipo de afección
         x, y = coordenadas
-        
-        # Afecciones basadas en ubicación
         if "Riesgo de Inundación" in afeccion:
-            return y < 36.71  # Zonas bajas
+            return y < 36.71
         elif "Costas Marítimas" in afeccion:
-            return y > 36.73  # Cerca del mar
+            return y > 36.73
         elif "Patrimonio Cultural" in afeccion:
-            return abs(x + 4.42) < 0.02  # Centro histórico
+            return abs(x + 4.42) < 0.02
         else:
-            # Para otras afecciones, probabilidad basada en uso
             import random
             return random.random() < 0.3
     
@@ -317,33 +327,66 @@ class InformeUrbanistico:
     
     def _procesar_geometria_anillos(self, geometria_anillos: List) -> Dict[str, Any]:
         """
-        Procesa geometría de anillos para obtener datos métricos precisos
+        Procesa geometría de anillos para obtener datos métricos precisos.
+        Detecta automaticamente si las coordenadas están en grados o metros.
         """
         try:
             if not geometria_anillos or not isinstance(geometria_anillos, list):
                 return {"error": "Geometría de anillos no válida"}
             
-            # El primer anillo es el exterior, los demás son patios
-            poly_exterior = Polygon(geometria_anillos[0])
-            patios = [Polygon(p) for p in geometria_anillos[1:]] if len(geometria_anillos) > 1 else []
+            try:
+                import geopandas as gpd
+                from shapely.geometry import Polygon as ShapelyPolygon
+                GEOPANDAS_AVAILABLE = True
+            except ImportError:
+                GEOPANDAS_AVAILABLE = False
             
-            # Cálculos métricos precisos
-            area_total = poly_exterior.area * 10**10  # Ajuste escala según CRS
-            area_patios = sum(p.area * 10**10 for p in patios)
-            area_ocupacion = area_total - area_patios
+            anillo_ext = geometria_anillos[0]
+            huecos = geometria_anillos[1:]
             
-            # Perímetro
-            perimetro_exterior = poly_exterior.length * 10**5  # Ajuste escala
-            
+            p = anillo_ext[0]
+            is_degrees = abs(p[0]) < 180 and abs(p[1]) < 180
+
+            if GEOPANDAS_AVAILABLE:
+                poly = ShapelyPolygon(anillo_ext, huecos)
+                source_crs = "EPSG:4326" if is_degrees else "EPSG:25830"
+                gdf = gpd.GeoDataFrame(geometry=[poly], crs=source_crs)
+                
+                if is_degrees:
+                    gdf = gdf.to_crs(epsg=25830)
+                
+                area_ocupacion = gdf.geometry.area.iloc[0]
+                perimetro = gdf.geometry.length.iloc[0]
+                
+                area_patios = 0
+                if huecos:
+                    gdf_patios = gpd.GeoDataFrame(geometry=[ShapelyPolygon(h) for h in huecos], crs=source_crs)
+                    if is_degrees:
+                        gdf_patios = gdf_patios.to_crs(epsg=25830)
+                    area_patios = gdf_patios.geometry.area.sum()
+                
+                area_total = area_ocupacion + area_patios
+            else:
+                from shapely.geometry import Polygon as ShapelyPolygon
+                poly_ext = ShapelyPolygon(anillo_ext)
+                factor_area = 1.23e10 if is_degrees else 1.0
+                factor_perim = 1.11e5 if is_degrees else 1.0
+                
+                area_total = poly_ext.area * factor_area
+                area_patios = sum(ShapelyPolygon(h).area for h in huecos) * factor_area
+                area_ocupacion = area_total - area_patios
+                perimetro = poly_ext.length * factor_perim
+
             return {
                 "geometria_procesada": True,
                 "area_geometrica_m2": round(area_total, 2),
                 "area_patios_m2": round(area_patios, 2),
                 "area_ocupacion_geometrica_m2": round(area_ocupacion, 2),
-                "perimetro_m": round(perimetro_exterior, 2),
+                "perimetro_m": round(perimetro, 2),
                 "numero_anillos": len(geometria_anillos),
-                "forma_parcela": self._determinar_forma_parcela(poly_exterior),
-                "factor_forma": round(area_ocupacion / (perimetro_exterior ** 2), 4) if perimetro_exterior > 0 else 0
+                "forma_parcela": self._determinar_forma_parcela(ShapelyPolygon(anillo_ext)),
+                "factor_forma": round(area_ocupacion / (perimetro ** 2), 4) if perimetro > 0 else 0,
+                "is_degrees": is_degrees
             }
         except Exception as e:
             return {"error": f"Error procesando geometría: {str(e)}"}
@@ -379,8 +422,6 @@ class InformeUrbanistico:
             
             diferencia = superficie_catastral - superficie_registral
             desvio_porcentual = (diferencia / superficie_registral) * 100 if superficie_registral > 0 else 0
-            
-            # Determinar si hay coordinación según Ley 13/2015
             coordinacion_posible = abs(desvio_porcentual) <= 10.0
             
             return {
@@ -401,24 +442,14 @@ class InformeUrbanistico:
         Determina la forma de la parcela basada en su geometría
         """
         try:
-            # Calcular relación entre área y perímetro cuadrado
             area = polygon.area
             perimetro = polygon.length
-            
-            if perimetro == 0:
-                return "Indeterminada"
-            
-            # Factor de forma (círculo perfecto = 1/4π ≈ 0.0796)
+            if perimetro == 0: return "Indeterminada"
             factor_forma = area / (perimetro ** 2)
-            
-            if factor_forma > 0.06:
-                return "Regular/Cuadrada"
-            elif factor_forma > 0.04:
-                return "Rectangular"
-            elif factor_forma > 0.02:
-                return "Irregular"
-            else:
-                return "Muy irregular"
+            if factor_forma > 0.06: return "Regular/Cuadrada"
+            elif factor_forma > 0.04: return "Rectangular"
+            elif factor_forma > 0.02: return "Irregular"
+            else: return "Muy irregular"
         except:
             return "No determinable"
     
@@ -429,7 +460,6 @@ class InformeUrbanistico:
         try:
             superficie_util = float(datos_sede.get('superficie_util', 150))
             superficie_construida = float(datos_sede.get('superficie_construida', 180))
-            
             if superficie_construida > 0:
                 return round(superficie_util / superficie_construida, 3)
             return 0.0
@@ -441,24 +471,17 @@ class InformeUrbanistico:
         Determina el nivel de concordancia entre catastro y registro
         """
         abs_desvio = abs(desvio_porcentual)
-        
-        if abs_desvio <= 5:
-            return "Muy alta"
-        elif abs_desvio <= 10:
-            return "Alta"
-        elif abs_desvio <= 20:
-            return "Media"
-        elif abs_desvio <= 30:
-            return "Baja"
-        else:
-            return "Muy baja"
+        if abs_desvio <= 5: return "Muy alta"
+        elif abs_desvio <= 10: return "Alta"
+        elif abs_desvio <= 20: return "Media"
+        elif abs_desvio <= 30: return "Baja"
+        else: return "Muy baja"
     
     def _generar_recomendacion_cruce(self, desvio_porcentual: float, coordinacion_posible: bool) -> str:
         """
         Genera recomendación basada en el cruce de datos
         """
         abs_desvio = abs(desvio_porcentual)
-        
         if coordinacion_posible:
             return "Coordinación catastral-registral posible. Desviación dentro de límites legales."
         elif abs_desvio <= 20:
@@ -470,46 +493,20 @@ class InformeUrbanistico:
 # Función de compatibilidad con el código existente
 def realizar_analisis_urbanistico(geometria_anillos, datos_sede=None, datos_registro=None):
     """
-    Función de compatibilidad para el código existente
+    Función de compatibilidad para el código existente que delega en el InformeUrbanistico
     """
-    if not geometria_anillos or not isinstance(geometria_anillos, list):
-        return {"error": "Geometría no válida"}
-
-    # El primer anillo es el exterior, los demás son patios
-    poly_exterior = Polygon(geometria_anillos[0])
-    patios = [Polygon(p) for p in geometria_anillos[1:]]
+    generador = InformeUrbanistico()
+    res = generador._procesar_geometria_anillos(geometria_anillos)
     
-    area_total = poly_exterior.area * 10**10 # Ajuste escala (según CRS)
-    area_patios = sum(p.area * 10**10 for p in patios)
-    area_ocupacion = area_total - area_patios
-    
-    # Simulación de coeficiente (esto debería venir de normativa local)
-    coeficiente_estimado = 0.6 
-    edificabilidad_maxima = area_total * coeficiente_estimado
-
-    # Cruce con Registro de la Propiedad (si hay datos)
-    analisis_registro = {}
-    if datos_registro and 'superficie_registral' in datos_registro:
-        try:
-            sup_reg = float(datos_registro['superficie_registral'])
-            diferencia = area_total - sup_reg
-            desvio = (diferencia / sup_reg) * 100 if sup_reg > 0 else 0
-            
-            analisis_registro = {
-                "superficie_registral_m2": round(sup_reg, 2),
-                "diferencia_m2": round(diferencia, 2),
-                "desvio_porcentaje": round(desvio, 2),
-                "coordinacion_posible": abs(desvio) <= 10.0  # Tolerancia del 10% (Ley 13/2015)
-            }
-        except (ValueError, TypeError):
-            analisis_registro = {"error": "Datos registrales inválidos"}
+    if "error" in res:
+        return res
 
     return {
-        "superficie_parcela_m2": round(area_total, 2),
-        "superficie_ocupada_m2": round(area_ocupacion, 2),
-        "superficie_patios_m2": round(area_patios, 2),
-        "edificabilidad_estimada_m2": round(edificabilidad_maxima, 2),
-        "porcentaje_ocupacion": round((area_ocupacion / area_total) * 100, 2) if area_total > 0 else 0,
+        "superficie_parcela_m2": res["area_geometrica_m2"],
+        "superficie_ocupada_m2": res["area_ocupacion_geometrica_m2"],
+        "superficie_patios_m2": res["area_patios_m2"],
+        "edificabilidad_estimada_m2": round(res["area_geometrica_m2"] * 0.6, 2),
+        "porcentaje_ocupacion": round((res["area_ocupacion_geometrica_m2"] / res["area_geometrica_m2"]) * 100, 2) if res["area_geometrica_m2"] > 0 else 0,
         "uso_principal": datos_sede.get('uso', 'Residencial') if datos_sede else "Consultar Sede",
-        "cruce_registro": analisis_registro
+        "cruce_registro": {}
     }

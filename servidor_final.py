@@ -104,7 +104,7 @@ class Web6Handler(http.server.SimpleHTTPRequestHandler):
         
         # Servir el visor como página principal
         if self.path == '/':
-            self.path = '/static/index
+            self.path = '/static/index.html'
         try:
             return super().do_GET()
         except FileNotFoundError:
@@ -410,7 +410,7 @@ class Web6Handler(http.server.SimpleHTTPRequestHandler):
 
                 if pdf_path:
                     # Devolver URL relativa
-                    self.send_json_response(FileResponse(str(pdf_path), media_type='application/pdf')) # Esto no funciona en SimpleHTTPRequestHandler
+                    # self.send_json_response(FileResponse(str(pdf_path), media_type='application/pdf')) # Esto no funciona en SimpleHTTPRequestHandler
                     # En su lugar, devolvemos la URL para descarga
                     self.send_json_response({"status": "success", "url": f"/outputs/{pdf_path.name}"}) # Corregido para devolver JSON con URL
                 else:

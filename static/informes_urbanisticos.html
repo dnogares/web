@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,6 +14,7 @@
             min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
+
         .glass-card {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
@@ -23,6 +25,7 @@
             margin: 2rem auto;
             max-width: 1200px;
         }
+
         .header-title {
             background: linear-gradient(45deg, #667eea, #764ba2);
             -webkit-background-clip: text;
@@ -32,12 +35,14 @@
             text-align: center;
             margin-bottom: 2rem;
         }
+
         .form-section {
             background: rgba(255, 255, 255, 0.8);
             border-radius: 15px;
             padding: 1.5rem;
             margin-bottom: 2rem;
         }
+
         .btn-generate {
             background: linear-gradient(45deg, #667eea, #764ba2);
             border: none;
@@ -47,20 +52,24 @@
             font-weight: bold;
             transition: all 0.3s ease;
         }
+
         .btn-generate:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
             color: white;
         }
+
         .loading-spinner {
             display: none;
             text-align: center;
             padding: 2rem;
         }
+
         .results-section {
             display: none;
             margin-top: 2rem;
         }
+
         .info-card {
             background: rgba(255, 255, 255, 0.9);
             border-radius: 15px;
@@ -68,24 +77,29 @@
             margin-bottom: 1.5rem;
             border-left: 4px solid #667eea;
         }
+
         .afeccion-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 0.5rem 0;
-            border-bottom: 1px solid rgba(0,0,0,0.1);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
+
         .afeccion-item:last-child {
             border-bottom: none;
         }
+
         .status-yes {
             color: #28a745;
             font-weight: bold;
         }
+
         .status-no {
             color: #dc3545;
             font-weight: bold;
         }
+
         .back-btn {
             position: absolute;
             top: 20px;
@@ -101,11 +115,13 @@
             color: #667eea;
             transition: all 0.3s ease;
         }
+
         .back-btn:hover {
             background: white;
             transform: scale(1.1);
             color: #764ba2;
         }
+
         .map-container {
             height: 400px;
             border-radius: 15px;
@@ -113,26 +129,31 @@
             margin-bottom: 2rem;
             border: 2px solid rgba(102, 126, 234, 0.3);
         }
+
         .progress-container {
             display: none;
             margin: 2rem 0;
         }
+
         .controls-section {
             background: rgba(255, 255, 255, 0.9);
             border-radius: 15px;
             padding: 1.5rem;
             margin-bottom: 2rem;
         }
+
         .layer-control {
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 0.5rem 0;
-            border-bottom: 1px solid rgba(0,0,0,0.1);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
+
         .layer-control:last-child {
             border-bottom: none;
         }
+
         .layer-legend {
             background: rgba(255, 255, 255, 0.95);
             border-radius: 10px;
@@ -140,11 +161,13 @@
             margin-top: 1rem;
             display: none;
         }
+
         .legend-item {
             display: flex;
             align-items: center;
             margin: 0.5rem 0;
         }
+
         .legend-color {
             width: 20px;
             height: 20px;
@@ -152,12 +175,14 @@
             margin-right: 10px;
             border: 1px solid #ccc;
         }
+
         .layer-folder {
             background: rgba(255, 255, 255, 0.8);
             border-radius: 10px;
             margin-bottom: 1rem;
-            border: 1px solid rgba(0,0,0,0.1);
+            border: 1px solid rgba(0, 0, 0, 0.1);
         }
+
         .folder-header {
             padding: 0.75rem 1rem;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -169,31 +194,38 @@
             align-items: center;
             transition: all 0.3s ease;
         }
+
         .folder-header:hover {
             background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
         }
+
         .folder-header i {
             transition: transform 0.3s ease;
         }
+
         .folder-header.collapsed i {
             transform: rotate(-90deg);
         }
+
         .folder-content {
             padding: 0.5rem;
             max-height: 500px;
             overflow: hidden;
             transition: max-height 0.3s ease;
         }
+
         .folder-content.collapsed {
             max-height: 0;
             padding: 0 0.5rem;
         }
+
         .layer-control {
             padding: 0.5rem 0;
             margin-left: 1rem;
         }
     </style>
 </head>
+
 <body>
     <a href="/static/index.html" class="back-btn">
         <i class="fas fa-arrow-left fa-lg"></i>
@@ -212,7 +244,8 @@
                             <i class="fas fa-search"></i> Búsqueda de Parcelas
                         </h4>
                         <div class="input-group mb-3">
-                            <input type="text" class="form-control" id="searchInput" placeholder="Ingrese referencia catastral o dirección">
+                            <input type="text" class="form-control" id="searchInput"
+                                placeholder="Ingrese referencia catastral o dirección">
                             <button class="btn btn-primary" type="button" id="searchBtn">
                                 <i class="fas fa-search"></i> Buscar
                             </button>
@@ -232,10 +265,10 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Mapa -->
                 <div class="map-container" id="map"></div>
-                
+
                 <!-- Barra de progreso -->
                 <div class="progress-container" id="progressContainer">
                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -381,7 +414,8 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="nombre_informe" class="form-label">Nombre del informe:</label>
-                                <input type="text" class="form-control" id="nombre_informe" placeholder="Informe Urbanístico">
+                                <input type="text" class="form-control" id="nombre_informe"
+                                    placeholder="Informe Urbanístico">
                             </div>
                         </div>
                     </div>
@@ -405,7 +439,7 @@
         let activeLayers = new Set();
         let layerControls = {};
         let currentRequest = null;
-        
+
         // Configuración de capas agrupadas por categorías
         const layerFolders = [
             {
@@ -466,31 +500,31 @@
                 ]
             }
         ];
-        
+
         // Inicialización
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             initializeMap();
             loadLayers();
             setupEventListeners();
         });
-        
+
         function initializeMap() {
             map = L.map('map').setView([36.7200, -4.4250], 13);
-            
+
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
             }).addTo(map);
         }
-        
+
         function loadLayers() {
             const layersList = document.getElementById('layersList');
             layersList.innerHTML = '';
-            
+
             layerFolders.forEach(folder => {
                 // Crear carpeta
                 const folderDiv = document.createElement('div');
                 folderDiv.className = 'layer-folder';
-                
+
                 // Crear header de la carpeta
                 const folderHeader = document.createElement('div');
                 folderHeader.className = 'folder-header';
@@ -502,12 +536,12 @@
                     </div>
                     <i class="fas fa-chevron-down"></i>
                 `;
-                
+
                 // Crear contenido de la carpeta
                 const folderContent = document.createElement('div');
                 folderContent.className = 'folder-content';
                 folderContent.id = `folder-${folder.id}`;
-                
+
                 // Añadir capas a la carpeta
                 folder.layers.forEach(layer => {
                     const layerControl = document.createElement('div');
@@ -525,67 +559,67 @@
                         </div>
                     `;
                     folderContent.appendChild(layerControl);
-                    
+
                     // Event listener para cada capa
                     const checkbox = layerControl.querySelector(`#layer_${layer.id}`);
-                    checkbox.addEventListener('change', function() {
+                    checkbox.addEventListener('change', function () {
                         toggleLayer(layer.id, this.checked, layer, folder.id);
                     });
                 });
-                
+
                 // Event listener para colapsar/expandir carpeta
-                folderHeader.addEventListener('click', function() {
+                folderHeader.addEventListener('click', function () {
                     folderHeader.classList.toggle('collapsed');
                     folderContent.classList.toggle('collapsed');
                 });
-                
+
                 // Ensamblar carpeta
                 folderDiv.appendChild(folderHeader);
                 folderDiv.appendChild(folderContent);
                 layersList.appendChild(folderDiv);
             });
         }
-        
+
         function setupEventListeners() {
             // Botón de búsqueda
             document.getElementById('searchBtn').addEventListener('click', searchParcel);
-            
+
             // Enter en campo de búsqueda
-            document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            document.getElementById('searchInput').addEventListener('keypress', function (e) {
                 if (e.key === 'Enter') {
                     searchParcel();
                 }
             });
-            
+
             // Botón generar informe
             document.getElementById('generateBtn').addEventListener('click', generateInforme);
-            
+
             // Botón cancelar
             document.getElementById('cancelBtn').addEventListener('click', cancelOperation);
-            
+
             // Botón panel de ajustes
             document.getElementById('settingsBtn').addEventListener('click', openSettings);
-            
+
             // Botón guardar configuración
             document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
         }
-        
+
         function openSettings() {
             // Cargar configuración guardada si existe
             loadSettings();
-            
+
             // Mostrar modal
             const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
             modal.show();
         }
-        
+
         function loadSettings() {
             // Cargar configuración desde localStorage
             const savedSettings = localStorage.getItem('informes_urbanisticos_settings');
-            
+
             if (savedSettings) {
                 const settings = JSON.parse(savedSettings);
-                
+
                 // Cargar configuración de ZIP
                 document.getElementById('zip_informe_pdf').checked = settings.zip_informe_pdf !== false;
                 document.getElementById('zip_ficha_tecnica').checked = settings.zip_ficha_tecnica !== false;
@@ -594,16 +628,16 @@
                 document.getElementById('zip_fotos').checked = settings.zip_fotos || false;
                 document.getElementById('zip_documentacion_legal').checked = settings.zip_documentacion_legal || false;
                 document.getElementById('zip_metadatos').checked = settings.zip_metadatos || false;
-                
+
                 // Cargar configuración de generación
                 document.getElementById('calidad_pdf').value = settings.calidad_pdf || 'media';
                 document.getElementById('formato_planos').value = settings.formato_planos || 'jpg';
-                
+
                 // Cargar personalización
                 document.getElementById('nombre_informe').value = settings.nombre_informe || 'Informe Urbanístico';
             }
         }
-        
+
         function saveSettings() {
             // Recopilar configuración
             const settings = {
@@ -615,26 +649,26 @@
                 zip_fotos: document.getElementById('zip_fotos').checked,
                 zip_documentacion_legal: document.getElementById('zip_documentacion_legal').checked,
                 zip_metadatos: document.getElementById('zip_metadatos').checked,
-                
+
                 // Configuración de generación
                 calidad_pdf: document.getElementById('calidad_pdf').value,
                 formato_planos: document.getElementById('formato_planos').value,
-                
+
                 // Personalización
                 nombre_informe: document.getElementById('nombre_informe').value
             };
-            
+
             // Guardar en localStorage
             localStorage.setItem('informes_urbanisticos_settings', JSON.stringify(settings));
-            
+
             // Mostrar mensaje de éxito
             alert('✅ Configuración guardada correctamente');
-            
+
             // Cerrar modal
             const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
             modal.hide();
         }
-        
+
         function getSettings() {
             // Obtener configuración actual (con valores por defecto)
             const savedSettings = localStorage.getItem('informes_urbanisticos_settings');
@@ -650,74 +684,95 @@
                 formato_planos: 'jpg',
                 nombre_informe: 'Informe Urbanístico'
             };
-            
+
             return savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings;
         }
-        
-        function searchParcel() {
+
+        async function searchParcel() {
             const searchTerm = document.getElementById('searchInput').value.trim();
             if (!searchTerm) {
-                alert('Por favor, ingrese una referencia catastral o dirección');
+                alert('Por favor, ingrese una referencia catastral');
                 return;
             }
-            
-            showProgress('Buscando parcela...', 20);
-            
-            // Simulación de búsqueda (en producción sería una API real)
-            setTimeout(() => {
-                // Coordenadas simuladas para Málaga centro
-                const coordinates = [36.7200 + (Math.random() - 0.5) * 0.01, -4.4250 + (Math.random() - 0.5) * 0.01];
-                
+
+            showProgress('Consultando Catastro...', 30);
+
+            try {
+                const response = await fetch('/api/v1/analizar-referencia', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ referencia: searchTerm })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.message || 'Error en la consulta');
+                }
+
+                const res = await response.json();
+                const data = res.data;
+
+                if (!data || data.coordenadas_y === undefined) {
+                    throw new Error('No se encontraron coordenadas para esta referencia');
+                }
+
+                const coordinates = [data.coordenadas_y, data.coordenadas_x];
+
                 // Limpiar parcela anterior
                 if (currentParcel) {
                     map.removeLayer(currentParcel);
                 }
-                
+
                 // Añadir marcador de parcela
                 currentParcel = L.marker(coordinates).addTo(map);
-                currentParcel.bindPopup(`<b>Parcela encontrada</b><br>${searchTerm}`).openPopup();
-                
-                // Centrar mapa en la parcela
-                map.setView(coordinates, 16);
-                
+                currentParcel.bindPopup(`<b>Parcela Encontrada</b><br>RC: ${data.referencia}<br>${data.direccion}`).openPopup();
+
+                // Centrar mapa
+                map.setView(coordinates, 18);
+
                 // Habilitar botón generar informe
                 document.getElementById('generateBtn').disabled = false;
-                
-                // Guardar datos de la parcela
+
+                // Guardar datos de la parcela para el informe
                 window.currentParcelData = {
-                    ref_catastral: searchTerm,
-                    coordenadas: coordinates,
-                    provincia: 'Málaga',
-                    municipio: 'Málaga',
-                    via: 'Calle Larios',
-                    numero: Math.floor(Math.random() * 100) + 1
+                    ref_catastral: data.referencia,
+                    coordenadas: [data.coordenadas.lon, data.coordenadas.lat], // Long, Lat para el backend
+                    provincia: '', // Se obtendrá en el backend
+                    municipio: data.municipio,
+                    via: data.direccion,
+                    numero: ''
                 };
-                
-                showProgress('Parcela encontrada', 100);
-                setTimeout(() => hideProgress(), 1000);
-            }, 1500);
+
+                showProgress('Parcela cargada correctamente', 100);
+                setTimeout(() => hideProgress(), 800);
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al buscar la parcela: ' + error.message);
+                hideProgress();
+            }
         }
-        
+
         function toggleLayer(layerId, enabled, layerInfo, folderId) {
             const maxLayers = parseInt(document.getElementById('maxLayers').value);
             const showShaded = document.getElementById('showShaded').checked;
-            
+
             if (enabled) {
                 if (activeLayers.size >= maxLayers) {
                     alert(`Máximo de ${maxLayers} capas simultáneas permitidas`);
                     document.getElementById(`layer_${layerId}`).checked = false;
                     return;
                 }
-                
+
                 // Verificar acceso a información de parcela (solo con capas catastrales)
                 if (folderId === 'catastro' || layerId.includes('parcela') || layerId.includes('referencia')) {
                     // Permitir acceso a información detallada
                     layerInfo.hasInfo = true;
                 }
-                
+
                 activeLayers.add(layerId);
                 addLayerToMap(layerId, layerInfo, showShaded);
-                
+
                 // Mostrar leyenda si la capa tiene información
                 if (layerInfo.hasInfo) {
                     showLegend(layerInfo, folderId);
@@ -725,21 +780,21 @@
             } else {
                 activeLayers.delete(layerId);
                 removeLayerFromMap(layerId);
-                
+
                 // Ocultar leyenda si no hay capas activas con información
                 if (!hasActiveLayersWithInfo()) {
                     hideLegend();
                 }
             }
         }
-        
+
         function addLayerToMap(layerId, layerInfo, showShaded) {
             // Simulación de capa (en producción serían WMS reales)
             const layerBounds = [
                 [36.71, -4.43],
                 [36.73, -4.42]
             ];
-            
+
             let layer;
             if (layerInfo.hasInfo || showShaded) {
                 layer = L.rectangle(layerBounds, {
@@ -758,18 +813,18 @@
                     dashArray: '5, 5'
                 });
             }
-            
+
             layer.addTo(map);
             layerControls[layerId] = layer;
         }
-        
+
         function removeLayerFromMap(layerId) {
             if (layerControls[layerId]) {
                 map.removeLayer(layerControls[layerId]);
                 delete layerControls[layerId];
             }
         }
-        
+
         function hasActiveLayersWithInfo() {
             // Buscar en todas las carpetas si hay capas activas con información
             for (const folder of layerFolders) {
@@ -781,11 +836,11 @@
             }
             return false;
         }
-        
+
         function showLegend(layerInfo, folderId) {
             const legend = document.getElementById('layerLegend');
             const legendContent = document.getElementById('legendContent');
-            
+
             // Leyendas específicas por capa
             const legendItems = {
                 // Capas catastrales
@@ -830,7 +885,7 @@
                     { color: '#FAD7A0', label: 'Zona de uso público' }
                 ]
             };
-            
+
             const items = legendItems[layerInfo.id] || [];
             legendContent.innerHTML = `
                 <h6><i class="fas ${layerInfo.icon}" style="color: ${layerInfo.color}"></i> ${layerInfo.name}</h6>
@@ -841,22 +896,22 @@
                     </div>
                 `).join('')}
             `;
-            
+
             legend.style.display = 'block';
         }
-        
+
         function hideLegend() {
             document.getElementById('layerLegend').style.display = 'none';
         }
-        
+
         function generateInforme() {
             if (!window.currentParcelData) {
                 alert('Primero debe buscar una parcela');
                 return;
             }
-            
+
             showProgress('Generando informe urbanístico...', 10);
-            
+
             // Simulación de generación con pasos
             const steps = [
                 { text: 'Obteniendo datos catastrales...', progress: 30, delay: 800 },
@@ -864,14 +919,14 @@
                 { text: 'Evaluando afecciones territoriales...', progress: 70, delay: 1200 },
                 { text: 'Generando informe final...', progress: 90, delay: 800 }
             ];
-            
+
             let currentStep = 0;
-            
+
             function executeStep() {
                 if (currentStep < steps.length && currentRequest) {
                     const step = steps[currentStep];
                     showProgress(step.text, step.progress);
-                    
+
                     setTimeout(() => {
                         currentStep++;
                         executeStep();
@@ -881,14 +936,14 @@
                     callAPI();
                 }
             }
-            
+
             currentRequest = { cancelled: false };
             executeStep();
         }
-        
+
         function callAPI() {
             const data = window.currentParcelData;
-            
+
             fetch('/api/v1/urbanismo/generar-informe', {
                 method: 'POST',
                 headers: {
@@ -896,28 +951,28 @@
                 },
                 body: JSON.stringify(data)
             })
-            .then(response => response.json())
-            .then(data => {
-                if (currentRequest && !currentRequest.cancelled) {
-                    showProgress('Informe generado', 100);
-                    setTimeout(() => {
+                .then(response => response.json())
+                .then(data => {
+                    if (currentRequest && !currentRequest.cancelled) {
+                        showProgress('Informe generado', 100);
+                        setTimeout(() => {
+                            hideProgress();
+                            mostrarResultados(data.data || data);
+                        }, 1000);
+                    }
+                })
+                .catch(error => {
+                    if (currentRequest && !currentRequest.cancelled) {
+                        console.error('Error:', error);
+                        alert('Error generando el informe: ' + error.message);
                         hideProgress();
-                        mostrarResultados(data.data || data);
-                    }, 1000);
-                }
-            })
-            .catch(error => {
-                if (currentRequest && !currentRequest.cancelled) {
-                    console.error('Error:', error);
-                    alert('Error generando el informe: ' + error.message);
-                    hideProgress();
-                }
-            })
-            .finally(() => {
-                currentRequest = null;
-            });
+                    }
+                })
+                .finally(() => {
+                    currentRequest = null;
+                });
         }
-        
+
         function cancelOperation() {
             if (currentRequest) {
                 currentRequest.cancelled = true;
@@ -926,21 +981,21 @@
                 alert('Operación cancelada');
             }
         }
-        
+
         function openSettings() {
             alert('Panel de ajustes en desarrollo. Aquí podrá configurar qué archivos incluir en el ZIP generado.');
         }
-        
+
         function showProgress(text, progress) {
             const container = document.getElementById('progressContainer');
             const progressBar = document.getElementById('progressBar');
             const progressText = document.getElementById('progressText');
-            
+
             container.style.display = 'block';
             progressBar.style.width = progress + '%';
             progressText.textContent = text;
         }
-        
+
         function hideProgress() {
             document.getElementById('progressContainer').style.display = 'none';
             document.getElementById('progressBar').style.width = '0%';
@@ -948,7 +1003,7 @@
 
         function mostrarResultados(data) {
             const resultsSection = document.getElementById('resultsSection');
-            
+
             let html = `
                 <div class="info-card">
                     <h5><i class="fas fa-info-circle"></i> Información General</h5>
@@ -993,15 +1048,15 @@
                         <h5><i class="fas fa-exclamation-triangle"></i> Afecciones Territoriales</h5>
                         <div class="afecciones-list">
                 `;
-                
+
                 for (const [afeccion, afeccionData] of Object.entries(data.afecciones_territoriales)) {
                     const afectado = typeof afeccionData === 'object' ? afeccionData.afectada : afeccionData;
                     const descripcion = typeof afeccionData === 'object' ? afeccionData.descripcion : '';
                     const restriccion = typeof afeccionData === 'object' ? afeccionData.restriccion : '';
-                    
+
                     const statusClass = afectado ? 'status-yes' : 'status-no';
                     const statusIcon = afectado ? '✅ SÍ' : '❌ NO';
-                    
+
                     html += `
                         <div class="afeccion-item">
                             <div>
@@ -1013,7 +1068,7 @@
                         </div>
                     `;
                 }
-                
+
                 html += `
                         </div>
                     </div>
@@ -1022,10 +1077,11 @@
 
             resultsSection.innerHTML = html;
             resultsSection.style.display = 'block';
-            
+
             // Scroll a resultados
             resultsSection.scrollIntoView({ behavior: 'smooth' });
         }
     </script>
 </body>
+
 </html>

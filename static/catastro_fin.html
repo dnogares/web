@@ -1,20 +1,21 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Visor Catastral - Index2</title>
-    
+
     <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <!-- Omnivore (Para cargar KML/GPX) -->
     <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.2.0/leaflet-omnivore.min.js'></script>
-    
+
     <style>
         body {
             margin: 0;
@@ -36,7 +37,7 @@
             flex-direction: column;
             gap: 20px;
             overflow-y: auto;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05);
             z-index: 10;
         }
 
@@ -45,7 +46,7 @@
             border: 1px solid #e0e0e0;
             border-radius: 8px;
             padding: 15px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
         }
 
         .module h3 {
@@ -69,11 +70,12 @@
         }
 
         #map-container {
-            inline-size: 70vh;  /* Cuadrado relativo a la altura */
+            inline-size: 70vh;
+            /* Cuadrado relativo a la altura */
             block-size: 70vh;
             border: 8px solid white;
             border-radius: 4px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
             position: relative;
         }
 
@@ -92,7 +94,7 @@
             border-radius: 25px;
             font-weight: bold;
             cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
             transition: transform 0.2s, background 0.2s;
             font-size: 1rem;
         }
@@ -113,11 +115,11 @@
             border-radius: 8px;
             margin-block-end: 12px;
             background: #fff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
             overflow: hidden;
         }
 
-        details.layer-accordion > summary {
+        details.layer-accordion>summary {
             list-style: none;
             cursor: pointer;
             padding: 10px 12px;
@@ -129,17 +131,17 @@
             border-block-end: 1px solid #eee;
         }
 
-        details.layer-accordion > summary::-webkit-details-marker {
+        details.layer-accordion>summary::-webkit-details-marker {
             display: none;
         }
 
-        details.layer-accordion > summary::after {
+        details.layer-accordion>summary::after {
             content: '▾';
             color: #666;
             font-size: 0.9rem;
         }
 
-        details.layer-accordion[open] > summary::after {
+        details.layer-accordion[open]>summary::after {
             content: '▴';
         }
 
@@ -177,7 +179,7 @@
             background: #fff;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
         }
 
         .right-box h4 {
@@ -233,10 +235,18 @@
             margin-block-start: 5px;
             font-size: 0.9rem;
         }
-        button.action-btn:hover { background-color: #2980b9; }
-        
-        button.secondary { background-color: #95a5a6; }
-        button.secondary:hover { background-color: #7f8c8d; }
+
+        button.action-btn:hover {
+            background-color: #2980b9;
+        }
+
+        button.secondary {
+            background-color: #95a5a6;
+        }
+
+        button.secondary:hover {
+            background-color: #7f8c8d;
+        }
 
         .file-upload-box {
             border: 2px dashed #bdc3c7;
@@ -248,6 +258,7 @@
             font-size: 0.9rem;
             margin-block-end: 10px;
         }
+
         .file-upload-box:hover {
             border-color: #3498db;
             color: #3498db;
@@ -258,13 +269,14 @@
             position: absolute;
             inset-block-start: 20px;
             inset-inline-start: 20px;
-            z-index: 1000; /* Encima del mapa */
+            z-index: 1000;
+            /* Encima del mapa */
             background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border-radius: 8px;
             padding: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
             inline-size: 220px;
         }
 
@@ -287,7 +299,7 @@
             border: 2px solid #1a252f;
             border-radius: 8px;
             padding: 12px 25px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             z-index: 10000;
             display: flex;
             gap: 50px;
@@ -334,13 +346,13 @@
             gap: 8px;
             min-inline-size: 90px;
             justify-content: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         .cad-btn:hover {
             background: linear-gradient(135deg, #2980b9 0%, #1f618d 100%);
             transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
         }
 
         .cad-btn.active {
@@ -369,152 +381,186 @@
             border-radius: 4px;
         }
 
-.medicion-label {
-    color: #3498db;
-    font-weight: 600;
-    font-family: 'Courier New', monospace;
-}
+        .medicion-label {
+            color: #3498db;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
 
-/* Glassmorphism Card */
-.glass-card {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    padding: 20px;
-    color: #ffffff;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
+        /* Glassmorphism Card */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
 
-.glass-title {
-    margin: 0 0 15px 0;
-    color: #ffffff;
-    font-size: 1.1rem;
-    font-weight: 600;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
+        .glass-title {
+            margin: 0 0 15px 0;
+            color: #ffffff;
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
 
-.stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 10px;
-    text-align: center;
-}
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            text-align: center;
+        }
 
-.stat-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 8px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.05);
-}
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+        }
 
-.stat-value { 
-    font-size: 1.4em; 
-    font-weight: bold; 
-    display: block; 
-    color: #ffffff;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
+        .stat-value {
+            font-size: 1.4em;
+            font-weight: bold;
+            display: block;
+            color: #ffffff;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
 
-.stat-label { 
-    font-size: 0.8em; 
-    opacity: 0.8; 
-    text-transform: uppercase; 
-    color: rgba(255, 255, 255, 0.8);
-}
+        .stat-label {
+            font-size: 0.8em;
+            opacity: 0.8;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.8);
+        }
 
-.alerts-box { 
-    margin-block-start: 15px; 
-}
+        .alerts-box {
+            margin-block-start: 15px;
+        }
 
-.alert-tag {
-    background: rgba(255, 0, 0, 0.3);
-    border: 1px solid #ff4d4d;
-    padding: 5px 10px;
-    border-radius: 5px;
-    font-size: 0.9em;
-    display: inline-block;
-    margin-inline-end: 5px;
-    color: #ffffff;
-}
+        .alert-tag {
+            background: rgba(255, 0, 0, 0.3);
+            border: 1px solid #ff4d4d;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            display: inline-block;
+            margin-inline-end: 5px;
+            color: #ffffff;
+        }
 
-.glass-metric {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-block-end: 8px;
-    padding: 5px 0;
-    border-block-end: 1px solid rgba(255, 255, 255, 0.1);
-}
+        .glass-metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-block-end: 8px;
+            padding: 5px 0;
+            border-block-end: 1px solid rgba(255, 255, 255, 0.1);
+        }
 
-.glass-metric-label {
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 0.9rem;
-}
+        .glass-metric-label {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.9rem;
+        }
 
-.glass-metric-value {
-    color: #ffffff;
-    font-weight: bold;
-    font-size: 1rem;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
+        .glass-metric-value {
+            color: #ffffff;
+            font-weight: bold;
+            font-size: 1rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
 
-.glass-metric-unit {
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 0.8rem;
-    margin-inline-start: 4px;
-}
+        .glass-metric-unit {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.8rem;
+            margin-inline-start: 4px;
+        }
 
-/* --- NUEVA BARRA DE HERRAMIENTAS FLOTANTE --- */
-.map-toolbar {
-    position: absolute;
-    inset-block-start: 10px;
-    inset-inline-start: 50%;
-    transform: translateX(-50%);
-    z-index: 1000;
-    display: flex;
-    gap: 8px;
-    background: rgba(255,255,255,0.95);
-    padding: 6px 12px;
-    border-radius: 30px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    backdrop-filter: blur(5px);
-}
-.tool-btn {
-    inline-size: 32px; block-size: 32px;
-    border: none; background: white; border-radius: 50%;
-    cursor: pointer; color: #444; display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-.tool-btn:hover { background: #3498db; color: white; transform: translateY(-2px); }
-.tool-btn.active { background: #2c3e50; color: white; }
-.tool-btn.danger { color: #e74c3c; }
-.tool-btn.danger:hover { background: #e74c3c; color: white; }
+        /* --- NUEVA BARRA DE HERRAMIENTAS FLOTANTE --- */
+        .map-toolbar {
+            position: absolute;
+            inset-block-start: 10px;
+            inset-inline-start: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 6px 12px;
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(5px);
+        }
 
-.glass-percentage {
-    color: #4CAF50;
-    font-weight: bold;
-}
+        .tool-btn {
+            inline-size: 32px;
+            block-size: 32px;
+            border: none;
+            background: white;
+            border-radius: 50%;
+            cursor: pointer;
+            color: #444;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .tool-btn:hover {
+            background: #3498db;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .tool-btn.active {
+            background: #2c3e50;
+            color: white;
+        }
+
+        .tool-btn.danger {
+            color: #e74c3c;
+        }
+
+        .tool-btn.danger:hover {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .glass-percentage {
+            color: #4CAF50;
+            font-weight: bold;
+        }
     </style>
 </head>
+
 <body>
     <div class="left-panel">
         <div class="module">
             <h3><i class="fa-solid fa-magnifying-glass"></i> Referencia Catastral</h3>
-            <input type="text" id="ref-input" placeholder="Introduce referencia (14 o 20 caracteres)" style="margin-block-end: 8px;">
+            <input type="text" id="ref-input" placeholder="Introduce referencia (14 o 20 caracteres)"
+                style="margin-block-end: 8px;">
             <div style="display:flex; gap:8px;">
                 <button class="action-btn" style="flex: 1;" onclick="cargarReferencia()">Buscar Referencia</button>
-                <button class="action-btn" id="btn-cancelar-busqueda" style="inline-size:auto; background:#e74c3c; display:none;" onclick="cancelarBusquedaCatastral()"><i class="fa-solid fa-xmark"></i></button>
+                <button class="action-btn" id="btn-cancelar-busqueda"
+                    style="inline-size:auto; background:#e74c3c; display:none;" onclick="cancelarBusquedaCatastral()"><i
+                        class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="progress-wrap" id="ref-progress">
-                <div id="ref-progress-text" style="font-size: 0.85rem; color:#2c3e50; margin-block-end: 6px;">Procesando...</div>
-                <div class="progress"><div class="progress-bar" id="ref-progress-bar"></div></div>
+                <div id="ref-progress-text" style="font-size: 0.85rem; color:#2c3e50; margin-block-end: 6px;">
+                    Procesando...</div>
+                <div class="progress">
+                    <div class="progress-bar" id="ref-progress-bar"></div>
+                </div>
             </div>
-            <div id="ref-results-checklist" style="display:none; margin-block-start:10px; font-size:0.85rem; background:#f8f9fa; padding:10px; border-radius:4px;"></div>
+            <div id="ref-results-checklist"
+                style="display:none; margin-block-start:10px; font-size:0.85rem; background:#f8f9fa; padding:10px; border-radius:4px;">
+            </div>
         </div>
 
         <div class="module">
@@ -522,72 +568,99 @@
             <div class="file-upload-box" onclick="document.getElementById('lote-input').click()">
                 <i class="fa-solid fa-file-csv"></i> Cargar TXT / CSV
             </div>
-            <input type="file" id="lote-input" style="display: none;" accept=".txt,.csv" onchange="handleRefsFile(this)">
+            <input type="file" id="lote-input" style="display: none;" accept=".txt,.csv"
+                onchange="handleRefsFile(this)">
             <div id="refs-file-list"></div>
         </div>
 
         <div class="module">
             <h3><i class="fa-solid fa-map-location-dot"></i> Descarga Municipal</h3>
             <div style="display: flex; gap: 5px;">
-                <input type="text" id="municipio-input" placeholder="Ej: Madrid (o vacío para ver todos)" style="margin-block-end: 0; font-size: 13px;" onkeypress="if(event.key==='Enter') buscarMunicipio()">
-                <button class="action-btn" style="inline-size: auto; margin-block-start: 0; padding: 0 12px;" onclick="buscarMunicipio()"><i class="fa-solid fa-magnifying-glass"></i></button>
+                <input type="text" id="municipio-input" placeholder="Ej: Madrid (o vacío para ver todos)"
+                    style="margin-block-end: 0; font-size: 13px;"
+                    onkeypress="if(event.key==='Enter') buscarMunicipio()">
+                <button class="action-btn" style="inline-size: auto; margin-block-start: 0; padding: 0 12px;"
+                    onclick="buscarMunicipio()"><i class="fa-solid fa-magnifying-glass"></i></button>
             </div>
-            <div id="municipio-resultados" style="margin-block-start: 10px; font-size: 0.85rem; max-block-size: 150px; overflow-y: auto;"></div>
-                    </div>
+            <div id="municipio-resultados"
+                style="margin-block-start: 10px; font-size: 0.85rem; max-block-size: 150px; overflow-y: auto;"></div>
+        </div>
 
         <div class="module">
             <h3><i class="fa-solid fa-city"></i> Análisis Urbanístico</h3>
             <label style="font-size: 12px; color: #666;">Referencia Catastral:</label>
-            <input type="text" id="ref-urbanismo" placeholder="Referencia Catastral (opcional si hay archivo)" style="inline-size: 100%; margin-block-end: 8px; font-size: 12px;">
+            <input type="text" id="ref-urbanismo" placeholder="Referencia Catastral (opcional si hay archivo)"
+                style="inline-size: 100%; margin-block-end: 8px; font-size: 12px;">
             <label style="font-size: 12px; color: #666;">Cargar geometría (KML/GML/GeoJSON):</label>
-            <input type="file" id="file-urbanismo" accept=".kml,.gml,.geojson,.json" multiple style="inline-size: 100%; margin-block-end: 8px; font-size: 12px;">
-            <button class="action-btn secondary" onclick="analizarUrbanismo()"><i class="fa-solid fa-chart-pie"></i> Analizar Urbanismo</button>
-            <div id="urbanismo-resultados" style="margin-block-start: 10px; font-size: 12px; color: #666; display: none;"></div>
+            <input type="file" id="file-urbanismo" accept=".kml,.gml,.geojson,.json" multiple
+                style="inline-size: 100%; margin-block-end: 8px; font-size: 12px;">
+            <button class="action-btn secondary" onclick="analizarUrbanismo()"><i class="fa-solid fa-chart-pie"></i>
+                Analizar Urbanismo</button>
+            <div id="urbanismo-resultados"
+                style="margin-block-start: 10px; font-size: 12px; color: #666; display: none;"></div>
         </div>
 
         <div class="module">
             <h3><i class="fa-solid fa-triangle-exclamation"></i> Análisis Afecciones</h3>
             <label style="font-size: 12px; color: #666;">Referencia Catastral:</label>
-            <input type="text" id="ref-afecciones" placeholder="Referencia Catastral (opcional si hay archivo)" style="inline-size: 100%; margin-block-end: 8px; font-size: 12px;">
+            <input type="text" id="ref-afecciones" placeholder="Referencia Catastral (opcional si hay archivo)"
+                style="inline-size: 100%; margin-block-end: 8px; font-size: 12px;">
             <label style="font-size: 12px; color: #666;">Cargar geometría (KML/GML/GeoJSON):</label>
-            <input type="file" id="file-afecciones" accept=".kml,.gml,.geojson,.json" multiple style="inline-size: 100%; margin-block-end: 8px; font-size: 12px;">
-            <button class="action-btn secondary" onclick="analizarAfecciones()"><i class="fa-solid fa-shield-halved"></i> Analizar Afecciones</button>
-            <div id="analisis-resultados" style="margin-block-start: 10px; font-size: 12px; color: #666; display: none;"></div>
+            <input type="file" id="file-afecciones" accept=".kml,.gml,.geojson,.json" multiple
+                style="inline-size: 100%; margin-block-end: 8px; font-size: 12px;">
+            <button class="action-btn secondary" onclick="analizarAfecciones()"><i
+                    class="fa-solid fa-shield-halved"></i> Analizar Afecciones</button>
+            <div id="analisis-resultados"
+                style="margin-block-start: 10px; font-size: 12px; color: #666; display: none;"></div>
         </div>
 
         <div class="module">
             <h3><i class="fa-solid fa-file-pdf"></i> Informes</h3>
-            <button class="action-btn" style="background-color: #e74c3c;" onclick="mostrarDialogoPDF()"><i class="fa-solid fa-print"></i> Generar PDF</button>
+            <button class="action-btn" style="background-color: #e74c3c;" onclick="mostrarDialogoPDF()"><i
+                    class="fa-solid fa-print"></i> Generar PDF</button>
         </div>
     </div>
 
     <!-- CENTRO: MAPA -->
     <div class="center-panel">
         <!-- Panel de información de parcela -->
-        <div class="right-box" id="parcel-info" style="display:none; position: absolute; top: 20px; right: 20px; z-index: 1000; background: rgba(255,255,255,0.95); padding: 15px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); max-width: 300px;"></div>
-        
+        <div class="right-box" id="parcel-info"
+            style="display:none; position: absolute; top: 20px; right: 20px; z-index: 1000; background: rgba(255,255,255,0.95); padding: 15px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); max-width: 300px;">
+        </div>
+
         <div id="map-container">
             <div class="map-toolbar">
-                <button class="tool-btn" id="location-toggle" onclick="toggleLocationTracking()" title="Activar/Desactivar GPS en tiempo real" style="background: white; color: #444;"><i class="fa-solid fa-location-crosshairs"></i></button>
-                <button class="tool-btn" onclick="activarMedicion('distancia')" title="Medir Distancia"><i class="fa-solid fa-ruler"></i></button>
-                <button class="tool-btn" onclick="activarMedicion('area')" title="Medir Área"><i class="fa-solid fa-draw-polygon"></i></button>
-                <button class="tool-btn danger" onclick="limpiarMapa()" title="Limpiar Mapa"><i class="fa-solid fa-trash"></i></button>
-                <div id="medicion-resultado" style="font-size: 12px; font-weight: bold; color: #2c3e50; padding: 0 8px; display: flex; align-items: center;"></div>
+                <button class="tool-btn" id="location-toggle" onclick="toggleLocationTracking()"
+                    title="Activar/Desactivar GPS en tiempo real" style="background: white; color: #444;"><i
+                        class="fa-solid fa-location-crosshairs"></i></button>
+                <button class="tool-btn" onclick="activarMedicion('distancia')" title="Medir Distancia"><i
+                        class="fa-solid fa-ruler"></i></button>
+                <button class="tool-btn" onclick="activarMedicion('area')" title="Medir Área"><i
+                        class="fa-solid fa-draw-polygon"></i></button>
+                <button class="tool-btn danger" onclick="limpiarMapa()" title="Limpiar Mapa"><i
+                        class="fa-solid fa-trash"></i></button>
+                <div id="medicion-resultado"
+                    style="font-size: 12px; font-weight: bold; color: #2c3e50; padding: 0 8px; display: flex; align-items: center;">
+                </div>
             </div>
             <div id="map"></div>
         </div>
         <button class="center-btn" onclick="centrarMapa()"><i class="fa-solid fa-crosshairs"></i> Centrar Vista</button>
     </div>
 
-    
+
     <!-- DIÁLOGO MODAL PARA GENERAR PDF -->
-    <div id="pdfDialog" style="display: none; position: fixed; inset-block-start: 0; inset-inline-start: 0; inline-size: 100%; block-size: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center;">
-        <div style="background: white; border-radius: 12px; padding: 25px; max-inline-size: 600px; inline-size: 90%; max-block-size: 80vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-block-end: 20px; border-block-end: 2px solid #e74c3c; padding-block-end: 10px;">
+    <div id="pdfDialog"
+        style="display: none; position: fixed; inset-block-start: 0; inset-inline-start: 0; inline-size: 100%; block-size: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center;">
+        <div
+            style="background: white; border-radius: 12px; padding: 25px; max-inline-size: 600px; inline-size: 90%; max-block-size: 80vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; margin-block-end: 20px; border-block-end: 2px solid #e74c3c; padding-block-end: 10px;">
                 <h2 style="margin: 0; color: #e74c3c; font-size: 1.5rem;">
                     <i class="fa-solid fa-file-pdf"></i> Generar Informe PDF
                 </h2>
-                <button onclick="cerrarDialogoPDF()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666;">&times;</button>
+                <button onclick="cerrarDialogoPDF()"
+                    style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666;">&times;</button>
             </div>
 
             <!-- Campos de empresa -->
@@ -597,12 +670,16 @@
                 </h3>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <div>
-                        <label style="display: block; margin-block-end: 5px; font-weight: 600; color: #555;">Nombre de Empresa:</label>
-                        <input type="text" id="empresa-nombre" placeholder="Ej: Tasaciones SL" style="inline-size: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px;">
+                        <label style="display: block; margin-block-end: 5px; font-weight: 600; color: #555;">Nombre de
+                            Empresa:</label>
+                        <input type="text" id="empresa-nombre" placeholder="Ej: Tasaciones SL"
+                            style="inline-size: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px;">
                     </div>
                     <div>
-                        <label style="display: block; margin-block-end: 5px; font-weight: 600; color: #555;">Número de Colegiado:</label>
-                        <input type="text" id="colegiado-numero" placeholder="Ej: 12345" style="inline-size: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px;">
+                        <label style="display: block; margin-block-end: 5px; font-weight: 600; color: #555;">Número de
+                            Colegiado:</label>
+                        <input type="text" id="colegiado-numero" placeholder="Ej: 12345"
+                            style="inline-size: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px;">
                     </div>
                 </div>
             </div>
@@ -612,7 +689,8 @@
                 <h3 style="color: #2c3e50; margin-block-end: 15px; font-size: 1.1rem;">
                     <i class="fa-solid fa-list-check"></i> Contenidos a Incluir
                 </h3>
-                <div id="contenidos-disponibles" style="max-block-size: 300px; overflow-y: auto; border: 2px solid #ecf0f1; border-radius: 8px; padding: 15px; background: #f8f9fa;">
+                <div id="contenidos-disponibles"
+                    style="max-block-size: 300px; overflow-y: auto; border: 2px solid #ecf0f1; border-radius: 8px; padding: 15px; background: #f8f9fa;">
                     <div style="text-align: center; color: #666; padding: 20px;">
                         <i class="fa-solid fa-spinner fa-spin"></i> Cargando contenidos disponibles...
                     </div>
@@ -620,11 +698,14 @@
             </div>
 
             <!-- Botones de acción -->
-            <div style="display: flex; gap: 10px; justify-content: flex-end; border-block-start: 2px solid #ecf0f1; padding-block-start: 15px;">
-                <button onclick="cerrarDialogoPDF()" style="padding: 12px 24px; border: 2px solid #95a5a6; background: white; color: #7f8c8d; border-radius: 6px; cursor: pointer; font-weight: 600;">
+            <div
+                style="display: flex; gap: 10px; justify-content: flex-end; border-block-start: 2px solid #ecf0f1; padding-block-start: 15px;">
+                <button onclick="cerrarDialogoPDF()"
+                    style="padding: 12px 24px; border: 2px solid #95a5a6; background: white; color: #7f8c8d; border-radius: 6px; cursor: pointer; font-weight: 600;">
                     Cancelar
                 </button>
-                <button onclick="generarPDFSeleccionado()" style="padding: 12px 24px; border: none; background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                <button onclick="generarPDFSeleccionado()"
+                    style="padding: 12px 24px; border: none; background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; border-radius: 6px; cursor: pointer; font-weight: 600;">
                     <i class="fa-solid fa-file-pdf"></i> Generar PDF
                 </button>
             </div>
@@ -650,13 +731,13 @@
 
         // Capas Base
         var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map);
-        
+
         // Satélite (Google Satellite)
         var satelite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
             attribution: 'Google Satellite',
             maxZoom: 20
         });
-        
+
         // Ortofoto de máxima resolución (CNIG)
         var pnoa_max = L.tileLayer.wms('https://wms.cnig.es/geoserver/wms', {
             layers: 'PNOA_MA',
@@ -665,7 +746,7 @@
             transparent: false,
             attribution: 'CNIG PNOA Máxima Resolución'
         });
-        
+
         // Ortofoto histórica (2018)
         var pnoa_2018 = L.tileLayer.wms('https://wms-sig.idee.es/pnoa-ma/wms', {
             layers: 'OI.OrthoimageCoverage',
@@ -675,13 +756,13 @@
             version: '1.3.0',
             time: '2018'
         });
-        
+
         // Ortofoto de Cataluña (ICGC) - muy alta resolución
         var icgc_orto = L.tileLayer.wms('https://geoserveis.icgc.cat/icc_mapesbase/wms/service', {
             layers: 'orto25c',
             attribution: 'ICGC Ortofoto 25cm'
         });
-        
+
         // Google Satellite (alternativa)
         var google_sat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
             maxZoom: 20,
@@ -711,9 +792,9 @@
 
         // Capas Overlay con calidad dinámica
         var layers = {
-            catastro: L.tileLayer.wms('https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx', { 
-                layers: 'Catastro', 
-                format: 'image/png', 
+            catastro: L.tileLayer.wms('https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx', {
+                layers: 'Catastro',
+                format: 'image/png',
                 transparent: true,
                 attribution: 'Catastro'
             }),
@@ -729,9 +810,9 @@
                 transparent: true,
                 attribution: 'Uso del Suelo'
             }),
-            catastro_hq: L.tileLayer.wms('https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx', { 
-                layers: 'Catastro', 
-                format: 'image/png', 
+            catastro_hq: L.tileLayer.wms('https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx', {
+                layers: 'Catastro',
+                format: 'image/png',
                 transparent: true,
                 attribution: 'Catastro Alta Calidad',
                 // Parámetros para mayor calidad
@@ -768,7 +849,7 @@
         // --- GESTIÓN DE CAPAS DINÁMICAS (LOCALES) ---
         var dynamicLayers = {};
         var layerControl = null;
-        
+
         // Inicializar control de capas estándar
         var baseMaps = {
             "Mapa Base (OSM)": osm,
@@ -781,7 +862,7 @@
         layerControl = L.control.layers(baseMaps, overlayMaps).addTo(map);
 
         // Evento para sincronizar checkboxes del sidebar y carga lazy
-        map.on('overlayadd', function(e) {
+        map.on('overlayadd', function (e) {
             if (e.layer && e.layer.options && e.layer.options.isDynamicLayer) {
                 // 1. Sincronizar checkbox del sidebar
                 const id = e.layer.options.layerId || e.layer.options.fileName;
@@ -798,7 +879,7 @@
         });
 
         // Evento para sincronizar desmarcado del sidebar
-        map.on('overlayremove', function(e) {
+        map.on('overlayremove', function (e) {
             if (e.layer && e.layer.options && e.layer.options.isDynamicLayer) {
                 const id = e.layer.options.layerId || e.layer.options.fileName;
                 const checkbox = document.getElementById(`chk-dyn-${id}`);
@@ -828,7 +909,7 @@
 
                 // WMS: ocultar los checkboxes no permitidos (sin eliminar lógica)
                 if (allowedWms) {
-                    const wmsIds = ['catastro','inundacion','siose','calificacion','t10','t100','t500','natura','vias','montes'];
+                    const wmsIds = ['catastro', 'inundacion', 'siose', 'calificacion', 't10', 't100', 't500', 'natura', 'vias', 'montes'];
                     wmsIds.forEach(id => {
                         const cb = document.getElementById(`layer-${id}`);
                         if (!cb) return;
@@ -852,7 +933,7 @@
 
         function contarCapasVisiblesActivas() {
             let count = 0;
-            const ids = ['catastro','inundacion','siose','calificacion','t10','t100','t500','natura','vias','montes'];
+            const ids = ['catastro', 'inundacion', 'siose', 'calificacion', 't10', 't100', 't500', 'natura', 'vias', 'montes'];
             ids.forEach(id => {
                 const cb = document.getElementById(`layer-${id}`);
                 if (cb && cb.checked) count += 1;
@@ -869,7 +950,7 @@
             const selected = contarCapasVisiblesActivas();
             const remaining = Math.max(0, MAX_VISIBLE_LAYERS - selected);
 
-            const ids = ['catastro','inundacion','siose','calificacion','t10','t100','t500','natura','vias','montes'];
+            const ids = ['catastro', 'inundacion', 'siose', 'calificacion', 't10', 't100', 't500', 'natura', 'vias', 'montes'];
             ids.forEach(id => {
                 const cb = document.getElementById(`layer-${id}`);
                 if (!cb) return;
@@ -899,7 +980,7 @@
                 .then(r => r.json())
                 .then(data => {
                     if (container) container.innerHTML = '';
-                    
+
                     if (data.status === 'success' && data.files.length > 0) {
                         data.files.forEach(file => {
                             // Si hay configuración desde Ajustes, ocultar lo no permitido
@@ -911,7 +992,7 @@
                             group.options.fileName = file.name;
                             group.options.layerId = file.id || file.name; // Fallback to name if id missing
                             group.hasLoadedData = false;
-                            
+
                             let iconChar = '📄';
                             if (file.type.includes('shp')) iconChar = '🗺️';
                             if (file.type.includes('kml')) iconChar = '🌏';
@@ -919,12 +1000,12 @@
                             if (file.type.includes('fgb')) iconChar = '🚀';
 
                             var label = `${iconChar} ${file.name}`;
-                            
+
                             // 1. Añadir al control de capas estándar (Leaflet)
                             if (layerControl) {
                                 layerControl.addOverlay(group, label);
                             }
-                            
+
                             // 2. Añadir al panel lateral (HTML)
                             if (container) {
                                 const div = document.createElement('div');
@@ -979,7 +1060,7 @@
             if (checked) {
                 map.addLayer(group);
                 if (!group.hasLoadedData && !group.isLoading) {
-                     cargarDatosCapaDinamica(group);
+                    cargarDatosCapaDinamica(group);
                 }
             } else {
                 map.removeLayer(group);
@@ -994,7 +1075,7 @@
             layerGroup.isLoading = true;
             const originalCursor = map.getContainer().style.cursor;
             map.getContainer().style.cursor = 'wait';
-            
+
             const layerName = layerGroup.options.fileName;
             const layerId = layerGroup.options.layerId || layerName;
 
@@ -1018,10 +1099,10 @@
                             hash = layerName.charCodeAt(i) + ((hash << 5) - hash);
                         }
                         const color = '#' + ((hash & 0x00FFFFFF).toString(16)).padStart(6, '0');
-                        
+
                         var geo = L.geoJSON(data, {
                             style: { color: color, weight: 2, opacity: 1, fillOpacity: 0.2 },
-                            onEachFeature: function(feature, layer) {
+                            onEachFeature: function (feature, layer) {
                                 if (feature.properties) {
                                     let popupContent = '<div style="max-block-size:200px;overflow:auto;font-family:sans-serif;font-size:12px;">';
                                     popupContent += '<h4 style="margin:0 0 5px 0;border-block-end:1px solid #ccc;">' + layerName + '</h4><table>';
@@ -1033,13 +1114,13 @@
                                 }
                             }
                         });
-                        
+
                         layerGroup.addLayer(geo);
                         layerGroup.hasLoadedData = true;
-                        
+
                         try {
                             map.fitBounds(geo.getBounds());
-                        } catch(e) {}
+                        } catch (e) { }
                     } else {
                         alert('La capa ' + layerName + ' está vacía o no es válida.');
                         map.removeLayer(layerGroup);
@@ -1139,7 +1220,7 @@
         function toggleLocationTracking() {
             const btn = document.getElementById('location-toggle');
             const isActive = window.locationTrackingActive;
-            
+
             if (isActive) {
                 // Detener seguimiento
                 window.locationTrackingActive = false;
@@ -1165,38 +1246,38 @@
                     alert('Tu navegador no soporta geolocalización');
                     return;
                 }
-                
+
                 window.locationTrackingActive = true;
                 btn.style.background = '#e74c3c';
                 btn.style.color = 'white';
                 btn.innerHTML = '<i class="fa-solid fa-location-crosshairs fa-pulse"></i>';
-                
+
                 // Opciones de geolocalización
                 const options = {
                     enableHighAccuracy: true,
                     timeout: 5000,
                     maximumAge: 0
                 };
-                
+
                 // Obtener posición inicial
                 navigator.geolocation.getCurrentPosition(
-                    function(position) {
+                    function (position) {
                         updateLocation(position);
                     },
-                    function(error) {
+                    function (error) {
                         console.error('❌ Error obteniendo posición:', error);
                         alert('No se pudo obtener tu ubicación: ' + error.message);
                         toggleLocationTracking(); // Resetear botón
                     },
                     options
                 );
-                
+
                 // Iniciar seguimiento continuo
                 window.locationWatchId = navigator.geolocation.watchPosition(
-                    function(position) {
+                    function (position) {
                         updateLocation(position);
                     },
-                    function(error) {
+                    function (error) {
                         console.error('❌ Error en seguimiento GPS:', error);
                         if (error.code === 3) { // TIMEOUT
                             console.log('⏰ Timeout de GPS, reintentando...');
@@ -1207,7 +1288,7 @@
                     },
                     options
                 );
-                
+
                 console.log('📍 Seguimiento GPS iniciado');
             }
         }
@@ -1216,9 +1297,9 @@
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
             const accuracy = position.coords.accuracy;
-            
+
             const latlng = L.latLng(lat, lng);
-            
+
             // Actualizar o crear marcador de posición
             if (window.locationMarker) {
                 window.locationMarker.setLatLng(latlng);
@@ -1232,7 +1313,7 @@
                     })
                 }).addTo(map);
             }
-            
+
             // Actualizar o crear círculo de precisión
             if (window.locationCircle) {
                 window.locationCircle.setLatLng(latlng);
@@ -1246,12 +1327,12 @@
                     weight: 2
                 }).addTo(map);
             }
-            
+
             // Centrar mapa en la posición (con suavizado)
             if (window.locationTrackingActive) {
                 map.panTo(latlng);
             }
-            
+
             // Actualizar información en el panel de parcela
             const parcelInfo = document.getElementById('parcel-info');
             if (parcelInfo && window.locationTrackingActive) {
@@ -1266,7 +1347,7 @@
                         <div>Precisión: ${accuracy.toFixed(1)}m (${accuracyText})</div>
                     </div>
                 `;
-                
+
                 // Si el panel ya está visible, añadir info de ubicación
                 if (parcelInfo.style.display !== 'none') {
                     const existingLocationInfo = parcelInfo.querySelector('.location-info');
@@ -1277,14 +1358,14 @@
                     }
                 }
             }
-            
+
             console.log(`📍 Ubicación actualizada: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${accuracy.toFixed(1)}m)`);
         }
 
         function toggleCatastroLayer() {
             const btn = document.getElementById('catastro-toggle');
             const isActive = map.hasLayer(layers.catastro);
-            
+
             if (isActive) {
                 map.removeLayer(layers.catastro);
                 btn.style.background = 'white';
@@ -1294,7 +1375,7 @@
                 btn.style.background = '#2c3e50';
                 btn.style.color = 'white';
             }
-            
+
             actualizarPanelParcela();
         }
 
@@ -1385,8 +1466,8 @@
 
         async function cargarReferencia() {
             var ref = document.getElementById('ref-input').value.trim().toUpperCase();
-            if(!ref) return alert("Introduce una referencia");
-            
+            if (!ref) return alert("Introduce una referencia");
+
             const resultsEl = document.getElementById('ref-results-checklist');
             resultsEl.style.display = 'block';
             resultsEl.innerHTML = 'Cargando contorno...';
@@ -1411,7 +1492,7 @@
 
                 loadedLayer.clearLayers();
                 var layer = L.geoJSON(data, { style: redStyle }).addTo(loadedLayer);
-                
+
                 if (layer.getBounds().isValid()) {
                     map.fitBounds(layer.getBounds());
                 }
@@ -1419,7 +1500,7 @@
                 actualizarPanelParcela();
                 setProgress(true, 'Contorno cargado. Iniciando proceso...', 35);
                 resultsEl.innerHTML = '✅ Contorno cargado.<br>Iniciando proceso completo...';
-            } catch(e) { 
+            } catch (e) {
                 if (e.name === 'AbortError') {
                     resultsEl.innerHTML = '<span style="color:#e67e22;">Operación cancelada.</span>';
                     setProgress(false, '', 0);
@@ -1435,7 +1516,7 @@
                 setProgress(true, 'Ejecutando proceso completo...', 55);
                 const processRes = await fetch('/api/v1/procesar-completo', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ referencia: ref }),
                     signal: busquedaController.signal
                 });
@@ -1446,7 +1527,7 @@
                 }
 
                 const processData = await processRes.json();
-                
+
                 if (processData.status === 'success') {
                     setProgress(true, 'Proceso finalizado', 100);
                     // Generar lista de verificación
@@ -1462,7 +1543,7 @@
                         { k: 'informe_pdf', l: 'Informe PDF' },
                         { k: 'contorno_superpuesto', l: 'Contorno superpuesto' }
                     ];
-                    
+
                     const res = processData.resultados || {};
                     items.forEach(i => checklist += `<li>${res[i.k] ? '✅' : '❌'} ${i.l}</li>`);
                     checklist += '</ul>';
@@ -1495,46 +1576,46 @@
             var refInput = document.getElementById('ref-urbanismo');
             var ref = refInput ? refInput.value.trim().toUpperCase() : '';
             if (!ref) {
-                 ref = document.getElementById('ref-input').value.trim().toUpperCase();
+                ref = document.getElementById('ref-input').value.trim().toUpperCase();
             }
-            
+
             if (fileInput.files.length > 0) {
                 // Prioridad al archivo
                 handleFileUpload(fileInput); // Cargar visualmente
             }
-            
-            if(!ref && fileInput.files.length === 0) {
+
+            if (!ref && fileInput.files.length === 0) {
                 alert("Introduce una referencia catastral o carga un archivo");
                 return;
             }
-            
+
             const resultadosEl = document.getElementById('urbanismo-resultados');
             resultadosEl.style.display = 'block';
             resultadosEl.innerHTML = '⏳ Analizando urbanismo...';
-            
+
             try {
                 const res = await fetch('/api/v1/analizar-urbanismo', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ referencia: ref || "Archivo cargado" })
                 });
-                
+
                 const data = await res.json();
-                
+
                 if (data.status === 'success') {
                     const u = data.data.analisis_urbanistico;
                     let html = '<div style="background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #e9ecef; margin-block-start: 5px;">';
-                    html += '<strong>🏙️ Datos Urbanísticos (Simulados):</strong><hr style="margin: 5px 0; border-block-start: 1px solid #ddd;">';
+                    html += '<strong>🏙️ Datos Urbanísticos Reales:</strong><hr style="margin: 5px 0; border-block-start: 1px solid #ddd;">';
                     html += `<b>Clasificación:</b> ${u.suelo || 'N/D'}<br>`;
                     html += `<b>Uso:</b> ${u.calificacion || 'N/D'}<br>`;
                     html += `<b>Edificabilidad:</b> ${u.edificabilidad || 'N/D'}<br>`;
                     html += `<b>Ocupación:</b> ${u.ocupacion || 'N/D'}</div>`;
-                    
+
                     resultadosEl.innerHTML = html;
                 } else {
                     throw new Error(data.message || 'Error en el análisis');
                 }
-                
+
             } catch (e) {
                 console.error('Error analizando urbanismo:', e);
                 resultadosEl.innerHTML = `<span style="color:red;">❌ Error: ${e.message}</span>`;
@@ -1547,36 +1628,36 @@
             var refInput = document.getElementById('ref-afecciones');
             var ref = refInput ? refInput.value.trim().toUpperCase() : '';
             if (!ref) {
-                 ref = document.getElementById('ref-input').value.trim().toUpperCase();
+                ref = document.getElementById('ref-input').value.trim().toUpperCase();
             }
-            
+
             if (fileInput.files.length > 0) {
                 // Prioridad al archivo
                 handleFileUpload(fileInput); // Cargar visualmente
             }
-            
-            if(!ref) {
+
+            if (!ref) {
                 if (fileInput.files.length === 0) alert("Introduce una referencia catastral o carga un archivo");
                 return;
             }
-            
+
             const resultadosEl = document.getElementById('analisis-resultados');
             resultadosEl.style.display = 'block';
             resultadosEl.innerHTML = '⏳ Analizando afecciones...';
-            
+
             try {
                 const res = await fetch('/api/v1/analizar-afecciones', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ referencia: ref })
                 });
-                
+
                 const data = await res.json();
-                
+
                 if (data.status === 'success') {
                     const afecciones = data.data.afecciones;
                     let html = '<strong>⚠️ Análisis de Afecciones:</strong><br><br>';
-                    
+
                     afecciones.forEach((afeccion, index) => {
                         html += `<div style="margin-block-end: 10px; padding: 8px; border-inline-start: 3px solid #e74c3c; background: #fef2f2;">`;
                         html += `<strong>Capa: ${afeccion.tipo}</strong><br>`;
@@ -1584,13 +1665,13 @@
                         html += `<strong>Afectación:</strong> ${afeccion.afectacion}`;
                         html += `</div>`;
                     });
-                    
+
                     resultadosEl.innerHTML = html;
                 } else {
                     const errorDetail = data.detail || (data.error || 'Error en el análisis');
                     throw new Error(errorDetail);
                 }
-                
+
             } catch (e) {
                 console.error('Error analizando afecciones:', e);
                 resultadosEl.innerHTML = `<span style="color:red;">❌ Error: ${e.message}</span>`;
@@ -1599,52 +1680,52 @@
 
         function handleRefsFile(input) {
             var file = input.files[0];
-            if(!file) return;
-            
+            if (!file) return;
+
             var reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 try {
                     var content = e.target.result;
                     var extension = file.name.split('.').pop().toLowerCase();
-                    
+
                     var referencias = [];
-                    
+
                     if (extension === 'csv') {
                         // Procesar CSV
                         var lines = content.split('\n').filter(line => line.trim());
-                        referencias = lines.map(function(line) {
+                        referencias = lines.map(function (line) {
                             var cols = line.split(',');
                             return cols[0].trim().replace(/["']/g, ''); // Quitar comillas
-                        }).filter(function(ref) { return ref.length > 0; });
+                        }).filter(function (ref) { return ref.length > 0; });
                     } else if (extension === 'txt') {
                         // Procesar TXT (una referencia por línea)
                         referencias = content.split('\n')
-                            .map(function(line) { return line.trim(); })
-                            .filter(function(line) { return line.length > 0; });
+                            .map(function (line) { return line.trim(); })
+                            .filter(function (line) { return line.length > 0; });
                     }
-                    
+
                     // Mostrar resultados
                     var refsFileList = document.getElementById('refs-file-list');
                     refsFileList.innerHTML = '<strong>📋 ' + referencias.length + ' referencias encontradas:</strong><br>';
-                    
+
                     // Mostrar primeras 5 como preview
                     var preview = referencias.slice(0, 5).join('<br>');
                     refsFileList.innerHTML += preview;
-                    
+
                     if (referencias.length > 5) {
                         refsFileList.innerHTML += '<br>... y ' + (referencias.length - 5) + ' más';
                     }
-                    
+
                     // Botón para cargar todas
                     refsFileList.innerHTML += '<br><br><button class="action-btn" style="font-size:12px; padding:6px 12px;" onclick="cargarLoteReferencias(' + JSON.stringify(referencias) + ')">🚀 Cargar todas las referencias</button>';
-                    
+
                 } catch (error) {
                     console.error('Error procesando archivo de referencias:', error);
                     var refsFileList = document.getElementById('refs-file-list');
                     refsFileList.innerHTML = '❌ Error al procesar el archivo: ' + error.message;
                 }
             };
-            
+
             reader.readAsText(file);
         }
 
@@ -1653,9 +1734,9 @@
                 alert('No hay referencias para cargar');
                 return;
             }
-            
+
             var refsFileList = document.getElementById('refs-file-list');
-            
+
             // Crear barra de progreso visual
             var progressHtml = `
                 <div style="margin-bottom: 10px;">
@@ -1669,7 +1750,7 @@
                 </div>
             `;
             refsFileList.innerHTML = progressHtml;
-            
+
             // Procesar como lote unificado
             procesarLoteUnificado(referencias);
         }
@@ -1678,43 +1759,43 @@
             var refsFileList = document.getElementById('refs-file-list');
             var progressBar = document.getElementById('batch-progress-bar');
             var progressText = document.getElementById('batch-progress-text');
-            
+
             try {
                 // Actualizar progreso
                 if (progressBar) progressBar.style.width = '25%';
                 if (progressText) progressText.textContent = 'Enviando referencias al servidor...';
-                
+
                 // Llamar al nuevo endpoint de procesamiento de lote
                 const response = await fetch('/api/v1/procesar-lote', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ referencias: referencias })
                 });
-                
+
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.detail || 'Error procesando lote');
                 }
-                
+
                 // Actualizar progreso
                 if (progressBar) progressBar.style.width = '75%';
                 if (progressText) progressText.textContent = 'Procesando geometrías combinadas...';
-                
+
                 const data = await response.json();
-                
+
                 if (data.status === 'success') {
                     // Cargar geometrías combinadas en el mapa
                     if (data.geojson_url) {
                         try {
                             const geoResponse = await fetch(data.geojson_url);
                             const geojsonData = await geoResponse.json();
-                            
+
                             // Limpar capa cargada anterior
                             loadedLayer.clearLayers();
-                            
+
                             // Añadir geometrías combinadas con estilo unificado
                             const combinedLayer = L.geoJSON(geojsonData, {
-                                style: function(feature) {
+                                style: function (feature) {
                                     return {
                                         color: '#e74c3c',
                                         weight: 2,
@@ -1723,7 +1804,7 @@
                                         fillColor: '#3498db'
                                     };
                                 },
-                                onEachFeature: function(feature, layer) {
+                                onEachFeature: function (feature, layer) {
                                     // Añadir popup con información de la referencia
                                     if (feature.properties) {
                                         const ref = feature.properties.referencia || 'N/A';
@@ -1738,23 +1819,23 @@
                                     }
                                 }
                             }).addTo(loadedLayer);
-                            
+
                             // Centrar mapa en todas las geometrías
                             if (combinedLayer.getBounds().isValid()) {
                                 map.fitBounds(combinedLayer.getBounds());
                             }
-                            
+
                             console.log(`✅ Geometrías combinadas cargadas: ${data.geometrias_combinadas} geometrías`);
-                            
+
                         } catch (geoError) {
                             console.warn('⚠️ Error cargando GeoJSON combinado:', geoError);
                         }
                     }
-                    
+
                     // Actualizar progreso a 100%
                     if (progressBar) progressBar.style.width = '100%';
                     if (progressText) progressText.textContent = '¡Proceso completado!';
-                    
+
                     // Mostrar resultados finales
                     var finalHtml = `
                         <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; padding: 10px; margin-bottom: 10px;">
@@ -1767,7 +1848,7 @@
                             </div>
                         </div>
                     `;
-                    
+
                     // Añadir botón de descarga del ZIP unificado
                     if (data.zip_path) {
                         finalHtml += `
@@ -1779,38 +1860,38 @@
                             </div>
                         `;
                     }
-                    
+
                     // Mostrar detalles individuales
                     if (data.resultados && data.resultados.length > 0) {
                         finalHtml += `
                             <div style="margin-top: 10px; font-size: 11px; color: #666;">
                                 <strong>Detalles por referencia:</strong><br>
                         `;
-                        
-                        data.resultados.forEach(function(resultado) {
+
+                        data.resultados.forEach(function (resultado) {
                             var icono = resultado.exitosa ? '✅' : '❌';
                             finalHtml += `${icono} ${resultado.referencia} - ${resultado.exitosa ? 'Procesada' : 'Error: ' + (resultado.error || 'Desconocido')}<br>`;
                         });
-                        
+
                         finalHtml += '</div>';
                     }
-                    
+
                     refsFileList.innerHTML = finalHtml;
-                    
+
                 } else {
                     throw new Error(data.error || 'Error en el procesamiento del lote');
                 }
-                
+
             } catch (error) {
                 console.error('❌ Error procesando lote unificado:', error);
-                
+
                 var errorHtml = `
                     <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; padding: 10px;">
                         <div style="color: #721c24; font-weight: bold;">❌ Error en el procesamiento</div>
                         <div style="font-size: 12px; color: #721c24;">${error.message}</div>
                     </div>
                 `;
-                
+
                 refsFileList.innerHTML = errorHtml;
             }
         }
@@ -1827,28 +1908,28 @@
                 }
 
                 var layer = L.geoJSON(data, { style: redStyle }).addTo(loadedLayer);
-                
+
                 if (layer.getBounds().isValid()) {
                     // Solo centrar en la primera referencia
                     if (loadedLayer.getLayers().length === 1) {
                         map.fitBounds(layer.getBounds());
                     }
                 }
-                
+
                 var zipPath = null;
-                
+
                 // 2. Ejecutar proceso completo de catastro4 si la geometría se cargó
                 try {
                     const processRes = await fetch('/api/v1/procesar-completo', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ referencia: ref })
                     });
 
                     if (processRes.ok) {
                         const processData = await processRes.json();
                         console.log(`✅ Proceso catastro completado para ${ref}:`, processData);
-                        
+
                         // Mostrar notificación de éxito y guardar ruta del ZIP
                         if (processData.status === 'success' && processData.zip_path) {
                             console.log(`📦 ZIP generado: ${processData.zip_path}`);
@@ -1861,9 +1942,9 @@
                     console.warn(`⚠️ Error en proceso catastro para ${ref}:`, processError);
                     // No fallar la carga de geometría si el proceso completo falla
                 }
-                
+
                 if (callback) callback(true, zipPath);
-            } catch(e) { 
+            } catch (e) {
                 console.error(`❌ Error cargando referencia ${ref}:`, e);
                 if (callback) callback(false, null);
             }
@@ -1871,8 +1952,8 @@
 
         function handleFileUpload(input) {
             var files = input.files;
-            if(!files || files.length === 0) return;
-            
+            if (!files || files.length === 0) return;
+
             // Buscar o crear contenedor de lista específico para este input
             var listId = input.id + '-list';
             var fileList = document.getElementById(listId);
@@ -1884,29 +1965,29 @@
                 fileList.style.color = '#666';
                 input.parentNode.insertBefore(fileList, input.nextSibling);
             }
-            
+
             fileList.innerHTML = '<strong>Archivos seleccionados:</strong><br>';
-            
+
             // Procesar cada archivo
             for (var i = 0; i < files.length; i++) {
                 var file = files[i];
-                fileList.innerHTML += `📄 ${file.name} (${(file.size/1024).toFixed(1)}KB)<br>`;
-                
+                fileList.innerHTML += `📄 ${file.name} (${(file.size / 1024).toFixed(1)}KB)<br>`;
+
                 // Leer y procesar el archivo
-                (function(currentFile) {
+                (function (currentFile) {
                     var reader = new FileReader();
-                    reader.onload = function(e) {
+                    reader.onload = function (e) {
                         try {
                             var content = e.target.result;
-                            
-                            if(currentFile.name.endsWith('.kml')) {
+
+                            if (currentFile.name.endsWith('.kml')) {
                                 var layer = omnivore.kml.parse(content).setStyle(redStyle).addTo(loadedLayer);
                                 setTimeout(() => {
                                     if (loadedLayer.getLayers().length === 1) {
                                         map.fitBounds(layer.getBounds());
                                     }
                                 }, 100);
-                            } else if(currentFile.name.endsWith('.gml')) {
+                            } else if (currentFile.name.endsWith('.gml')) {
                                 // Para GML, mostrar mensaje de conversión necesaria
                                 console.log('🔄 GML detectado - conversión necesaria:', currentFile.name);
                                 // Aquí se podría añadir lógica de conversión GML a GeoJSON
@@ -1917,7 +1998,7 @@
                                     map.fitBounds(layer.getBounds());
                                 }
                             }
-                        } catch(error) {
+                        } catch (error) {
                             console.error('Error procesando archivo:', currentFile.name, error);
                             fileList.innerHTML += `❌ Error con ${currentFile.name}: ${error.message}<br>`;
                         }
@@ -1925,7 +2006,7 @@
                     reader.readAsText(currentFile);
                 })(file);
             }
-            
+
             // Ajustar vista si hay múltiples capas
             setTimeout(() => {
                 if (loadedLayer.getLayers().length > 0) {
@@ -1939,12 +2020,12 @@
         updateLayersVisibility(); // Llamada inicial para el estado correcto
 
         // Inicializar mapa
-        map.whenReady(function() {
+        map.whenReady(function () {
             // Activar capa de catastro por defecto
             if (layers.catastro) {
                 map.addLayer(layers.catastro);
             }
-            
+
             // Inicializar variables de seguimiento GPS
             window.locationTrackingActive = false;
             window.locationWatchId = null;
@@ -1963,12 +2044,12 @@
             measureMode = modo;
             measurePoints = [];
             measureLayer.clearLayers();
-            
+
             // Actualizar display
             const displayEl = document.getElementById('medicion-resultado');
             displayEl.style.display = 'flex';
             displayEl.innerHTML = `MODO: ${modo.toUpperCase()}`;
-            
+
             map.getContainer().style.cursor = 'crosshair';
             updateCadButtons();
         }
@@ -1980,15 +2061,15 @@
             loadedLayer.clearLayers();
             map.getContainer().style.cursor = '';
             document.getElementById('ref-input').value = '';
-            
+
             // Reset display
             const displayEl = document.getElementById('medicion-resultado');
             displayEl.innerHTML = '';
-            
+
             updateCadButtons();
         }
 
-        map.on('click', function(e) {
+        map.on('click', function (e) {
             if (!measureMode) {
                 // Si no estamos midiendo, intentar obtener información de la capa
                 identificarMetadatos(e.latlng);
@@ -1996,37 +2077,37 @@
             }
 
             measurePoints.push(e.latlng);
-            
+
             // Dibujar punto
             L.circleMarker(e.latlng, { radius: 5, color: 'blue' }).addTo(measureLayer);
 
             if (measureMode === 'distancia' && measurePoints.length > 1) {
                 // Dibujar línea
                 L.polyline(measurePoints, { color: 'blue' }).addTo(measureLayer);
-                
+
                 // Calcular distancia total
                 var dist = 0;
-                for(var i=0; i<measurePoints.length-1; i++) {
-                    dist += measurePoints[i].distanceTo(measurePoints[i+1]);
+                for (var i = 0; i < measurePoints.length - 1; i++) {
+                    dist += measurePoints[i].distanceTo(measurePoints[i + 1]);
                 }
-                document.getElementById('medicion-resultado').innerHTML = 
+                document.getElementById('medicion-resultado').innerHTML =
                     `DIST: ${(dist).toFixed(1)}m`;
             }
             else if (measureMode === 'area' && measurePoints.length > 2) {
                 // Dibujar polígono temporal
-                measureLayer.eachLayer(l => { if(l instanceof L.Polygon) measureLayer.removeLayer(l); });
+                measureLayer.eachLayer(l => { if (l instanceof L.Polygon) measureLayer.removeLayer(l); });
                 L.polygon(measurePoints, { color: 'blue', fillOpacity: 0.3 }).addTo(measureLayer);
-                
+
                 // Calcular área (aproximada)
                 var area = calcularArea(measurePoints);
-                var areaStr = area > 10000 ? (area/10000).toFixed(2) + ' ha' : area.toFixed(1) + ' m²';
-                
-                document.getElementById('medicion-resultado').innerHTML = 
+                var areaStr = area > 10000 ? (area / 10000).toFixed(2) + ' ha' : area.toFixed(1) + ' m²';
+
+                document.getElementById('medicion-resultado').innerHTML =
                     `ÁREA: ${areaStr}`;
             }
         });
 
-        map.on('dblclick', function(e) {
+        map.on('dblclick', function (e) {
             if (measureMode) {
                 measureMode = null;
                 map.getContainer().style.cursor = '';
@@ -2050,7 +2131,7 @@
                     p1 = latLngs[i];
                     p2 = latLngs[(i + 1) % pointsCount];
                     area += ((p2.lng - p1.lng) * d2r) *
-                            (2 + Math.sin(p1.lat * d2r) + Math.sin(p2.lat * d2r));
+                        (2 + Math.sin(p1.lat * d2r) + Math.sin(p2.lat * d2r));
                 }
                 area = area * 6378137.0 * 6378137.0 / 2.0;
             }
@@ -2077,12 +2158,12 @@
             // Obtener capa base actual
             const baseLayers = ['osm', 'satelite', 'pnoa_max', 'pnoa_2018', 'icgc_orto', 'google_sat', 'osm_hot', 'carto_light', 'esri_world_imagery', 'esri_topo'];
             const currentBase = baseLayers.find(layer => map.hasLayer(eval(layer)));
-            
+
             if (!currentBase) return;
 
             // Determinar si es una capa de satélite/ortofoto
             const esCapaSatelite = ['satelite', 'pnoa_max', 'pnoa_2018', 'icgc_orto', 'google_sat', 'osm_hot', 'esri_world_imagery', 'esri_topo'].includes(currentBase);
-            
+
             if (esCapaSatelite) {
                 // Usar capa de catastro de alta calidad
                 if (map.hasLayer(layers.catastro)) {
@@ -2100,7 +2181,7 @@
 
         function actualizarOpacidadCatastro(valor) {
             const opacidad = valor / 100;
-            
+
             // Determinar qué capa de catastro está activa
             if (map.hasLayer(layers.catastro_hq)) {
                 layers.catastro_hq.setOpacity(opacidad);
@@ -2122,31 +2203,31 @@
         async function cargarContenidosDisponibles() {
             const contenedor = document.getElementById('contenidos-disponibles');
             contenedor.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> Cargando contenidos disponibles...</div>'; // Muestra spinner
-            
+
             try {
                 const ref = document.getElementById('ref-input').value.trim().toUpperCase();
                 if (!ref) {
                     contenedor.innerHTML = '<div style="text-align: center; color: #e74c3c; padding: 20px;"><i class="fa-solid fa-exclamation-triangle"></i> Introduce una referencia catastral primero</div>';
                     return;
                 }
-                
+
                 // Obtener resultados del proceso completo
                 const res = await fetch('/api/v1/procesar-completo', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ referencia: ref })
                 });
-                
+
                 if (!res.ok) {
                     throw new Error('Error obteniendo datos del proceso');
                 }
-                
+
                 const processData = await res.json();
                 datosProceso = processData.resultados || {}; // Guardar los resultados para usar en generarPDFSeleccionado
-                
+
                 // Generar lista de contenidos con checkboxes
                 let html = '<div style="display: grid; gap: 10px;">';
-                
+
                 const items = [
                     { k: 'datos_descriptivos', l: 'Datos Descriptivos (XML)', icon: '📝', desc: 'Usos, superficies, año construcción (XML Catastro)' },
                     { k: 'coordenadas', l: 'Coordenadas', icon: '📍', desc: 'Coordenadas UTM y geográficas de la parcela' },
@@ -2159,13 +2240,13 @@
                     { k: 'informe_pdf', l: 'Informe PDF', icon: '📊', desc: 'Informe técnico completo de la parcela' },
                     { k: 'contorno_superpuesto', l: 'Contorno superpuesto', icon: '🖼️', desc: 'Contorno sobre ortofoto de alta resolución' }
                 ];
-                
+
                 items.forEach(item => {
                     // Datos descriptivos siempre disponibles si la referencia es válida
                     const disponible = item.k === 'datos_descriptivos' ? true : datosProceso[item.k];
                     const checked = disponible ? 'checked' : '';
                     const disabled = disponible ? '' : 'disabled style="opacity: 0.5;"';
-                    
+
                     html += `
                         <div style="display: flex; align-items: center; padding: 8px; border-radius: 6px; ${disponible ? 'background: #f8f9fa;' : 'background: #e9ecef;'}">
                             <input type="checkbox" id="pdf-${item.k}" value="${item.k}" ${checked} ${disabled} style="margin-inline-end: 10px;">
@@ -2179,7 +2260,7 @@
                     `;
                 });
                 contenedor.innerHTML = html;
-                
+
             } catch (e) {
                 contenedor.innerHTML = `<div style="text-align: center; color: #dc3545; padding: 20px;">❌ Error cargando contenidos: ${e.message}</div>`;
             }
@@ -2189,7 +2270,7 @@
             const ref = document.getElementById('ref-input').value.trim();
             const empresa = document.getElementById('empresa-nombre').value.trim();
             const colegiado = document.getElementById('colegiado-numero').value.trim();
-            
+
             if (!ref) {
                 alert('Introduce una referencia catastral primero');
                 return;
@@ -2201,7 +2282,7 @@
                 'datos_descriptivos', 'coordenadas', 'parcela_gml', 'edificio_gml', 'plano_ortofoto',
                 'pdf_oficial', 'kml', 'capas_afecciones', 'informe_pdf', 'contorno_superpuesto'
             ];
-            
+
             items.forEach(item => { if (document.getElementById(`pdf-${item}`).checked) contenidosSeleccionados.push(item); });
             // Mostrar indicador de progreso
             const boton = event.target;
@@ -2226,7 +2307,7 @@
                 if (res.ok) {
                     const data = await res.json();
                     if (data.status === 'error') throw new Error(data.error);
-                    
+
                     // Descargar usando la URL devuelta
                     const a = document.createElement('a');
                     a.href = data.url;
@@ -2234,7 +2315,7 @@
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
-                    
+
                     cerrarDialogoPDF();
                 } else {
                     const errorData = await res.json();
@@ -2251,13 +2332,13 @@
         async function buscarMunicipio() {
             const query = document.getElementById('municipio-input').value.trim();
             const resDiv = document.getElementById('municipio-resultados');
-            
+
             resDiv.innerHTML = '<div style="text-align:center; color:#666;"><i class="fa-solid fa-spinner fa-spin"></i> Buscando...</div>';
-            
+
             try {
                 const res = await fetch(`/api/v1/buscar-municipio?q=${encodeURIComponent(query)}`);
                 const data = await res.json();
-                
+
                 if (data.municipios && data.municipios.length > 0) {
                     let html = '<div style="display:grid; gap:5px;">';
                     data.municipios.forEach(m => {
@@ -2346,7 +2427,7 @@
         // Inyectar botón al cargar
         injectThemeSwitcher();
         */
-        
+
         function getWMSGetFeatureInfoUrl(layer, latlng) {
             const point = map.latLngToContainerPoint(latlng, map.getZoom());
             const size = map.getSize();
@@ -2372,11 +2453,15 @@
 
             return layer._url + L.Util.getParamString(params, layer._url, true);
         }
-        
+
         function identificarMetadatos(latlng) {
-            const catastroLayer = layers.catastro;
-            if (catastroLayer) {
-                const url = getWMSGetFeatureInfoUrl(catastroLayer, latlng);
+            // Actuar solo si la capa de catastro está activa
+            const catastroLayer = layers.catastro_hq && map.hasLayer(layers.catastro_hq) ? layers.catastro_hq : layers.catastro;
+
+            if (map.hasLayer(catastroLayer)) {
+                // Forzar XML para extracción automática de la Referencia Catastral
+                const url = getWMSGetFeatureInfoUrl(catastroLayer, latlng).replace('info_format=text/html', 'info_format=text/xml');
+
                 if (url) {
                     const popup = L.popup()
                         .setLatLng(latlng)
@@ -2385,15 +2470,48 @@
 
                     fetch(`/api/v1/proxy?url=${encodeURIComponent(url)}`)
                         .then(r => r.text())
-                        .then(html => {
-                            popup.setContent(`<div style="max-inline-size:400px; max-block-size:300px; overflow:auto; font-size:12px;">${html}</div>`);
+                        .then(text => {
+                            // Intentar capturar la referencia catastral (<pc> o PC=)
+                            const match = text.match(/<pc>([^<]+)<\/pc>/i) || text.match(/PC="([^"]+)"/i);
+
+                            if (match && match[1]) {
+                                const ref = match[1].trim();
+                                console.log("✅ Referencia encontrada en mapa:", ref);
+
+                                // Rellenar buscador e iniciar análisis automático
+                                const input = document.getElementById('ref-input');
+                                if (input) {
+                                    input.value = ref;
+                                    map.closePopup();
+                                    cargarReferencia(); // Lanza el proceso completo (geometría + urbanismo + afecciones)
+                                } else {
+                                    popup.setContent(`<div style="padding:10px;"><strong>RC:</strong> ${ref}<br><button onclick="window.cargarReferenciaClick('${ref}')" style="margin-top:5px; width:100%; cursor:pointer;">Cargar</button></div>`);
+                                }
+                            } else {
+                                // Fallback a HTML para mostrar la ficha tradicional si falla la extracción
+                                const urlHtml = url.replace('info_format=text/xml', 'info_format=text/html');
+                                fetch(`/api/v1/proxy?url=${encodeURIComponent(urlHtml)}`)
+                                    .then(r => r.text())
+                                    .then(html => {
+                                        popup.setContent(`<div style="max-inline-size:400px; max-block-size:300px; overflow:auto; font-size:12px;">${html}</div>`);
+                                    });
+                            }
                         })
                         .catch(e => {
-                            popup.setContent('<div style="color:red; padding:10px;">Error obteniendo información.</div>');
+                            popup.setContent('<div style="color:red; padding:10px;">Error al conectar con Catastro.</div>');
                         });
                 }
             }
         }
+
+        // Función auxiliar global para clics desde el popup
+        window.cargarReferenciaClick = function (ref) {
+            const input = document.getElementById('ref-input');
+            if (input) input.value = ref;
+            map.closePopup();
+            cargarReferencia();
+        };
     </script>
 </body>
+
 </html>

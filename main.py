@@ -803,10 +803,21 @@ async def get_referencia_geojson(ref: str):
         coords_poligono = None
         
         if gml_descargado:
-            # La clase crea un subdirectorio con el nombre de la referencia
-            gml_path = Path(cfg["rutas"]["outputs"]) / ref / f"{ref}_parcela.gml"
-            if gml_path.exists():
-                coords_poligono = downloader.extraer_coordenadas_gml(str(gml_path))
+            # Intentar encontrar el archivo en la carpeta de la referencia o en la raíz de outputs
+            posibles_rutas = [
+                Path(cfg["rutas"]["outputs"]) / ref / f"{ref}_parcela.gml",
+                Path(cfg["rutas"]["outputs"]) / f"{ref}_parcela.gml"
+            ]
+            
+            for p in posibles_rutas:
+                if p.exists():
+                    gml_path = p
+                    print(f"✅ GML encontrado en: {p}")
+                    coords_poligono = downloader.extraer_coordenadas_gml(str(gml_path))
+                    break
+            
+            if not coords_poligono:
+                print(f"⚠️ No se pudo extraer geometría de ninguna ruta: {[str(p) for p in posibles_rutas]}")
 
         if coords_poligono:
             if len(coords_poligono) > 0:
@@ -866,7 +877,11 @@ async def get_referencia_geojson(ref: str):
             # Sin GML: devolver error para que el frontend muestre mensaje claro
             raise HTTPException(status_code=404, detail=f"No hay geometría GML disponible para la referencia {ref}")
         
+    except HTTPException as he:
+        raise he
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 class LoteRequest(BaseModel):
