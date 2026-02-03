@@ -4,7 +4,7 @@ Módulo catastro4 - Wrapper para CatastroDownloader
 
 from referenciaspy.catastro_downloader import CatastroDownloader
 
-def procesar_y_comprimir(referencia: str, directorio_base: str = None):
+def procesar_y_comprimir(referencia: str, directorio_base: str = None, buffer_metros: int = None):
     """
     Procesa y comprime los datos de una referencia catastral.
     Wrapper para mantener compatibilidad con el código existente.
@@ -15,7 +15,7 @@ def procesar_y_comprimir(referencia: str, directorio_base: str = None):
         downloader = CatastroDownloader(output_dir=output_dir)
         
         # Descargar toda la documentación
-        resultados = downloader.descargar_todo(referencia)
+        resultados = downloader.descargar_todo(referencia, buffer_metros=buffer_metros)
         
         # Crear ZIP con los resultados
         import zipfile

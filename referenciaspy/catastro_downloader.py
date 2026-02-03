@@ -707,7 +707,7 @@ class CatastroDownloader:
     
     # --------- resto de métodos: HTML, descargas, etc. ---------
 
-    def descargar_plano_ortofoto(self, referencia):
+    def descargar_plano_ortofoto(self, referencia, buffer_metros=None):
         """Descarga el plano con ortofoto usando servicios WMS y guarda geolocalización."""
         ref = self.limpiar_referencia(referencia)
 
@@ -721,7 +721,59 @@ class CatastroDownloader:
         lon = coords["lon"]
         lat = coords["lat"]
 
-        bbox_wgs84 = self.calcular_bbox(lon, lat, buffer_metros=200)
+        # --- BBOX ADAPTATIVO ---
+        bbox_wgs84 = None
+        
+        # 1. Si se especifica buffer manual, tiene prioridad
+        if buffer_metros and int(buffer_metros) > 0:
+            bbox_wgs84 = self.calcular_bbox(lon, lat, buffer_metros=int(buffer_metros))
+            print(f"  ℹ Usando BBOX manual ({buffer_metros}m)")
+        
+        # 2. Intentar usar la geometría del GML para ajustar el encuadre (si no hay manual)
+        if not bbox_wgs84:
+            gml_path = self.output_dir / f"{ref}_parcela.gml"
+            if gml_path.exists():
+            try:
+                coords_gml = self.extraer_coordenadas_gml(gml_path)
+                if coords_gml:
+                    lats = []
+                    lons = []
+                    for v1, v2 in coords_gml:
+                        # Heurística: España Lat 36-44, Lon -10-5
+                        if 35 < v1 < 45: 
+                            lats.append(v1)
+                            lons.append(v2)
+                        else: 
+                            lons.append(v1)
+                            lats.append(v2)
+                    
+                    if lats and lons:
+                        min_lat, max_lat = min(lats), max(lats)
+                        min_lon, max_lon = min(lons), max(lons)
+                        
+                        # Calcular centro y dimensiones
+                        center_lat = (min_lat + max_lat) / 2
+                        center_lon = (min_lon + max_lon) / 2
+                        
+                        height = max_lat - min_lat
+                        width = max_lon - min_lon
+                        
+                        # Ajustar aspecto cuadrado (aprox España: 1 deg lat ~ 111km, 1 deg lon ~ 85km -> ratio ~ 0.76)
+                        max_dim = max(height, width * 0.76)
+                        margin = max(max_dim * 0.3, 0.002) # Margen 30% o mínimo ~200m
+                        
+                        span_lat = max_dim + (margin * 2)
+                        span_lon = span_lat / 0.76
+                        
+                        bbox_wgs84 = f"{center_lon - span_lon/2},{center_lat - span_lat/2},{center_lon + span_lon/2},{center_lat + span_lat/2}"
+                        print(f"  ✓ BBOX adaptado a la parcela")
+            except Exception as e:
+                print(f"  ⚠ Error calculando BBOX adaptativo: {e}")
+
+        if not bbox_wgs84:
+            bbox_wgs84 = self.calcular_bbox(lon, lat, buffer_metros=200)
+            print(f"  ℹ Usando BBOX fijo (200m)")
+
         coords_list = bbox_wgs84.split(",")
         # BBOX para WMS 1.3.0 (CRS=EPSG:4326) es Lat, Lon (miny, minx, maxy, maxx)
         bbox_wms13 = (
@@ -1151,7 +1203,7 @@ class CatastroDownloader:
             print(f"  ⚠ Error generando KML: {e}")
             return False
 
-    def descargar_todo(self, referencia):
+    def descargar_todo(self, referencia, buffer_metros=None):
         """Descarga todos los documentos para una referencia catastral."""
         print(f"\n{'='*60}")
         print(f"Procesando referencia: {referencia}")
@@ -1171,7 +1223,7 @@ class CatastroDownloader:
 
         resultados = {
             'consulta_descriptiva': self.descargar_consulta_pdf(ref),
-            'plano_ortofoto': self.descargar_plano_ortofoto(ref), # Esto llama a superponer_contorno_parcela
+            'plano_ortofoto': self.descargar_plano_ortofoto(ref, buffer_metros=buffer_metros), # Esto llama a superponer_contorno_parcela
             'parcela_gml': parcela_gml_descargado, 
             'edificio_gml': self.descargar_edificio_gml(ref),
             'kml': self.generar_kml(ref),

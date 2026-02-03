@@ -889,6 +889,7 @@ class LoteRequest(BaseModel):
 
 class ProcesoRequest(BaseModel):
     referencia: str
+    buffer_metros: Optional[int] = None
 
 @app.post("/api/v1/procesar-completo")
 async def procesar_completo(request: ProcesoRequest):
@@ -904,7 +905,8 @@ async def procesar_completo(request: ProcesoRequest):
         # Usar la función de catastro4.py
         zip_path, resultados = procesar_y_comprimir(
             referencia=ref,
-            directorio_base=cfg["rutas"]["outputs"]
+            directorio_base=cfg["rutas"]["outputs"],
+            buffer_metros=request.buffer_metros
         )
         
         if zip_path and resultados.get('exitosa'):

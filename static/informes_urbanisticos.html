@@ -492,6 +492,16 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label for="buffer_mapa" class="form-label">Zoom / Buffer del mapa (metros):</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="buffer_mapa" placeholder="0 = Automático" min="0" step="10">
+                                    <span class="input-group-text">metros</span>
+                                </div>
+                                <div class="form-text">Radio en metros alrededor de la parcela. Dejar en 0 o vacío para ajuste automático.</div>
+                            </div>
+                        </div>
                     </div>
 
                     <h6><i class="fas fa-palette"></i> Personalización</h6>
@@ -1021,6 +1031,7 @@
                 // Cargar configuración de generación
                 document.getElementById('calidad_pdf').value = settings.calidad_pdf || 'media';
                 document.getElementById('formato_planos').value = settings.formato_planos || 'jpg';
+                document.getElementById('buffer_mapa').value = settings.buffer_mapa || '';
 
                 // Cargar personalización
                 document.getElementById('nombre_informe').value = settings.nombre_informe || 'Informe Urbanístico';
@@ -1042,6 +1053,7 @@
                 // Configuración de generación
                 calidad_pdf: document.getElementById('calidad_pdf').value,
                 formato_planos: document.getElementById('formato_planos').value,
+                buffer_mapa: document.getElementById('buffer_mapa').value,
 
                 // Personalización
                 nombre_informe: document.getElementById('nombre_informe').value
@@ -1071,6 +1083,7 @@
                 zip_metadatos: false,
                 calidad_pdf: 'media',
                 formato_planos: 'jpg',
+                buffer_mapa: '',
                 nombre_informe: 'Informe Urbanístico'
             };
 
@@ -1090,10 +1103,17 @@
                 // 1. PRIMERO: Procesamiento completo de Catastro (como en catastro_fin.html)
                 showProgress('Descargando documentación catastral...', 20);
                 
+                // Obtener configuración de buffer
+                const settings = getSettings();
+                const buffer = settings.buffer_mapa ? parseInt(settings.buffer_mapa) : 0;
+
                 const catastroResponse = await fetch('/api/v1/procesar-completo', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ referencia: searchTerm })
+                    body: JSON.stringify({ 
+                        referencia: searchTerm,
+                        buffer_metros: buffer
+                    })
                 });
 
                 if (!catastroResponse.ok) {
