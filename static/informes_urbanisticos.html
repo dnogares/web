@@ -262,10 +262,27 @@
                             <button class="btn btn-info" type="button" id="toggleCatastroBtn">
                                 <i class="fas fa-map"></i> Activar Catastro
                             </button>
-                            <button class="btn btn-warning" type="button" id="settingsBtn">
+                            <button class="btn btn-secondary" type="button" id="settingsBtn">
                                 <i class="fas fa-cog"></i> Panel de Ajustes
                             </button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Búsqueda de Municipios -->
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <h5 class="mb-3">
+                            <i class="fas fa-city"></i> Descarga Municipal
+                        </h5>
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" id="municipio-input" 
+                                placeholder="Ej: Madrid (o vacío para ver todos)">
+                            <button class="btn btn-outline-primary" type="button" id="buscarMunicipioBtn">
+                                <i class="fas fa-search"></i> Buscar
+                            </button>
+                        </div>
+                        <div id="municipio-resultados" class="mt-2"></div>
                     </div>
                 </div>
 
@@ -538,30 +555,46 @@
         }
 
         function identificarMetadatosCatastro(latlng) {
+            console.log('Click en mapa - identificando metadatos catastro:', latlng);
+            
             // Consultar FeatureInfo de Catastro a través del proxy
             const catastroLayer = window.catastroLayer;
             
-            if (catastroLayer) {
-                const url = getWMSGetFeatureInfoUrl(catastroLayer, latlng);
-                if (url) {
-                    // Mostrar popup de carga
-                    const popup = L.popup()
-                        .setLatLng(latlng)
-                        .setContent('<div style="text-align:center; padding:10px;"><i class="fas fa-spinner fa-spin"></i> Consultando Catastro...</div>')
-                        .openOn(map);
+            if (!catastroLayer) {
+                console.error('No se encontró la capa de catastro');
+                return;
+            }
+            
+            console.log('Capa catastro encontrada:', catastroLayer);
+            
+            const url = getWMSGetFeatureInfoUrl(catastroLayer, latlng);
+            console.log('URL WMS GetFeatureInfo:', url);
+            
+            if (url) {
+                // Mostrar popup de carga
+                const popup = L.popup()
+                    .setLatLng(latlng)
+                    .setContent('<div style="text-align:center; padding:10px;"><i class="fas fa-spinner fa-spin"></i> Consultando Catastro...</div>')
+                    .openOn(map);
 
-                    // Usar el proxy para evitar CORS
-                    fetch(`/api/v1/proxy?url=${encodeURIComponent(url)}`)
-                        .then(r => r.text())
-                        .then(html => {
-                            // Insertar HTML de Catastro en un contenedor con scroll
-                            popup.setContent(`<div style="max-width:400px; max-height:300px; overflow:auto; font-size:12px;">${html}</div>`);
-                        })
-                        .catch(e => {
-                            console.error("Error GetFeatureInfo:", e);
-                            popup.setContent('<div style="color:red; padding:10px;">Error obteniendo información del catastro.</div>');
-                        });
-                }
+                // Usar el proxy para evitar CORS
+                console.log('Haciendo petición al proxy...');
+                fetch(`/api/v1/proxy?url=${encodeURIComponent(url)}`)
+                    .then(r => {
+                        console.log('Respuesta del proxy:', r.status);
+                        return r.text();
+                    })
+                    .then(html => {
+                        console.log('HTML recibido:', html.substring(0, 200) + '...');
+                        // Insertar HTML de Catastro en un contenedor con scroll
+                        popup.setContent(`<div style="max-width:400px; max-height:300px; overflow:auto; font-size:12px;">${html}</div>`);
+                    })
+                    .catch(e => {
+                        console.error("Error GetFeatureInfo:", e);
+                        popup.setContent('<div style="color:red; padding:10px;">Error obteniendo información del catastro: ' + e.message + '</div>');
+                    });
+            } else {
+                console.error('No se pudo construir la URL WMS');
             }
         }
 
@@ -672,6 +705,16 @@
             // Botón toggle catastro
             document.getElementById('toggleCatastroBtn').addEventListener('click', toggleCatastroLayer);
 
+            // Botón buscar municipio
+            document.getElementById('buscarMunicipioBtn').addEventListener('click', buscarMunicipio);
+
+            // Enter en campo de municipio
+            document.getElementById('municipio-input').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    buscarMunicipio();
+                }
+            });
+
             // Botón cancelar
             document.getElementById('cancelBtn').addEventListener('click', cancelOperation);
 
@@ -696,6 +739,41 @@
                 btn.classList.remove('btn-secondary');
                 btn.classList.add('btn-info');
                 btn.innerHTML = '<i class="fas fa-map"></i> Desactivar Catastro';
+            }
+        }
+
+        async function buscarMunicipio() {
+            const query = document.getElementById('municipio-input')?.value.trim() || '';
+            const resDiv = document.getElementById('municipio-resultados');
+
+            if (!resDiv) {
+                console.error('No se encontró el elemento municipio-resultados');
+                return;
+            }
+
+            resDiv.innerHTML = '<div style="text-align:center; color:#666;"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
+
+            try {
+                const res = await fetch(`/api/v1/buscar-municipio?q=${encodeURIComponent(query)}`);
+                const data = await res.json();
+
+                if (data.municipios && data.municipios.length > 0) {
+                    let html = '<div style="display:grid; gap:5px;">';
+                    data.municipios.forEach(m => {
+                        html += `
+                            <div style="padding:8px; background:#f8f9fa; border:1px solid #eee; border-radius:4px; cursor:pointer;" onclick="window.open('${m.url}', '_blank')">
+                                <strong>${m.nombre}</strong> (${m.codigo})<br>
+                                <span style="color:#3498db; font-size:0.8em;"><i class="fas fa-download"></i> Descargar ZIP INSPIRE</span>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    resDiv.innerHTML = html;
+                } else {
+                    resDiv.innerHTML = '<div style="color:#e74c3c; padding:5px;">No se encontraron municipios.</div>';
+                }
+            } catch (e) {
+                resDiv.innerHTML = `<div style="color:#e74c3c;">Error: ${e.message}</div>`;
             }
         }
 
