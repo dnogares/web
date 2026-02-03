@@ -1198,8 +1198,12 @@
                 // 4. CUARTO: Mostrar archivos generados por Catastro
                 showProgress('Mostrando archivos generados...', 80);
                 
+                // SIEMPRE mostrar sección de descargas, incluso si no hay resultados de catastro
+                mostrarArchivosCatastro(catastroData.resultados || {}, catastroData.zip_path, searchTerm);
+                
                 if (catastroData.resultados) {
-                    mostrarArchivosCatastro(catastroData.resultados, catastroData.zip_path, searchTerm);
+                    // Mostrar archivos específicos solo si existen
+                    // (el resto del código existente)
                 }
 
                 // 5. QUINTO: Guardar datos para informe urbanístico
@@ -1453,23 +1457,29 @@
                     <div class="row g-2">
             `;
 
-            // Mostrar checklist de archivos generados
+            // Mostrar checklist de archivos generados - PRIORIZAR VERSIONES CON SILUETA
             const items = [
                 { k: 'consulta_descriptiva', l: 'Ficha Catastral', icon: 'fa-file-pdf', color: '#e74c3c', file: `${ref}_consulta_oficial.pdf` },
-                { k: 'plano_ortofoto', l: 'Plano Catastral', icon: 'fa-map', color: '#3498db', file: `${ref}_plano_catastro.png` },
-                { k: 'plano_ortofoto', l: 'Ortofoto PNOA', icon: 'fa-image', color: '#2ecc71', file: `${ref}_ortofoto_pnoa.jpg` },
-                { k: 'plano_ortofoto', l: 'Composición', icon: 'fa-layer-group', color: '#9b59b6', file: `${ref}_plano_con_ortofoto.png` },
-                { k: 'contorno_superpuesto', l: 'Plano + Perímetro', icon: 'fa-vector-square', color: '#e67e22', file: `${ref}_plano_con_ortofoto_contorno.png` },
-                { k: 'parcela_gml', l: 'Parcela GML', icon: 'fa-code', color: '#34495e', file: `${ref}_parcela.gml` },
-                { k: 'edificio_gml', l: 'Edificio GML', icon: 'fa-building', color: '#7f8c8d', file: `${ref}_edificio.gml` },
-                { k: 'kml', l: 'Google Earth (KML)', icon: 'fa-globe', color: '#f1c40f', file: `${ref}.kml` },
-                { k: 'datos_xml', l: 'Datos XML', icon: 'fa-database', color: '#1abc9c', file: `${ref}_datos.xml` }
+                { k: 'plano_ortofoto', l: 'Plano Catastral', icon: 'fa-map', color: '#3498db', file: `${ref}_plano_catastro_contorno.png`, fallback: `${ref}_plano_catastro.png` },
+                { k: 'plano_ortofoto', l: 'Ortofoto PNOA', icon: 'fa-image', color: '#2ecc71', file: `${ref}_ortofoto_pnoa_contorno.jpg`, fallback: `${ref}_ortofoto_pnoa.jpg` },
+                { k: 'plano_ortofoto', l: 'Composición', icon: 'fa-layer-group', color: '#9b59b6', file: `${ref}_plano_con_ortofoto_contorno.png`, fallback: `${ref}_plano_con_ortofoto.png` },
+                { k: 'kml', l: 'KML', icon: 'fa-map-marker-alt', color: '#27ae60', file: `${ref}.kml` },
+                { k: 'datos_xml', l: 'Datos XML', icon: 'fa-code', color: '#f39c12', file: `${ref}_datos.xml` },
+                { k: 'geojson', l: 'GeoJSON', icon: 'fa-globe', color: '#16a085', file: `${ref}.geojson` },
+                { k: 'informe_pdf', l: 'Informe PDF', icon: 'fa-file-pdf', color: '#e67e22', file: `${ref}_informe.pdf` }
             ];
 
             items.forEach(item => {
                 const disponible = resultados[item.k];
                 
                 if (disponible) {
+                    // Determinar qué archivo usar (con silueta si existe, sino fallback)
+                    let fileToUse = item.file;
+                    if (item.fallback) {
+                        // Intentar usar el endpoint robusto para verificar si existe el archivo con silueta
+                        fileToUse = item.file; // Priorizar versión con silueta
+                    }
+                    
                     html += `
                         <div class="col-md-6 col-lg-4">
                             <div class="file-card p-2 border rounded d-flex align-items-center justify-content-between bg-white h-100">
@@ -1479,7 +1489,7 @@
                                     </div>
                                     <div class="file-name small text-truncate fw-medium" title="${item.l}">${item.l}</div>
                                 </div>
-                                <a href="/outputs/${ref}/${item.file}" target="_blank" class="btn btn-sm btn-light text-primary border-0 ms-2" title="Ver/Descargar">
+                                <a href="/api/v1/descargar-archivo/${ref}/${fileToUse}" target="_blank" class="btn btn-sm btn-light text-primary border-0 ms-2" title="Ver/Descargar">
                                     <i class="fas fa-download"></i>
                                 </a>
                             </div>

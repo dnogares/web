@@ -359,6 +359,8 @@ class CatastroDownloader:
             
             # 11. Superponer contornos en TODAS las imágenes
             if PILLOW_AVAILABLE and coords_poligono and bbox:
+                print(f"  🎨 Aplicando siluetas a todas las imágenes...")
+                
                 # Primero usar la función específica para imágenes conocidas
                 contorno_superpuesto = self.superponer_contorno_parcela(ref, bbox)
                 resultados['contorno_superpuesto'] = contorno_superpuesto
@@ -372,7 +374,16 @@ class CatastroDownloader:
                 else:
                     print(f"  ⚠ No se encontraron imágenes adicionales para procesar")
                 
-                # 12. Crear composiciones GML + capas de intersección
+                # 12. APLICAR SILUETAS A IMÁGENES ESPECÍFICAS PARA PDFs
+                try:
+                    self._aplicar_siluetas_imagenes_pdf(ref, coords_poligono, bbox)
+                    resultados['siluetas_pdf'] = True
+                    print(f"  ✅ Siluetas aplicadas a imágenes para PDFs")
+                except Exception as pdf_sil_e:
+                    print(f"  ⚠ Error aplicando siluetas a PDFs: {pdf_sil_e}")
+                    resultados['siluetas_pdf'] = False
+                
+                # 13. Crear composiciones GML + capas de intersección
                 try:
                     composiciones_gml = self.crear_composicion_gml_intersecciones(ref, bbox)
                     resultados['composiciones_gml'] = composiciones_gml
@@ -1100,6 +1111,74 @@ class CatastroDownloader:
                 print(f"    ⚠ Error procesando {img_path.name}: {e}")
         
         print(f"  ✅ Contornos superpuestos en {exitos}/{len(imagenes_encontradas)} imágenes")
+        return exitos > 0
+    
+    def _aplicar_siluetas_imagenes_pdf(self, ref, coords_poligono, bbox_wgs84):
+        """Aplica siluetas a imágenes específicas que se usan en PDFs"""
+        ref = self.limpiar_referencia(ref)
+        
+        # Imágenes específicas que deben tener silueta para PDFs
+        imagenes_pdf = [
+            f"{ref}_plano_catastro.png",
+            f"{ref}_ortofoto_pnoa.jpg", 
+            f"{ref}_plano_con_ortofoto.png",
+            f"{ref}_plano_con_ortofoto_contorno.png",
+            f"{ref}_mapa_satelite.jpg",
+            f"{ref}_mapa_calles.jpg"
+        ]
+        
+        exitos = 0
+        
+        for img_name in imagenes_pdf:
+            img_path = self.output_dir / img_name
+            
+            if img_path.exists():
+                try:
+                    # Solo aplicar si no tiene ya contorno
+                    if "_contorno" not in img_name:
+                        output_name = img_name.replace(".", "_contorno.")
+                        output_path = self.output_dir / output_name
+                        
+                        if not output_path.exists():
+                            # Aplicar silueta
+                            with Image.open(img_path) as img:
+                                width, height = img.size
+                                
+                                # Convertir coordenadas a píxeles
+                                coords_bbox = [float(x) for x in bbox_wgs84.split(",")]
+                                minx, miny, maxx, maxy = coords_bbox
+                                
+                                pixels = []
+                                for coord in coords_poligono:
+                                    for ring_coord in coord if isinstance(coord[0], (list, tuple)) else [coord]:
+                                        if self._es_latitud(ring_coord[0]):
+                                            lat, lon = ring_coord[0], ring_coord[1]
+                                        else:
+                                            lon, lat = ring_coord[0], ring_coord[1]
+                                        
+                                        x = int(((lon - minx) / (maxx - minx)) * width)
+                                        y = int(((maxy - lat) / (maxy - miny)) * height)
+                                        pixels.append((x, y))
+                                
+                                # Dibujar silueta
+                                if len(pixels) > 2:
+                                    overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+                                    draw = ImageDraw.Draw(overlay)
+                                    
+                                    # Línea principal (roja brillante)
+                                    draw.line(pixels + [pixels[0]], fill=(255, 0, 0), width=4)
+                                    # Línea secundaria (blanca) para contraste
+                                    draw.line(pixels + [pixels[0]], fill=(255, 255, 255), width=2)
+                                    
+                                    img_with_contour = Image.alpha_composite(img.convert('RGBA'), overlay)
+                                    img_with_contour.convert('RGB').save(output_path, quality=95)
+                                    
+                                    print(f"    ✓ Silueta aplicada a {img_name}")
+                                    exitos += 1
+                    
+                except Exception as e:
+                    print(f"    ⚠ Error aplicando silueta a {img_name}: {e}")
+        
         return exitos > 0
     
     def crear_composicion_gml_intersecciones(self, referencia, bbox_wgs84, capas_interseccion=None):
