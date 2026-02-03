@@ -410,12 +410,32 @@ class CatastroDownloader:
                  # Se asume lista de anillos [[(x,y)...], ...]
                  rings = pixels_or_rings
 
+            # 1. Dibujar líneas de contorno (exterior e interiores)
             for pixels in rings:
                 if len(pixels) > 2:
                     # Cerrar el polígono
                     if pixels[0] != pixels[-1]:
                         pixels = pixels + [pixels[0]]
                     draw.line(pixels, fill=color + (255,), width=width)
+            
+            # 2. Dibujar relleno con huecos (usando máscara)
+            if rings and len(rings[0]) > 2:
+                mask = Image.new('L', img.size, 0)
+                draw_mask = ImageDraw.Draw(mask)
+                
+                # Exterior (blanco = opaco)
+                ext = rings[0]
+                if ext[0] != ext[-1]: ext = ext + [ext[0]]
+                draw_mask.polygon(ext, fill=255)
+                
+                # Interiores (negro = transparente)
+                for ring in rings[1:]:
+                    if len(ring) > 2:
+                        inte = ring + [ring[0]] if ring[0] != ring[-1] else ring
+                        draw_mask.polygon(inte, fill=0)
+                
+                fill_layer = Image.new("RGBA", img.size, color + (40,))
+                overlay.paste(fill_layer, (0, 0), mask)
 
             # Combina la imagen original con la capa de contorno
             result = Image.alpha_composite(img, overlay).convert("RGB")
@@ -427,7 +447,7 @@ class CatastroDownloader:
             print(f"  ⚠ Error dibujando contorno: {e}")
             return False
 
-    def superponer_contorno_parcela(self, ref, bbox_wgs84):
+    def superponer_contorno_parcela(self, ref, bbox_wgs84, suffix=""):
         """Superpone el contorno de la parcela sobre plano, ortofoto y composición."""
         ref = self.limpiar_referencia(ref)
         
@@ -455,16 +475,16 @@ class CatastroDownloader:
 
         imagenes = [
             (
-                self.output_dir / f"{ref}_ortofoto_pnoa.jpg",
-                self.output_dir / f"{ref}_ortofoto_pnoa_contorno.jpg",
+                self.output_dir / f"{ref}_ortofoto_pnoa{suffix}.jpg",
+                self.output_dir / f"{ref}_ortofoto_pnoa{suffix}_contorno.jpg",
             ),
             (
-                self.output_dir / f"{ref}_plano_catastro.png",
-                self.output_dir / f"{ref}_plano_catastro_contorno.png",
+                self.output_dir / f"{ref}_plano_catastro{suffix}.png",
+                self.output_dir / f"{ref}_plano_catastro{suffix}_contorno.png",
             ),
             (
-                self.output_dir / f"{ref}_plano_con_ortofoto.png",
-                self.output_dir / f"{ref}_plano_con_ortofoto_contorno.png",
+                self.output_dir / f"{ref}_plano_con_ortofoto{suffix}.png",
+                self.output_dir / f"{ref}_plano_con_ortofoto{suffix}_contorno.png",
             ),
         ]
 
@@ -552,13 +572,28 @@ class CatastroDownloader:
                     width, height = img.size
                     
                     for parcel_rings in all_coords:
+                        pixel_rings = []
                         for ring in parcel_rings:
                             pixels = self.convertir_coordenadas_a_pixel(ring, bbox_wgs84, width, height)
                             if pixels and len(pixels) > 2:
                                  if pixels[0] != pixels[-1]:
                                     pixels.append(pixels[0])
-                                 draw.line(pixels, fill=(255, 0, 0, 255), width=3)
-                                 draw.polygon(pixels, fill=(255, 0, 0, 40))
+                                 pixel_rings.append(pixels)
+                        
+                        if pixel_rings:
+                            # Contornos
+                            for pixels in pixel_rings:
+                                draw.line(pixels, fill=(255, 0, 0, 255), width=3)
+                            
+                            # Relleno con huecos
+                            mask = Image.new('L', img.size, 0)
+                            draw_mask = ImageDraw.Draw(mask)
+                            draw_mask.polygon(pixel_rings[0], fill=255)
+                            for pixels in pixel_rings[1:]:
+                                draw_mask.polygon(pixels, fill=0)
+                            
+                            fill_layer = Image.new("RGBA", img.size, (255, 0, 0, 40))
+                            overlay.paste(fill_layer, (0, 0), mask)
 
                     result = Image.alpha_composite(img, overlay).convert("RGB")
                     result.save(output_path)
@@ -796,181 +831,214 @@ class CatastroDownloader:
             bbox_wgs84 = self.calcular_bbox(lon, lat, buffer_metros=200)
             print(f"  ℹ Usando BBOX fijo (200m)")
 
-        coords_list = bbox_wgs84.split(",")
-        # BBOX para WMS 1.3.0 (CRS=EPSG:4326) es Lat, Lon (miny, minx, maxy, maxx)
-        bbox_wms13 = (
-            f"{coords_list[1]},{coords_list[0]},{coords_list[3]},{coords_list[2]}"
-        )
+        # Definir escalas para generar múltiples vistas (1x, 2.5x, 5x)
+        scales = [
+            (1.0, ""),       # Original (Detalle)
+            (2.5, "_zoom2"), # Entorno cercano
+            (5.0, "_zoom3")  # Entorno lejano
+        ]
+        
+        # Parsear BBOX base
+        base_coords = [float(x) for x in bbox_wgs84.split(",")]
+        cx = (base_coords[0] + base_coords[2]) / 2
+        cy = (base_coords[1] + base_coords[3]) / 2
+        w = base_coords[2] - base_coords[0]
+        h = base_coords[3] - base_coords[1]
+        
+        success_main = False
 
-        print("  Generando mapa con ortofoto...")
+        for scale, suffix in scales:
+            # Calcular BBOX para esta escala
+            nw = w * scale
+            nh = h * scale
+            minx = cx - nw/2
+            maxx = cx + nw/2
+            miny = cy - nh/2
+            maxy = cy + nh/2
+            
+            current_bbox_wgs84 = f"{minx},{miny},{maxx},{maxy}"
+            # BBOX para WMS 1.3.0 (Lat, Lon)
+            current_bbox_wms13 = f"{miny},{minx},{maxy},{maxx}"
+            
+            print(f"  Generando mapa con ortofoto (Escala {scale}x)...")
 
-        # Usar HTTPS cuando sea posible
-        wms_url = "https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx"
+            # Usar HTTPS cuando sea posible
+            wms_url = "https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx"
 
-        params = {
-            "SERVICE": "WMS",
-            "VERSION": "1.1.1",
-            "REQUEST": "GetMap",
-            "LAYERS": "Catastro",
-            "STYLES": "",
-            "SRS": "EPSG:4326", # WMS 1.1.1 usa SRS, y el Catastro necesita Lon/Lat para BBOX
-            "BBOX": bbox_wgs84,
-            "WIDTH": "1600",
-            "HEIGHT": "1600",
-            "FORMAT": "image/png",
-            "TRANSPARENT": "FALSE",
-        }
+            params = {
+                "SERVICE": "WMS",
+                "VERSION": "1.1.1",
+                "REQUEST": "GetMap",
+                "LAYERS": "Catastro",
+                "STYLES": "",
+                "SRS": "EPSG:4326", # WMS 1.1.1 usa SRS, y el Catastro necesita Lon/Lat para BBOX
+                "BBOX": current_bbox_wgs84,
+                "WIDTH": "1600",
+                "HEIGHT": "1600",
+                "FORMAT": "image/png",
+                "TRANSPARENT": "FALSE",
+            }
 
-        try:
-            # Plano catastral
-            response_catastro = safe_get(
-                wms_url, params=params, timeout=60, max_retries=3
-            )
-
-            if (
-                response_catastro.status_code == 200
-                and len(response_catastro.content) > 1000
-            ):
-                filename_catastro = (
-                    self.output_dir / f"{ref}_plano_catastro.png"
-                )
-                with open(filename_catastro, "wb") as f:
-                    f.write(response_catastro.content)
-                print(f"  ✓ Plano catastral descargado: {filename_catastro}")
-            else:
-                print("  ⚠ Error descargando plano catastral")
-
-            ortofotos_descargadas = False
-
-            # PNOA
             try:
-                wms_pnoa_url = "https://www.ign.es/wms-inspire/pnoa-ma"
-                params_pnoa = {
-                    "SERVICE": "WMS",
-                    "VERSION": "1.3.0",
-                    "REQUEST": "GetMap",
-                    "LAYERS": "OI.OrthoimageCoverage",
-                    "STYLES": "",
-                    "CRS": "EPSG:4326", # WMS 1.3.0 usa CRS
-                    "BBOX": bbox_wms13, # BBOX para 1.3.0 (Lat, Lon)
-                    "WIDTH": "1600",
-                    "HEIGHT": "1600",
-                    "FORMAT": "image/jpeg",
-                }
-
-                response_pnoa = safe_get(
-                    wms_pnoa_url, params=params_pnoa, timeout=60, max_retries=3
+                # Plano catastral
+                response_catastro = safe_get(
+                    wms_url, params=params, timeout=60, max_retries=3
                 )
 
                 if (
-                    response_pnoa.status_code == 200
-                    and len(response_pnoa.content) > 5000
+                    response_catastro.status_code == 200
+                    and len(response_catastro.content) > 1000
                 ):
-                    filename_ortofoto = (
-                        self.output_dir / f"{ref}_ortofoto_pnoa.jpg"
+                    filename_catastro = (
+                        self.output_dir / f"{ref}_plano_catastro{suffix}.png"
                     )
-                    with open(filename_ortofoto, "wb") as f:
-                        f.write(response_pnoa.content)
-                    print(
-                        f"  ✓ Ortofoto PNOA descargada: {filename_ortofoto}"
-                    )
-                    ortofotos_descargadas = True
+                    with open(filename_catastro, "wb") as f:
+                        f.write(response_catastro.content)
+                    print(f"  ✓ Plano catastral descargado: {filename_catastro.name}")
+                else:
+                    print("  ⚠ Error descargando plano catastral")
 
-                    # Composición opcional
-                    if PILLOW_AVAILABLE and response_catastro.status_code == 200:
-                        try:
-                            # Volver a leer el contenido del plano catastral (si se descargó)
-                            if os.path.exists(filename_catastro):
-                                with open(filename_catastro, "rb") as f:
-                                    img_catastro = Image.open(BytesIO(f.read()))
-                            else:
-                                img_catastro = Image.open(
-                                    BytesIO(response_catastro.content)
-                                )
-                                
-                            img_ortofoto = Image.open(
-                                BytesIO(response_pnoa.content)
-                            )
+                ortofotos_descargadas = False
 
-                            img_ortofoto = img_ortofoto.convert("RGBA")
-                            img_catastro = img_catastro.convert("RGBA")
-
-                            # Asegurar mismo tamaño antes de mezclar
-                            if img_ortofoto.size != img_catastro.size:
-                                img_ortofoto = img_ortofoto.resize(img_catastro.size, Image.LANCZOS)
-
-                            # Simple alpha blend:
-                            resultado = Image.alpha_composite(img_ortofoto, img_catastro)
-
-                            filename_composicion = (
-                                self.output_dir / f"{ref}_plano_con_ortofoto.png"
-                            )
-                            resultado.save(filename_composicion, "PNG")
-                            print(
-                                f"  ✓ Composición creada: {filename_composicion}"
-                            )
-                        except Exception as e:
-                            print(
-                                f"  ⚠ No se pudo crear composición: {e}"
-                            )
-                    else:
-                        if not PILLOW_AVAILABLE:
-                            print(
-                                "  ⚠ Composición omitida (Pillow no instalado)"
-                            )
-
-            except Exception as e:
-                print(f"  ⚠ PNOA no disponible: {e}")
-
-            # Ortofoto Catastro como respaldo
-            if not ortofotos_descargadas:
+                # PNOA
                 try:
-                    wms_catastro_orto = wms_url
-                    params_orto = {
+                    wms_pnoa_url = "https://www.ign.es/wms-inspire/pnoa-ma"
+                    params_pnoa = {
                         "SERVICE": "WMS",
-                        "VERSION": "1.1.1",
+                        "VERSION": "1.3.0",
                         "REQUEST": "GetMap",
-                        "LAYERS": "ORTOFOTOS",
+                        "LAYERS": "OI.OrthoimageCoverage",
                         "STYLES": "",
-                        "SRS": "EPSG:4326",
-                        "BBOX": bbox_wgs84,
+                        "CRS": "EPSG:4326", # WMS 1.3.0 usa CRS
+                        "BBOX": current_bbox_wms13, # BBOX para 1.3.0 (Lat, Lon)
                         "WIDTH": "1600",
                         "HEIGHT": "1600",
                         "FORMAT": "image/jpeg",
-                        "TRANSPARENT": "FALSE",
                     }
 
-                    response_orto = safe_get(
-                        wms_catastro_orto, params=params_orto, timeout=60, max_retries=3
+                    response_pnoa = safe_get(
+                        wms_pnoa_url, params=params_pnoa, timeout=60, max_retries=3
                     )
 
                     if (
-                        response_orto.status_code == 200
-                        and len(response_orto.content) > 5000
+                        response_pnoa.status_code == 200
+                        and len(response_pnoa.content) > 5000
                     ):
                         filename_ortofoto = (
-                            self.output_dir / f"{ref}_ortofoto_catastro.jpg"
+                            self.output_dir / f"{ref}_ortofoto_pnoa{suffix}.jpg"
                         )
                         with open(filename_ortofoto, "wb") as f:
-                            f.write(response_orto.content)
+                            f.write(response_pnoa.content)
                         print(
-                            f"  ✓ Ortofoto Catastro descargada: {filename_ortofoto}"
+                            f"  ✓ Ortofoto PNOA descargada: {filename_ortofoto.name}"
                         )
                         ortofotos_descargadas = True
-                except Exception as e:
-                    print(f"  ⚠ Ortofoto Catastro no disponible: {e}")
 
-            if not ortofotos_descargadas:
-                print("  ⚠ No se pudieron descargar ortofotos automáticamente")
-                print(
-                    f"  📍 Google Maps: https://www.google.com/maps/search/?api=1&query={lat},{lon}"
-                )
+                        # Composición opcional
+                        if PILLOW_AVAILABLE and response_catastro.status_code == 200:
+                            try:
+                                # Volver a leer el contenido del plano catastral (si se descargó)
+                                if os.path.exists(filename_catastro):
+                                    with open(filename_catastro, "rb") as f:
+                                        img_catastro = Image.open(BytesIO(f.read()))
+                                else:
+                                    img_catastro = Image.open(
+                                        BytesIO(response_catastro.content)
+                                    )
+                                    
+                                img_ortofoto = Image.open(
+                                    BytesIO(response_pnoa.content)
+                                )
+
+                                img_ortofoto = img_ortofoto.convert("RGBA")
+                                img_catastro = img_catastro.convert("RGBA")
+
+                                # Asegurar mismo tamaño antes de mezclar
+                                if img_ortofoto.size != img_catastro.size:
+                                    img_ortofoto = img_ortofoto.resize(img_catastro.size, Image.LANCZOS)
+
+                                # Simple alpha blend:
+                                resultado = Image.alpha_composite(img_ortofoto, img_catastro)
+
+                                filename_composicion = (
+                                    self.output_dir / f"{ref}_plano_con_ortofoto{suffix}.png"
+                                )
+                                resultado.save(filename_composicion, "PNG")
+                                print(
+                                    f"  ✓ Composición creada: {filename_composicion.name}"
+                                )
+                            except Exception as e:
+                                print(
+                                    f"  ⚠ No se pudo crear composición: {e}"
+                                )
+                        else:
+                            if not PILLOW_AVAILABLE:
+                                print(
+                                    "  ⚠ Composición omitida (Pillow no instalado)"
+                                )
+
+                except Exception as e:
+                    print(f"  ⚠ PNOA no disponible: {e}")
+
+                # Ortofoto Catastro como respaldo
+                if not ortofotos_descargadas:
+                    try:
+                        wms_catastro_orto = wms_url
+                        params_orto = {
+                            "SERVICE": "WMS",
+                            "VERSION": "1.1.1",
+                            "REQUEST": "GetMap",
+                            "LAYERS": "ORTOFOTOS",
+                            "STYLES": "",
+                            "SRS": "EPSG:4326",
+                            "BBOX": current_bbox_wgs84,
+                            "WIDTH": "1600",
+                            "HEIGHT": "1600",
+                            "FORMAT": "image/jpeg",
+                            "TRANSPARENT": "FALSE",
+                        }
+
+                        response_orto = safe_get(
+                            wms_catastro_orto, params=params_orto, timeout=60, max_retries=3
+                        )
+
+                        if (
+                            response_orto.status_code == 200
+                            and len(response_orto.content) > 5000
+                        ):
+                            filename_ortofoto = (
+                                self.output_dir / f"{ref}_ortofoto_catastro{suffix}.jpg"
+                            )
+                            with open(filename_ortofoto, "wb") as f:
+                                f.write(response_orto.content)
+                            print(
+                                f"  ✓ Ortofoto Catastro descargada: {filename_ortofoto.name}"
+                            )
+                            ortofotos_descargadas = True
+                    except Exception as e:
+                        print(f"  ⚠ Ortofoto Catastro no disponible: {e}")
+
+                if not ortofotos_descargadas:
+                    print("  ⚠ No se pudieron descargar ortofotos automáticamente")
+                    if scale == 1.0:
+                        print(
+                            f"  📍 Google Maps: https://www.google.com/maps/search/?api=1&query={lat},{lon}"
+                        )
+
+                # DIBUJAR CONTORNO
+                self.superponer_contorno_parcela(ref, current_bbox_wgs84, suffix=suffix)
+                
+                if scale == 1.0:
+                    success_main = True
+
+            except Exception as e:
+                print(f"  ✗ Error descargando plano con ortofoto (Escala {scale}x): {e}")
 
             # Geolocalización
             geo_info = {
                 "referencia": ref,
                 "coordenadas": coords,
-                "bbox": bbox_wgs84,
+                "bbox": current_bbox_wgs84,
                 "url_visor_catastro": (
                     "https://www1.sedecatastro.gob.es/Cartografia/"
                     f"mapa.aspx?refcat={ref}"
@@ -982,19 +1050,13 @@ class CatastroDownloader:
                 ),
             }
 
-            filename_geo = self.output_dir / f"{ref}_geolocalizacion.json"
-            with open(filename_geo, "w", encoding="utf-8") as f:
-                json.dump(geo_info, f, indent=2, ensure_ascii=False)
-            print(f"  ✓ Información de geolocalización guardada: {filename_geo}")
+            if scale == 1.0:
+                filename_geo = self.output_dir / f"{ref}_geolocalizacion.json"
+                with open(filename_geo, "w", encoding="utf-8") as f:
+                    json.dump(geo_info, f, indent=2, ensure_ascii=False)
+                print(f"  ✓ Información de geolocalización guardada: {filename_geo}")
 
-            # DIBUJAR CONTORNO
-            self.superponer_contorno_parcela(ref, bbox_wgs84)
-
-            return True
-
-        except Exception as e:
-            print(f"  ✗ Error descargando plano con ortofoto: {e}")
-            return False
+        return success_main
 
     def descargar_consulta_pdf(self, referencia):
         """Descarga el PDF oficial de consulta descriptiva (versión antigua)"""
