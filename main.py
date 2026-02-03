@@ -1455,7 +1455,7 @@ async def analizar_afecciones(request: AfeccionesRequest):
 
 @app.post("/api/v1/procesar-completo")
 async def procesar_completo(request: ProcesoRequest):
-    """Procesa una referencia completa y genera ZIP"""
+    """Procesa una referencia completa y genera ZIP con siluetas en todas las imágenes"""
     try:
         if not CATASTRO_AVAILABLE:
             raise HTTPException(status_code=503, detail="Módulo catastro4 no disponible")
@@ -1463,11 +1463,50 @@ async def procesar_completo(request: ProcesoRequest):
         ref = request.referencia
         buffer = request.buffer_metros
         
+        # Procesar con siluetas garantizadas
         zip_path, resultados = procesar_y_comprimir(
             referencia=ref,
             directorio_base=cfg["rutas"]["outputs"],
             buffer_metros=buffer
         )
+        
+        # Verificar que se generaron siluetas y aplicar a todas las imágenes si es necesario
+        if CATASTRO_AVAILABLE:
+            try:
+                from referenciaspy.catastro_downloader import CatastroDownloader
+                downloader = CatastroDownloader(output_dir=cfg["rutas"]["outputs"])
+                
+                # Forzar aplicación de siluetas a TODAS las imágenes
+                ref_dir = Path(cfg["rutas"]["outputs"]) / ref
+                if ref_dir.exists():
+                    gml_file = ref_dir / f"{ref}_parcela.gml"
+                    if gml_file.exists():
+                        # Obtener BBOX para aplicar siluetas
+                        coords = downloader.extraer_coordenadas_gml(str(gml_file))
+                        if coords:
+                            # Calcular BBOX simple
+                            all_coords = [coord for ring in coords for coord in ring]
+                            lons = [coord[0] for coord in all_coords if not downloader._es_latitud(coord[0])]
+                            lats = [coord[0] for coord in all_coords if downloader._es_latitud(coord[0])]
+                            
+                            if lons and lats:
+                                bbox_wgs84 = f"{min(lons)},{min(lats)},{max(lons)},{max(lats)}"
+                                
+                                # Aplicar siluetas a todas las imágenes encontradas
+                                from src.core.catastro_engine import CatastroEngine
+                                engine = CatastroEngine(cfg["rutas"]["outputs"])
+                                siluetas_aplicadas = engine.superponer_contorno_en_todas_imagenes(ref, bbox_wgs84)
+                                
+                                if siluetas_aplicadas:
+                                    print(f"✅ Siluetas aplicadas automáticamente a todas las imágenes")
+                                    resultados['siluetas_completas'] = True
+                                else:
+                                    print(f"⚠ No se encontraron imágenes adicionales para siluetas")
+                                    resultados['siluetas_completas'] = False
+                
+            except Exception as silhouette_e:
+                print(f"⚠ Error aplicando siluetas automáticas: {silhouette_e}")
+                resultados['siluetas_completas'] = False
         
         zip_url = f"/outputs/{ref}/{os.path.basename(zip_path)}" if zip_path else ""
         return {"status": "success", "zip_path": zip_url, "resultados": resultados}
@@ -1475,7 +1514,72 @@ async def procesar_completo(request: ProcesoRequest):
         return {"status": "error", "message": str(e)}
 
 
-@app.post("/api/analizar-avanzado")
+@app.post("/api/v1/generar-composiciones-gml")
+async def generar_composiciones_gml(request: ProcesoRequest):
+    """Genera composiciones del GML catastral con capas de intersección"""
+    try:
+        if not CATASTRO_AVAILABLE:
+            raise HTTPException(status_code=503, detail="Módulo catastro4 no disponible")
+            
+        ref = request.referencia.strip()
+        
+        # Verificar que existe el GML
+        outputs_dir = cfg["rutas"]["outputs"]
+        gml_path = Path(outputs_dir) / ref / f"{ref}_parcela.gml"
+        
+        if not gml_path.exists():
+            raise HTTPException(status_code=404, detail="GML catastral no encontrado")
+        
+        # Obtener coordenadas y BBOX
+        downloader = CatastroDownloader(output_dir=outputs_dir)
+        coords = downloader.extraer_coordenadas_gml(str(gml_path))
+        
+        if not coords:
+            raise HTTPException(status_code=422, detail="No se pudieron extraer coordenadas del GML")
+        
+        # Calcular BBOX
+        all_coords = [coord for ring in coords for coord in ring]
+        lons = [coord[0] for coord in all_coords if not downloader._es_latitud(coord[0])]
+        lats = [coord[0] for coord in all_coords if downloader._es_latitud(coord[0])]
+        
+        if not lons or not lats:
+            raise HTTPException(status_code=422, detail="No se pudieron calcular coordenadas válidas")
+        
+        bbox_wgs84 = f"{min(lons)},{min(lats)},{max(lons)},{max(lats)}"
+        
+        # Generar composiciones
+        from src.core.catastro_engine import CatastroEngine
+        engine = CatastroEngine(outputs_dir)
+        
+        composiciones_generadas = engine.crear_composicion_gml_intersecciones(ref, bbox_wgs84)
+        
+        # Listar composiciones generadas
+        composiciones = []
+        ref_dir = Path(outputs_dir) / ref
+        
+        for comp_file in ref_dir.glob(f"{ref}_composicion_gml_*.png"):
+            comp_url = f"/outputs/{ref}/{comp_file.name}"
+            composiciones.append({
+                "nombre": comp_file.name,
+                "url": comp_url,
+                "tipo": "composicion_gml_interseccion"
+            })
+        
+        return {
+            "status": "success", 
+            "referencia": ref,
+            "composiciones_generadas": composiciones_generadas,
+            "bbox": bbox_wgs84,
+            "composiciones": composiciones,
+            "total_composiciones": len(composiciones)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {"status": "error", "message": f"Error generando composiciones: {str(e)}"}
+
+@app.post("/api/v1/composicion-multiple")
 async def analizar_avanzado(request: ProcesoRequest):
     """
     Endpoint unificado premium que realiza análisis urbanístico y de afecciones.

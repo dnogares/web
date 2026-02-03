@@ -357,12 +357,36 @@ class CatastroDownloader:
                     print(f"  ⚠ Error generando informe PDF: {e}")
                     resultados['informe_pdf'] = False
             
-            # 11. Superponer contornos
+            # 11. Superponer contornos en TODAS las imágenes
             if PILLOW_AVAILABLE and coords_poligono and bbox:
+                # Primero usar la función específica para imágenes conocidas
                 contorno_superpuesto = self.superponer_contorno_parcela(ref, bbox)
                 resultados['contorno_superpuesto'] = contorno_superpuesto
+                
+                # Luego aplicar a TODAS las imágenes encontradas
+                contorno_completo = self.superponer_contorno_en_todas_imagenes(ref, bbox)
+                resultados['contorno_completo'] = contorno_completo
+                
+                if contorno_completo:
+                    print(f"  ✅ Siluetas aplicadas a todas las imágenes disponibles")
+                else:
+                    print(f"  ⚠ No se encontraron imágenes adicionales para procesar")
+                
+                # 12. Crear composiciones GML + capas de intersección
+                try:
+                    composiciones_gml = self.crear_composicion_gml_intersecciones(ref, bbox)
+                    resultados['composiciones_gml'] = composiciones_gml
+                    
+                    if composiciones_gml:
+                        print(f"  ✅ Composiciones GML + intersecciones generadas")
+                    else:
+                        print(f"  ⚠ No se generaron composiciones GML")
+                        
+                except Exception as comp_e:
+                    print(f"  ⚠ Error generando composiciones GML: {comp_e}")
+                    resultados['composiciones_gml'] = False
             
-            # 12. Crear ZIP si se solicita
+            # 13. Crear ZIP si se solicita
             if crear_zip:
                 zip_path = self.crear_zip_referencia(ref, str(old_dir))
                 resultados['zip_generado'] = zip_path is not None
@@ -590,6 +614,42 @@ class CatastroDownloader:
                                 comp_file = self.output_dir / f"{ref}_plano_con_ortofoto.png"
                                 composicion.save(comp_file, "PNG")
                                 print(f"  ✓ Composición creada")
+                                
+                                # INMEDIATAMENTE aplicar silueta a la composición
+                                if coords_poligono and bbox_wgs84:
+                                    try:
+                                        # Convertir coordenadas a píxeles para la composición
+                                        coords_bbox = [float(x) for x in bbox_wgs84.split(",")]
+                                        minx, miny, maxx, maxy = coords_bbox
+                                        width, height = composicion.size
+                                        
+                                        pixels = []
+                                        for coord in coords_poligono:
+                                            if self._es_latitud(coord[0]):
+                                                lat, lon = coord[0], coord[1]
+                                            else:
+                                                lon, lat = coord[0], coord[1]
+                                            
+                                            x = int(((lon - minx) / (maxx - minx)) * width)
+                                            y = int(((maxy - lat) / (maxy - miny)) * height)
+                                            pixels.append((x, y))
+                                        
+                                        # Dibujar silueta en la composición
+                                        if len(pixels) > 2:
+                                            overlay = Image.new('RGBA', composicion.size, (0, 0, 0, 0))
+                                            draw = ImageDraw.Draw(overlay)
+                                            
+                                            # Línea principal (roja brillante)
+                                            draw.line(pixels + [pixels[0]], fill=(255, 0, 0), width=4)
+                                            # Línea secundaria (blanca) para contraste
+                                            draw.line(pixels + [pixels[0]], fill=(255, 255, 255), width=2)
+                                            
+                                            composicion_con_contorno = Image.alpha_composite(composicion, overlay)
+                                            comp_contorno_file = self.output_dir / f"{ref}_plano_con_ortofoto_contorno.png"
+                                            composicion_con_contorno.convert('RGB').save(comp_contorno_file, quality=95)
+                                            print(f"  ✓ Silueta aplicada a composición")
+                                    except Exception as contour_e:
+                                        print(f"  ⚠ Error aplicando silueta a composición: {contour_e}")
                     
                     except Exception as e:
                         print(f"  ⚠ Error creando composición: {e}")
@@ -865,11 +925,39 @@ class CatastroDownloader:
         if not coords_poligono:
             return False
         
-        # Lista de imágenes a procesar
+        # Lista de imágenes a procesar - AMPLIADA para incluir TODOS los tipos posibles
         imagenes = [
+            # Imágenes principales
             (f"{ref}_plano_catastro.png", f"{ref}_plano_catastro_contorno.png"),
             (f"{ref}_plano_con_ortofoto.png", f"{ref}_plano_con_ortofoto_contorno.png"),
             (f"{ref}_ortofoto_pnoa.jpg", f"{ref}_ortofoto_pnoa_contorno.jpg"),
+            
+            # Imágenes de afecciones
+            (f"{ref}_afeccion_hidrografia.png", f"{ref}_afeccion_hidrografia_contorno.png"),
+            (f"{ref}_afeccion_planeamiento.png", f"{ref}_afeccion_planeamiento_contorno.png"),
+            (f"{ref}_afeccion_catastro_parcelas.png", f"{ref}_afeccion_catastro_parcelas_contorno.png"),
+            (f"{ref}_afeccion_otros.png", f"{ref}_afeccion_otros_contorno.png"),
+            
+            # Imágenes de análisis urbanístico
+            (f"{ref}_analisis_urbanistico.png", f"{ref}_analisis_urbanistico_contorno.png"),
+            (f"{ref}_uso_suelo.png", f"{ref}_uso_suelo_contorno.png"),
+            (f"{ref}_calificacion_urbanistica.png", f"{ref}_calificacion_urbanistica_contorno.png"),
+            
+            # Imágenes de escalas múltiples
+            (f"{ref}_plano_catastro_1.0.png", f"{ref}_plano_catastro_1.0_contorno.png"),
+            (f"{ref}_plano_catastro_0.5.png", f"{ref}_plano_catastro_0.5_contorno.png"),
+            (f"{ref}_plano_catastro_2.0.png", f"{ref}_plano_catastro_2.0_contorno.png"),
+            (f"{ref}_ortofoto_pnoa_1.0.jpg", f"{ref}_ortofoto_pnoa_1.0_contorno.jpg"),
+            (f"{ref}_ortofoto_pnoa_0.5.jpg", f"{ref}_ortofoto_pnoa_0.5_contorno.jpg"),
+            (f"{ref}_ortofoto_pnoa_2.0.jpg", f"{ref}_ortofoto_pnoa_2.0_contorno.jpg"),
+            
+            # Imágenes combinadas con buffer
+            (f"{ref}_plano_con_buffer.png", f"{ref}_plano_con_buffer_contorno.png"),
+            (f"{ref}_ortofoto_con_buffer.png", f"{ref}_ortofoto_con_buffer_contorno.png"),
+            
+            # Imágenes de informes y documentos
+            (f"{ref}_mapa_situacion.png", f"{ref}_mapa_situacion_contorno.png"),
+            (f"{ref}_mapa_emplazamiento.png", f"{ref}_mapa_emplazamiento_contorno.png"),
         ]
         
         exitos = 0
@@ -904,19 +992,367 @@ class CatastroDownloader:
                         
                         pixels.append((x, y))
                     
-                    # Dibujar contorno
+                    # Dibujar contorno con mejor visibilidad y estilo
                     if len(pixels) > 2:
-                        draw = ImageDraw.Draw(img)
-                        draw.line(pixels + [pixels[0]], fill=(255, 0, 0), width=3)
+                        # Crear capa de dibujo con transparencia
+                        overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+                        draw = ImageDraw.Draw(overlay)
                         
-                        # Guardar
-                        img.save(out_path)
+                        # Dibujar línea principal (roja brillante)
+                        draw.line(pixels + [pixels[0]], fill=(255, 0, 0), width=4)
+                        
+                        # Dibujar línea secundaria (blanca) para mejor contraste
+                        draw.line(pixels + [pixels[0]], fill=(255, 255, 255), width=2)
+                        
+                        # Combinar con imagen original
+                        img_with_contour = Image.alpha_composite(img.convert('RGBA'), overlay)
+                        
+                        # Guardar como PNG para mantener calidad
+                        final_output = out_path.with_suffix('.png') if out_path.suffix.lower() == '.jpg' else out_path
+                        img_with_contour.convert('RGB').save(final_output, quality=95)
+                        
+                        # Si el archivo original era JPG y creamos PNG, también guardar versión JPG
+                        if out_path.suffix.lower() == '.jpg' and final_output.suffix.lower() == '.png':
+                            img_with_contour.convert('RGB').save(out_path, quality=90)
+                        
                         exitos += 1
+                        print(f"  ✓ Contorno superpuesto en {img_in}")
             
             except Exception as e:
                 print(f"  ⚠ Error superponiendo {img_in}: {e}")
         
         return exitos > 0
+    
+    def superponer_contorno_en_todas_imagenes(self, referencia, bbox_wgs84):
+        """Superpone contorno en TODAS las imágenes encontradas en el directorio"""
+        ref = self.limpiar_referencia(referencia)
+        gml_file = self.output_dir / f"{ref}_parcela.gml"
+        
+        if not gml_file.exists():
+            return False
+        
+        coords_poligono = self.extraer_coordenadas_gml(str(gml_file))
+        if not coords_poligono:
+            return False
+        
+        # Buscar TODAS las imágenes en el directorio de la referencia
+        ref_dir = self.output_dir
+        image_extensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff']
+        imagenes_encontradas = []
+        
+        for ext in image_extensions:
+            for img_path in ref_dir.glob(f"{ref}*{ext}"):
+                # Ignorar archivos que ya tienen contorno
+                if '_contorno' not in img_path.name:
+                    # Generar nombre de archivo con contorno
+                    if ext.lower() in ['.jpg', '.jpeg']:
+                        out_name = img_path.stem + '_contorno.jpg'
+                    else:
+                        out_name = img_path.stem + '_contorno.png'
+                    out_path = img_path.parent / out_name
+                    imagenes_encontradas.append((img_path, out_path))
+        
+        if not imagenes_encontradas:
+            print(f"  ⚠ No se encontraron imágenes para procesar")
+            return False
+        
+        print(f"  📸 Procesando {len(imagenes_encontradas)} imágenes encontradas...")
+        
+        # Procesar cada imagen encontrada
+        exitos = 0
+        coords_bbox = [float(x) for x in bbox_wgs84.split(",")]
+        minx, miny, maxx, maxy = coords_bbox
+        
+        for img_path, out_path in imagenes_encontradas:
+            try:
+                with Image.open(img_path) as img:
+                    width, height = img.size
+                    
+                    # Convertir coordenadas a píxeles
+                    pixels = []
+                    for coord in coords_poligono:
+                        if self._es_latitud(coord[0]):
+                            lat, lon = coord[0], coord[1]
+                        else:
+                            lon, lat = coord[0], coord[1]
+                        
+                        x = int(((lon - minx) / (maxx - minx)) * width)
+                        y = int(((maxy - lat) / (maxy - miny)) * height)
+                        pixels.append((x, y))
+                    
+                    # Dibujar contorno con mejor visibilidad
+                    if len(pixels) > 2:
+                        overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+                        draw = ImageDraw.Draw(overlay)
+                        
+                        # Línea principal (roja brillante)
+                        draw.line(pixels + [pixels[0]], fill=(255, 0, 0), width=4)
+                        # Línea secundaria (blanca) para contraste
+                        draw.line(pixels + [pixels[0]], fill=(255, 255, 255), width=2)
+                        
+                        img_with_contour = Image.alpha_composite(img.convert('RGBA'), overlay)
+                        img_with_contour.convert('RGB').save(out_path, quality=95)
+                        
+                        exitos += 1
+                        print(f"    ✓ Contorno en {img_path.name}")
+            
+            except Exception as e:
+                print(f"    ⚠ Error procesando {img_path.name}: {e}")
+        
+        print(f"  ✅ Contornos superpuestos en {exitos}/{len(imagenes_encontradas)} imágenes")
+        return exitos > 0
+    
+    def crear_composicion_gml_intersecciones(self, referencia, bbox_wgs84, capas_interseccion=None):
+        """Crea composiciones visuales del GML con capas de intersección"""
+        if not PILLOW_AVAILABLE:
+            print("  ⚠ Pillow no disponible, no se pueden crear composiciones")
+            return False
+        
+        ref = self.limpiar_referencia(referencia)
+        gml_file = self.output_dir / f"{ref}_parcela.gml"
+        
+        if not gml_file.exists():
+            print("  ⚠ No existe GML de parcela")
+            return False
+        
+        coords_poligono = self.extraer_coordenadas_gml(str(gml_file))
+        if not coords_poligono:
+            print("  ⚠ No se pudieron extraer coordenadas del GML")
+            return False
+        
+        # Si no se proporcionan capas, buscar automáticamente
+        if capas_interseccion is None:
+            capas_interseccion = self._buscar_capas_interseccion(ref)
+        
+        if not capas_interseccion:
+            print("  ⚠ No se encontraron capas de intersección")
+            return False
+        
+        print(f"  🎨 Creando composiciones con {len(capas_interseccion)} capas...")
+        
+        exitos = 0
+        
+        # Para cada capa de intersección, crear una composición
+        for capa in capas_interseccion:
+            try:
+                # Buscar imagen de la capa de intersección
+                imagen_capa = self._buscar_imagen_capa(ref, capa)
+                if not imagen_capa:
+                    print(f"    ⚠ No se encontró imagen para la capa: {capa}")
+                    continue
+                
+                # Crear composición
+                resultado = self._crear_composicion_individual(
+                    ref, coords_poligono, bbox_wgs84, 
+                    imagen_capa, capa
+                )
+                
+                if resultado:
+                    exitos += 1
+                    print(f"    ✓ Composición creada: {capa}")
+                
+            except Exception as e:
+                print(f"    ⚠ Error creando composición con {capa}: {e}")
+        
+        print(f"  ✅ Composiciones creadas: {exitos}/{len(capas_interseccion)}")
+        return exitos > 0
+    
+    def _buscar_capas_interseccion(self, ref):
+        """Busca capas con las que la referencia tiene intersección"""
+        capas_encontradas = []
+        
+        # Buscar archivos de afecciones generados
+        ref_dir = self.output_dir
+        for archivo in ref_dir.glob(f"{ref}_afeccion_*.png"):
+            nombre_capa = archivo.stem.replace(f"{ref}_afeccion_", "")
+            capas_encontradas.append(nombre_capa)
+        
+        # Buscar en resultados de análisis
+        csv_resultados = ref_dir / f"{ref}_afecciones.csv"
+        if csv_resultados.exists():
+            try:
+                import pandas as pd
+                df = pd.read_csv(csv_resultados)
+                if 'capa' in df.columns:
+                    capas_csv = df['capa'].unique().tolist()
+                    capas_encontradas.extend(capas_csv)
+            except Exception as e:
+                print(f"    ⚠ Error leyendo CSV de afecciones: {e}")
+        
+        return list(set(capas_encontradas))  # Eliminar duplicados
+    
+    def _buscar_imagen_capa(self, ref, nombre_capa):
+        """Busca la imagen de una capa específica"""
+        ref_dir = self.output_dir
+        
+        # Posibles nombres de archivo
+        posibles_nombres = [
+            f"{ref}_afeccion_{nombre_capa}.png",
+            f"{ref}_afeccion_{nombre_capa}.jpg",
+            f"{ref}_{nombre_capa}.png",
+            f"{ref}_{nombre_capa}.jpg",
+            f"mapa_{nombre_capa}.jpg",
+            f"silueta_{nombre_capa}.jpg"
+        ]
+        
+        for nombre in posibles_nombres:
+            archivo = ref_dir / nombre
+            if archivo.exists():
+                return archivo
+        
+        return None
+    
+    def _crear_composicion_individual(self, ref, coords_poligono, bbox_wgs84, imagen_capa, nombre_capa):
+        """Crea una composición individual del GML con una capa específica con estilo mejorado"""
+        try:
+            # Abrir imagen de la capa
+            with Image.open(imagen_capa) as img_capa:
+                # Convertir a RGBA si es necesario
+                if img_capa.mode != 'RGBA':
+                    img_capa = img_capa.convert('RGBA')
+                
+                # Crear capa de dibujo para el GML
+                overlay = Image.new('RGBA', img_capa.size, (0, 0, 0, 0))
+                draw = ImageDraw.Draw(overlay)
+                
+                # Convertir coordenadas GML a píxeles
+                coords_bbox = [float(x) for x in bbox_wgs84.split(",")]
+                minx, miny, maxx, maxy = coords_bbox
+                width, height = img_capa.size
+                
+                pixels = []
+                for coord in coords_poligono:
+                    for ring_coord in coord if isinstance(coord[0], (list, tuple)) else [coord]:
+                        if self._es_latitud(ring_coord[0]):
+                            lat, lon = ring_coord[0], ring_coord[1]
+                        else:
+                            lon, lat = ring_coord[0], ring_coord[1]
+                        
+                        x = int(((lon - minx) / (maxx - minx)) * width)
+                        y = int(((maxy - lat) / (maxy - miny)) * height)
+                        pixels.append((x, y))
+                
+                # Dibujar GML con estilo destacado y profesional
+                if len(pixels) > 2:
+                    fill_pixels = pixels + [pixels[0]]
+                    
+                    # 1. Relleno semitransparente para mejor visibilidad
+                    try:
+                        # Crear máscara para relleno
+                        mask = Image.new('L', img_capa.size, 0)
+                        draw_mask = ImageDraw.Draw(mask)
+                        draw_mask.polygon(fill_pixels, fill=128)  # Semi-transparente
+                        
+                        # Capa de relleno rojo semitransparente
+                        fill_layer = Image.new('RGBA', img_capa.size, (255, 0, 0, 60))
+                        overlay.paste(fill_layer, (0, 0), mask)
+                    except:
+                        pass  # Si falla el relleno, continuar con bordes
+                    
+                    # 2. Borde múltiple para máxima visibilidad
+                    # Borde exterior blanco (más grueso)
+                    draw.line(fill_pixels, fill=(255, 255, 255), width=6)
+                    # Borde principal rojo brillante
+                    draw.line(fill_pixels, fill=(255, 0, 0), width=4)
+                    # Borde interior blanco para contraste
+                    draw.line(fill_pixels, fill=(255, 255, 255), width=2)
+                    # Borde central rojo oscuro
+                    draw.line(fill_pixels, fill=(200, 0, 0), width=1)
+                
+                # Añadir leyenda y título
+                try:
+                    from PIL import ImageFont
+                    # Intentar cargar fuente, si no disponible usar fuente por defecto
+                    try:
+                        font_title = ImageFont.truetype("arial.ttf", 24)
+                        font_legend = ImageFont.truetype("arial.ttf", 16)
+                    except:
+                        font_title = ImageFont.load_default()
+                        font_legend = ImageFont.load_default()
+                    
+                    # Crear capa para texto
+                    text_overlay = Image.new('RGBA', img_capa.size, (0, 0, 0, 0))
+                    text_draw = ImageDraw.Draw(text_overlay)
+                    
+                    # Título con fondo semitransparente
+                    title_text = f"Composición: {ref}"
+                    title_bbox = text_draw.textbbox((10, 10), title_text, font=font_title)
+                    title_width = title_bbox[2] - title_bbox[0]
+                    title_height = title_bbox[3] - title_bbox[1]
+                    
+                    # Fondo para título
+                    text_draw.rectangle([5, 5, title_width + 15, title_height + 15], 
+                                      fill=(0, 0, 0, 180))
+                    text_draw.text((10, 10), title_text, fill=(255, 255, 255), font=font_title)
+                    
+                    # Leyenda de la capa
+                    capa_text = f"Capa: {nombre_capa}"
+                    capa_bbox = text_draw.textbbox((10, 40), capa_text, font=font_legend)
+                    capa_width = capa_bbox[2] - capa_bbox[0]
+                    capa_height = capa_bbox[3] - capa_bbox[1]
+                    
+                    # Fondo para leyenda
+                    text_draw.rectangle([5, 35, capa_width + 15, 35 + capa_height + 10], 
+                                      fill=(0, 0, 0, 180))
+                    text_draw.text((10, 40), capa_text, fill=(255, 255, 100), font=font_legend)
+                    
+                    # Leyenda de la parcela
+                    parcela_text = "■ Parcela Catastral"
+                    parcela_bbox = text_draw.textbbox((10, 65), parcela_text, font=font_legend)
+                    
+                    # Fondo para leyenda de parcela
+                    text_draw.rectangle([5, 60, parcela_bbox[2] + 15, 60 + parcela_bbox[3] + 10], 
+                                      fill=(255, 0, 0, 180))
+                    text_draw.text((10, 65), parcela_text, fill=(255, 255, 255), font=font_legend)
+                    
+                    # Combinar con overlay principal
+                    overlay = Image.alpha_composite(overlay, text_overlay)
+                    
+                except Exception as text_e:
+                    print(f"      ⚠ Error añadiendo texto/leyenda: {text_e}")
+                
+                # Combinar imágenes
+                composicion = Image.alpha_composite(img_capa, overlay)
+                
+                # Guardar composición con alta calidad
+                safe_name = str(nombre_capa).replace("/", "_").replace("\\", "_").replace(":", "_")
+                comp_file = self.output_dir / f"{ref}_composicion_gml_{safe_name}.png"
+                composicion.convert('RGB').save(comp_file, quality=95)
+                
+                # También crear versión con marca de agua
+                try:
+                    watermark = Image.new('RGBA', composicion.size, (0, 0, 0, 0))
+                    wm_draw = ImageDraw.Draw(watermark)
+                    
+                    # Marca de agua sutil
+                    wm_text = "Generado por Catastro GIS"
+                    try:
+                        wm_font = ImageFont.truetype("arial.ttf", 12)
+                    except:
+                        wm_font = ImageFont.load_default()
+                    
+                    # Posición en la esquina inferior derecha
+                    wm_bbox = wm_draw.textbbox((0, 0), wm_text, font=wm_font)
+                    wm_width = wm_bbox[2] - wm_bbox[0]
+                    wm_height = wm_bbox[3] - wm_bbox[1]
+                    
+                    pos_x = composicion.width - wm_width - 10
+                    pos_y = composicion.height - wm_height - 10
+                    
+                    wm_draw.text((pos_x, pos_y), wm_text, fill=(255, 255, 255, 100), font=wm_font)
+                    
+                    # Aplicar marca de agua
+                    composicion_con_wm = Image.alpha_composite(composicion.convert('RGBA'), watermark)
+                    composicion_con_wm.convert('RGB').save(comp_file, quality=95)
+                    
+                except Exception as wm_e:
+                    print(f"      ⚠ Error añadiendo marca de agua: {wm_e}")
+                
+                return True
+                
+        except Exception as e:
+            print(f"      ⚠ Error en composición individual: {e}")
+            return False
     
     def crear_zip_referencia(self, referencia, directorio_base):
         """Crea ZIP con todos los archivos de la referencia"""

@@ -187,8 +187,8 @@ def procesar_parcelas(capas_locales, capas_wfs, capas_wms, crs_objetivo, config_
                                 })
                                 print(f"  ✓ Afección hallada: {capa_label} ({perc:.2f}%)")
                                 
-                                # Generar mapa para esta afección
-                                fig, ax = plt.subplots(figsize=(8, 6))
+                                # Generar mapa para esta afección con silueta mejorada
+                                fig, ax = plt.subplots(figsize=(10, 8))
                                 bbox = parcela.total_bounds
                                 cx_min, cy_min, cx_max, cy_max = bbox
                                 margin = 0.002
@@ -196,21 +196,114 @@ def procesar_parcelas(capas_locales, capas_wfs, capas_wms, crs_objetivo, config_
                                 ax.set_ylim(cy_min-margin, cy_max+margin)
                                 
                                 # Capa de afección completa para contexto
-                                interseccion_gdf.to_crs(epsg=4326).plot(ax=ax, color='orange', alpha=0.5, label=f'Afección ({tabla})')
-                                # Parcela analizada
-                                parcela.plot(ax=ax, facecolor="none", edgecolor="red", linewidth=2, label='Parcela')
-                                # Área exacta de intersección
+                                interseccion_gdf.to_crs(epsg=4326).plot(ax=ax, color='orange', alpha=0.4, label=f'Afección ({tabla})')
+                                
+                                # DIBUJAR SILUETA DE PARCELA CON MEJOR VISIBILIDAD
+                                # Primera capa: relleno semitransparente
+                                parcela.to_crs(epsg=4326).plot(ax=ax, facecolor='red', alpha=0.2, edgecolor='none')
+                                # Segunda capa: borde grueso y brillante
+                                parcela.to_crs(epsg=4326).plot(ax=ax, facecolor="none", edgecolor='red', linewidth=3, label='Parcela')
+                                # Tercera capa: borde blanco para contraste
+                                parcela.to_crs(epsg=4326).plot(ax=ax, facecolor="none", edgecolor='white', linewidth=1.5)
+                                
+                                # Área exacta de intersección resaltada
                                 area_interseccion_gdf.to_crs(epsg=4326).plot(ax=ax, color='purple', alpha=0.7, label='Área Afectada')
                                 
+                                # Añadir mapa base
                                 try:
                                     cx.add_basemap(ax, crs=4326, source=cx.providers.OpenStreetMap.Mapnik)
-                                except: pass
+                                except: 
+                                    pass
                                 
-                                ax.legend()
-                                ax.set_title(f"Afección: {capa_label} ({perc:.2f}%)")
-                                safe_name = str(capa_label).replace("/", "_").replace("\\", "_").replace(":", "_")
-                                plt.savefig(os.path.join(carpeta_resultados, f"mapa_{safe_name}.jpg"), bbox_inches='tight')
+                                # Configuración del gráfico
+                                ax.legend(loc='upper right', framealpha=0.9)
+                                ax.set_title(f"Afección: {capa_label} ({perc:.2f}%)", fontsize=14, fontweight='bold')
+                                ax.set_xlabel("Longitud", fontsize=12)
+                                ax.set_ylabel("Latitud", fontsize=12)
+                                ax.grid(True, alpha=0.3)
+                                
+                                # Guardar con alta calidad
+                                safe_name = str(capa_label).replace("/", "_").replace("\\", "_").replace(":", "_").replace(" ", "_")
+                                output_path = os.path.join(carpeta_resultados, f"mapa_afeccion_{safe_name}.jpg")
+                                plt.savefig(output_path, bbox_inches='tight', dpi=300, quality=95)
                                 plt.close()
+                                
+                                # También generar versión con silueta roja brillante
+                                fig2, ax2 = plt.subplots(figsize=(10, 8))
+                                ax2.set_xlim(cx_min-margin, cx_max+margin)
+                                ax2.set_ylim(cy_min-margin, cy_max+margin)
+                                
+                                # Mapa base
+                                try:
+                                    cx.add_basemap(ax2, crs=4326, source=cx.providers.OpenStreetMap.Mapnik)
+                                except: 
+                                    pass
+                                
+                                # Capa de afección
+                                interseccion_gdf.to_crs(epsg=4326).plot(ax2, color='orange', alpha=0.3)
+                                
+                                # SILUETA PRINCIPAL - Roja brillante con borde blanco
+                                parcela.to_crs(epsg=4326).plot(ax2, facecolor="none", edgecolor='white', linewidth=4)
+                                parcela.to_crs(epsg=4326).plot(ax2, facecolor="none", edgecolor='red', linewidth=2.5)
+                                
+                                ax2.set_title(f"Silueta Parcela - {capa_label}", fontsize=14, fontweight='bold')
+                                contour_path = os.path.join(carpeta_resultados, f"silueta_{safe_name}.jpg")
+                                plt.savefig(contour_path, bbox_inches='tight', dpi=300, quality=95)
+                                plt.close()
+                                
+                                print(f"    ✓ Mapas generados: {safe_name}")
+                                
+                                # Generar composición GML + capa de afección
+                                try:
+                                    from src.core.catastro_engine import CatastroEngine
+                                    from referenciaspy.catastro_downloader import CatastroDownloader
+                                    
+                                    # Obtener referencia del nombre del archivo
+                                    ref_parts = archivo_parcela.split('_')
+                                    ref = ref_parts[0] if ref_parts else "unknown"
+                                    
+                                    # Inicializar motor de composiciones
+                                    output_dir = os.path.dirname(carpeta_resultados)
+                                    engine = CatastroEngine(output_dir)
+                                    downloader = CatastroDownloader(output_dir)
+                                    
+                                    # Obtener BBOX del GML
+                                    gml_file = os.path.join(output_dir, ref, f"{ref}_parcela.gml")
+                                    if os.path.exists(gml_file):
+                                        coords = downloader.extraer_coordenadas_gml(gml_file)
+                                        if coords:
+                                            # Calcular BBOX
+                                            all_coords = [coord for ring in coords for coord in ring]
+                                            lons = [coord[0] for coord in all_coords if not downloader._es_latitud(coord[0])]
+                                            lats = [coord[0] for coord in all_coords if downloader._es_latitud(coord[0])]
+                                            
+                                            if lons and lats:
+                                                bbox_wgs84 = f"{min(lons)},{min(lats)},{max(lons)},{max(lats)}"
+                                                
+                                                # Crear composición individual
+                                                comp_result = engine.crear_composicion_gml_intersecciones(
+                                                    ref, bbox_wgs84, [safe_name]
+                                                )
+                                                
+                                                if comp_result:
+                                                    print(f"    ✓ Composición GML + {safe_name} generada")
+                                                
+                                                # También generar composición con la imagen original
+                                                original_img = os.path.join(carpeta_resultados, f"mapa_afeccion_{safe_name}.jpg")
+                                                if os.path.exists(original_img):
+                                                    # Copiar imagen al directorio principal para composición
+                                                    import shutil
+                                                    main_img = os.path.join(output_dir, ref, f"{ref}_afeccion_{safe_name}.jpg")
+                                                    os.makedirs(os.path.dirname(main_img), exist_ok=True)
+                                                    shutil.copy2(original_img, main_img)
+                                                    
+                                                    # Reintentar composición
+                                                    comp_result = engine.crear_composicion_gml_intersecciones(
+                                                        ref, bbox_wgs84, [safe_name]
+                                                    )
+                                                    
+                                except Exception as comp_e:
+                                    print(f"    ⚠ Error generando composición: {comp_e}")
 
                     except Exception as e:
                         print(f"Error procesando tabla {tabla}: {e}")
