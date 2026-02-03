@@ -76,6 +76,10 @@ class CatastroDownloader:
             return ref[:2], ref[2:5] # C=provincia (2), M=municipio (3)
         return "", ""
 
+    def obtener_coordenadas_unificado(self, referencia):
+        """Obtiene coordenadas unificadas usando el método estándar"""
+        return self.obtener_coordenadas(referencia)
+
     def obtener_coordenadas(self, referencia):
         """Obtiene las coordenadas de la parcela desde el servicio del Catastro."""
         ref = self.limpiar_referencia(referencia)
@@ -247,10 +251,10 @@ class CatastroDownloader:
         url = f"https://www1.sedecatastro.gob.es/CYCBienInmueble/SECImprimirCroquisYDatos.aspx?del={del_code}&mun={mun_code}&refcat={ref}"
         
         # Corrección de la ruta de guardado
-        filename = self.output_dir / f"{ref}_consulta_oficial.pdf"
+        filename = self.output_dir / f"{ref}_consulta_oficial.html"
         
         if os.path.exists(filename):
-            print(f"  ↩ PDF oficial ya existe")
+            print(f"  ↩ Ficha oficial ya existe")
             return True
         
         try:
@@ -265,19 +269,19 @@ class CatastroDownloader:
                     # Verificar el tipo de contenido para informar
                     content_type = response.headers.get("Content-Type", "")
                     if content_type.startswith("application/pdf"):
-                        print(f"  ✓ PDF oficial descargado: {filename}")
+                        print(f"  ✓ Ficha oficial descargada (PDF): {filename}")
                     else:
                         print(f"  ✓ Archivo oficial descargado (tipo: {content_type}): {filename}")
                     return True
                 else:
-                    print(f"  ✗ PDF oficial vacío (Status {response.status_code})")
+                    print(f"  ✗ Ficha oficial vacía (Status {response.status_code})")
                     return False
             else:
-                print(f"  ✗ PDF oficial falló (Status {response.status_code})")
+                print(f"  ✗ Ficha oficial falló (Status {response.status_code})")
                 return False
                     
         except Exception as e:
-            print(f"  ✗ Error descargando PDF: {e}")
+            print(f"  ✗ Error descargando Ficha: {e}")
             return False
 
     # --------- NUEVO: utilidades de geometría / contorno ---------
@@ -465,6 +469,100 @@ class CatastroDownloader:
                     print(f"  ⚠ Error procesando imagen {in_path}: {e}")
 
         return exito
+
+    def generar_mapa_lote(self, all_coords, output_path):
+        """Genera un mapa único con todas las parcelas del lote."""
+        if not all_coords:
+            return False
+            
+        try:
+            # Calcular BBOX global
+            min_lon, min_lat, max_lon, max_lat = 180, 90, -180, -90
+            
+            for coords in all_coords:
+                for v1, v2 in coords:
+                    # Heurística simple para Lat/Lon vs Lon/Lat (España Lat 36-44, Lon -10-5)
+                    lat, lon = v1, v2
+                    if 35 < v1 < 45: lat, lon = v1, v2
+                    else: lon, lat = v1, v2
+                    
+                    if lat < min_lat: min_lat = lat
+                    if lat > max_lat: max_lat = lat
+                    if lon < min_lon: min_lon = lon
+                    if lon > max_lon: max_lon = lon
+            
+            # Margen del 10%
+            lat_margin = max((max_lat - min_lat) * 0.1, 0.001)
+            lon_margin = max((max_lon - min_lon) * 0.1, 0.001)
+            
+            min_lat -= lat_margin
+            max_lat += lat_margin
+            min_lon -= lon_margin
+            max_lon += lon_margin
+            
+            bbox_wgs84 = f"{min_lon},{min_lat},{max_lon},{max_lat}"
+            # BBOX para WMS 1.3.0 (Lat, Lon)
+            bbox_wms13 = f"{min_lat},{min_lon},{max_lat},{max_lon}"
+            
+            wms_pnoa_url = "https://www.ign.es/wms-inspire/pnoa-ma"
+            params_pnoa = {
+                "SERVICE": "WMS",
+                "VERSION": "1.3.0",
+                "REQUEST": "GetMap",
+                "LAYERS": "OI.OrthoimageCoverage",
+                "STYLES": "",
+                "CRS": "EPSG:4326",
+                "BBOX": bbox_wms13,
+                "WIDTH": "2048",
+                "HEIGHT": "2048",
+                "FORMAT": "image/jpeg",
+            }
+            
+            response = safe_get(wms_pnoa_url, params=params_pnoa, timeout=60)
+            if response.status_code == 200:
+                with open(output_path, "wb") as f:
+                    f.write(response.content)
+                
+                if PILLOW_AVAILABLE:
+                    img = Image.open(output_path).convert("RGBA")
+                    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+                    draw = ImageDraw.Draw(overlay)
+                    
+                    width, height = img.size
+                    
+                    for coords in all_coords:
+                        pixels = self.convertir_coordenadas_a_pixel(coords, bbox_wgs84, width, height)
+                        if pixels and len(pixels) > 2:
+                             if pixels[0] != pixels[-1]:
+                                pixels.append(pixels[0])
+                             draw.line(pixels, fill=(255, 0, 0, 255), width=3)
+                             draw.polygon(pixels, fill=(255, 0, 0, 40))
+
+                    result = Image.alpha_composite(img, overlay).convert("RGB")
+                    result.save(output_path)
+                    print(f"  ✓ Mapa Global generado: {output_path}")
+                    return True
+            return False
+        except Exception as e:
+            print(f"  ⚠ Error generando mapa global: {e}")
+            return False
+
+    def generar_gml_global(self, datos_lote, output_path):
+        """Genera un archivo GML único con todas las parcelas."""
+        try:
+            gml_content = ['<?xml version="1.0" encoding="UTF-8"?>', '<gml:FeatureCollection xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:cp="http://inspire.ec.europa.eu/schemas/cp/4.0">', f'<gml:description>Lote de {len(datos_lote)} referencias</gml:description>', '<gml:boundedBy><gml:Envelope srsName="EPSG:4326"><gml:lowerCorner>-180 -90</gml:lowerCorner><gml:upperCorner>180 90</gml:upperCorner></gml:Envelope></gml:boundedBy>']
+            for item in datos_lote:
+                ref, coords = item.get('referencia'), item.get('geometria')
+                if not coords: continue
+                coord_str = " ".join([f"{c[0]} {c[1]}" for c in coords])
+                gml_content.append(f'<gml:featureMember><cp:CadastralParcel gml:id="{ref}"><cp:nationalCadastralReference>{ref}</cp:nationalCadastralReference><cp:geometry><gml:MultiSurface srsName="EPSG:4326"><gml:surfaceMember><gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>{coord_str}</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon></gml:surfaceMember></gml:MultiSurface></cp:geometry></cp:CadastralParcel></gml:featureMember>')
+            gml_content.append('</gml:FeatureCollection>')
+            with open(output_path, 'w', encoding='utf-8') as f: f.write("".join(gml_content))
+            print(f"  ✓ GML Global generado: {output_path}")
+            return True
+        except Exception as e:
+            print(f"  ⚠ Error generando GML Global: {e}")
+            return False
     
     # --------- resto de métodos: HTML, descargas, etc. ---------
 
@@ -763,6 +861,155 @@ class CatastroDownloader:
             print(f"  ✗ Error descargando edificio GML para {ref}: {e}")
             return False
 
+    def obtener_datos_alfanumericos(self, referencia):
+        """Obtiene datos alfanuméricos de la referencia catastral"""
+        ref = self.limpiar_referencia(referencia)
+        
+        # 1. Intentar parsear XML existente
+        datos = self.parsear_datos_xml(ref)
+        if datos:
+            return datos
+            
+        # 2. Si no existe, intentar descargar y luego parsear
+        print(f"  🔍 Descargando datos alfanuméricos para: {ref}")
+        if self.descargar_datos_xml(ref):
+            datos = self.parsear_datos_xml(ref)
+            if datos: return datos
+        
+        # 3. Fallback
+        return {
+            'domicilio': 'No disponible',
+            'municipio': 'No disponible', 
+            'provincia': 'No disponible',
+            'superficie_construida': 0,
+            'anio_construccion': 0,
+            'uso_principal': 'Desconocido'
+        }
+
+    def parsear_datos_xml(self, referencia):
+        """Parsea el archivo XML de datos para extraer información detallada."""
+        ref = self.limpiar_referencia(referencia)
+        
+        # Buscar el archivo en la raíz o en la subcarpeta de la referencia
+        filename = self.output_dir / f"{ref}_datos.xml"
+        if not filename.exists():
+            filename = self.output_dir / ref / f"{ref}_datos.xml"
+            
+        if not filename.exists():
+            return None
+
+        try:
+            tree = ET.parse(filename)
+            root = tree.getroot()
+            
+            datos = {}
+            
+            # Helper para buscar texto ignorando namespaces
+            def find_val(tags):
+                for elem in root.iter():
+                    if elem.tag.split('}')[-1] in tags:
+                        return elem.text
+                return None
+
+            datos['municipio'] = find_val(['nm']) or 'Desconocido'
+            datos['provincia'] = find_val(['np']) or 'Desconocida'
+            datos['domicilio'] = find_val(['ldt']) or f"{find_val(['tv']) or ''} {find_val(['nv']) or ''} {find_val(['pnp']) or ''}".strip()
+            datos['superficie_construida'] = float(find_val(['sfc']) or 0)
+            datos['superficie_parcela'] = float(find_val(['ss', 'ssu']) or 0) # Superficie suelo
+            datos['anio_construccion'] = int(find_val(['ant']) or 0)
+            datos['uso_principal'] = find_val(['luso']) or 'Residencial'
+            
+            return datos
+        except Exception as e:
+            print(f"  ⚠ Error parseando XML: {e}")
+            return None
+
+    def descargar_datos_xml(self, referencia):
+        """Descarga los datos alfanuméricos en XML."""
+        ref = self.limpiar_referencia(referencia)
+        filename = self.output_dir / f"{ref}_datos.xml"
+        
+        url = "http://ovc.catastro.meh.es/ovcservweb/OVCSWLocalizacionRC/OVCCallejero.asmx/Consulta_DNPRC"
+        params = {
+            "Provincia": "",
+            "Municipio": "",
+            "RC": ref
+        }
+        
+        try:
+            response = safe_get(url, params=params, timeout=30)
+            if response.status_code == 200:
+                with open(filename, 'wb') as f:
+                    f.write(response.content)
+                print(f"  ✓ Datos XML descargados: {filename}")
+                return True
+            return False
+        except Exception as e:
+            print(f"  ⚠ Error descargando XML: {e}")
+            return False
+
+    def generar_kml(self, referencia):
+        """Genera un archivo KML a partir de la geometría o coordenadas."""
+        ref = self.limpiar_referencia(referencia)
+        filename = self.output_dir / f"{ref}.kml"
+        
+        try:
+            # 1. Intentar usar geometría del GML
+            gml_path = self.output_dir / f"{ref}_parcela.gml"
+            coords = []
+            if gml_path.exists():
+                coords = self.extraer_coordenadas_gml(gml_path)
+            
+            # 2. Si no hay GML, usar centroide
+            if not coords:
+                center = self.obtener_coordenadas(ref)
+                if center:
+                    coords = [(center['lat'], center['lon'])]
+                    is_point = True
+                else:
+                    return False
+            else:
+                is_point = False
+
+            # Construir KML
+            kml = [
+                '<?xml version="1.0" encoding="UTF-8"?>',
+                '<kml xmlns="http://www.opengis.net/kml/2.2">',
+                '<Document>',
+                f'<name>Referencia {ref}</name>',
+                '<Style id="poly"><LineStyle><color>ff0000ff</color><width>2</width></LineStyle><PolyStyle><color>7f0000ff</color></PolyStyle></Style>',
+                '<Placemark>',
+                f'<name>{ref}</name>',
+                '<styleUrl>#poly</styleUrl>'
+            ]
+
+            if is_point:
+                lat, lon = coords[0]
+                kml.append(f'<Point><coordinates>{lon},{lat},0</coordinates></Point>')
+            else:
+                kml.append('<Polygon><outerBoundaryIs><LinearRing><coordinates>')
+                for p in coords:
+                    # Heurística simple para Lat/Lon vs Lon/Lat
+                    v1, v2 = p
+                    # España: Lat 36-44, Lon -10-5
+                    if 35 < v1 < 45: # v1 es Lat
+                        kml.append(f"{v2},{v1},0")
+                    else: # v1 es Lon
+                        kml.append(f"{v1},{v2},0")
+                kml.append('</coordinates></LinearRing></outerBoundaryIs></Polygon>')
+
+            kml.append('</Placemark></Document></kml>')
+            
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(''.join(kml))
+            
+            print(f"  ✓ KML generado: {filename}")
+            return True
+            
+        except Exception as e:
+            print(f"  ⚠ Error generando KML: {e}")
+            return False
+
     def descargar_todo(self, referencia):
         """Descarga todos los documentos para una referencia catastral."""
         print(f"\n{'='*60}")
@@ -786,6 +1033,8 @@ class CatastroDownloader:
             'plano_ortofoto': self.descargar_plano_ortofoto(ref), # Esto llama a superponer_contorno_parcela
             'parcela_gml': parcela_gml_descargado, 
             'edificio_gml': self.descargar_edificio_gml(ref),
+            'kml': self.generar_kml(ref),
+            'datos_xml': self.descargar_datos_xml(ref)
         }
 
         self.output_dir = old_dir # Se restaura el directorio de salida

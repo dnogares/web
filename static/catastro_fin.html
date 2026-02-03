@@ -716,8 +716,8 @@
         // --- INICIALIZACIÓN DEL MAPA ---
         var savedCenter = localStorage.getItem('visor_map_center');
         var savedZoom = localStorage.getItem('visor_map_zoom');
-        var initialCenter = savedCenter ? JSON.parse(savedCenter) : [40.4168, -3.7038];
-        var initialZoom = savedZoom ? parseInt(savedZoom) : 6;
+        var initialCenter = savedCenter ? JSON.parse(savedCenter) : [40.4168, -3.7038]; // Madrid
+        var initialZoom = savedZoom ? parseInt(savedZoom) : 8; // Zoom 8 = Vista más cercana de España
 
         var busquedaController = null;
         var ultimaReferencia = null;

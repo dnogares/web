@@ -1006,6 +1006,7 @@ async def procesar_lote(request: LoteRequest):
         resultados_individuales = []
         todas_geometrias = []
         xml_datos = []
+        lista_coords_para_mapa = []
         
         for i, ref in enumerate(referencias):
             print(f" [{i+1}/{len(referencias)}] Procesando referencia: {ref}")
@@ -1051,6 +1052,7 @@ async def procesar_lote(request: LoteRequest):
                                         'geometria': coords_poligono,
                                         'resultados': resultados
                                     })
+                                    lista_coords_para_mapa.append(coords_poligono)
                                     
                                     print(f" Geometría extraída para {ref}: {len(coords_poligono)} anillos")
                                 else:
@@ -1118,15 +1120,28 @@ async def procesar_lote(request: LoteRequest):
         with open(xml_path, 'w', encoding='utf-8') as f:
             f.write(xml_content)
         
-        # 3. Crear GeoJSON combinado para visualización
+        # 3. Crear GeoJSON combinado y GML Global
         geojson_combinado = crear_geojson_combinado(todas_geometrias)
         geojson_path = lote_dir / f"{lote_id}_geometrias_combinadas.geojson"
         with open(geojson_path, 'w', encoding='utf-8') as f:
             json.dump(geojson_combinado, f, ensure_ascii=False, indent=2)
         
+        # Generar GML Global y Mapa Global
+        downloader = CatastroDownloader(output_dir=str(lote_dir))
+        downloader.generar_gml_global(xml_datos, lote_dir / f"{lote_id}_global.gml")
+        
+        mapa_global_creado = False
+        if lista_coords_para_mapa:
+            if downloader.generar_mapa_lote(lista_coords_para_mapa, lote_dir / f"{lote_id}_mapa_global.jpg"):
+                mapa_global_creado = True
+
         # 4. Organizar carpetas del ZIP final
         zip_final_path = organizar_zip_lote(lote_dir, lote_id, referencias, resultados_individuales)
         
+        mapa_global_url = None
+        if mapa_global_creado:
+             mapa_global_url = f"/outputs/{lote_id}/Imagenes/{lote_id}_mapa_global.jpg".replace('\\', '/')
+
         return {
             "status": "success",
             "message": f"Lote procesado: {len(referencias)} referencias",
@@ -1134,7 +1149,8 @@ async def procesar_lote(request: LoteRequest):
             "zip_path": f"/outputs/{lote_id}/{lote_id}.zip".replace('\\', '/'),
             "geometrias_combinadas": len(todas_geometrias),
             "resultados": resultados_individuales,
-            "geojson_url": f"/outputs/{lote_id}/{lote_id}_geometrias_combinadas.geojson".replace('\\', '/')
+            "geojson_url": f"/outputs/{lote_id}/{lote_id}_geometrias_combinadas.geojson".replace('\\', '/'),
+            "mapa_global_url": mapa_global_url
         }
         
     except Exception as e:
@@ -1199,23 +1215,41 @@ def organizar_zip_lote(lote_dir, lote_id, referencias, resultados):
     import shutil
     
     # Crear estructura de carpetas
-    carpetas = {
-        'documentos': [],
-        'geometrias': [],
-        'imagenes': [],
-        'informes': [],
-        'individuales': []
+    dirs = {
+        'Documentacion': ['pdf', 'html', 'xml'],
+        'Imagenes': ['jpg', 'png'],
+        'Geometria': ['gml', 'kml', 'geojson'],
+        'Informes': ['csv', 'json']
     }
+    
+    for d in dirs:
+        (lote_dir / d).mkdir(exist_ok=True)
     
     # Mover archivos a carpetas correspondientes
     for ref in referencias:
         ref_dir = lote_dir / ref
         if ref_dir.exists():
-            # Mover a individuales
-            destino_individual = lote_dir / 'individuales' / ref
-            if destino_individual.exists():
-                shutil.rmtree(destino_individual)
-            shutil.move(str(ref_dir), str(destino_individual))
+            for f in ref_dir.iterdir():
+                if f.is_file():
+                    ext = f.suffix.lower().replace('.', '')
+                    for d, exts in dirs.items():
+                        if ext in exts:
+                            shutil.copy2(f, lote_dir / d / f.name)
+                            break
+            
+            # Limpiar carpeta individual
+            shutil.rmtree(ref_dir)
+
+    # Mover archivos globales
+    for f in lote_dir.glob(f"{lote_id}_*"):
+        if f.suffix.lower() == '.gml':
+            shutil.move(str(f), str(lote_dir / 'Geometria' / f.name))
+        elif f.suffix.lower() in ['.jpg', '.png']:
+            shutil.move(str(f), str(lote_dir / 'Imagenes' / f.name))
+        elif f.suffix.lower() == '.xml':
+            shutil.move(str(f), str(lote_dir / 'Documentacion' / f.name))
+        elif f.suffix.lower() == '.geojson':
+             shutil.move(str(f), str(lote_dir / 'Geometria' / f.name))
     
     # Crear ZIP final
     zip_path = lote_dir / f"{lote_id}.zip"
@@ -1431,31 +1465,49 @@ async def analizar_referencia(referencia: dict):
     """Analizar una referencia catastral completa con estructura de datos ampliada"""
     try:
         ref = referencia.get("referencia", "")
+        print(f"🔍 Analizando referencia: {ref}")
         
         if not ref:
             raise HTTPException(status_code=400, detail="Se requiere una referencia")
         
         if not CATASTRO_AVAILABLE:
+            print("❌ Catastro no disponible")
             return {
                 "status": "error",
                 "message": "Catastro no disponible",
                 "data": None
             }
         
+        print("✅ Catastro disponible, creando downloader...")
         downloader = CatastroDownloader(output_dir=outputs_dir)
         
         # 1. Obtener Coordenadas
+        print("📍 Obteniendo coordenadas...")
         coords = downloader.obtener_coordenadas_unificado(ref) or {}
+        print(f"📍 Coordenadas obtenidas: {coords}")
         
         # 2. Obtener Datos Alfanuméricos
+        print("📋 Obteniendo datos alfanuméricos...")
         datos_xml = downloader.obtener_datos_alfanumericos(ref) or {}
+        print(f"📋 Datos alfanuméricos: {datos_xml}")
         
         # 3. Calcular Superficie (intentar obtener de GML o XML)
         superficie = float(datos_xml.get("superficie_construida", 0)) # Fallback
+        print(f"📏 Superficie: {superficie}")
         
         # 4. Obtener Población INE
         municipio_nombre = datos_xml.get("municipio", "")
         poblacion = obtener_poblacion_ine(municipio_nombre)
+        print(f"👥 Población: {poblacion}")
+        
+        # Verificar coordenadas antes de construir respuesta
+        if not coords or (coords.get("lat", 0) == 0 and coords.get("lon", 0) == 0):
+            print("❌ No se encontraron coordenadas válidas")
+            return {
+                "status": "error",
+                "message": "No se encontraron coordenadas para esta referencia",
+                "data": None
+            }
         
         # Construir modelo de respuesta
         data = ReferenciaData(
@@ -1470,6 +1522,8 @@ async def analizar_referencia(referencia: dict):
             fecha_alta_catastro=str(datos_xml.get("anio_construccion", "N/D")),
             num_habitantes_municipio=poblacion
         )
+        
+        print(f"✅ Referencia analizada correctamente: {data.dict()}")
         
         return {
             "status": "success",

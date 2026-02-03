@@ -6,6 +6,7 @@ Servicio de Informes Urbanísticos
 import json
 import os
 import sys
+import csv
 from typing import Dict, Any, Optional, List
 from shapely.geometry import Polygon
 from pathlib import Path
@@ -14,6 +15,13 @@ from pathlib import Path
 root_dir = str(Path(__file__).parents[2])
 if root_dir not in sys.path:
     sys.path.append(root_dir)
+
+# Intentar importar el generador de PDF
+try:
+    from referenciaspy.pdf_generator import AfeccionesPDF
+    PDF_GENERATOR_AVAILABLE = True
+except ImportError:
+    PDF_GENERATOR_AVAILABLE = False
 
 class InformeUrbanistico:
     """Clase principal para generar informes urbanísticos"""
@@ -24,6 +32,8 @@ class InformeUrbanistico:
         """
         self.config_file = config_file
         self.config = self._cargar_configuracion()
+        # Directorio de salida por defecto (ajustar según configuración real si es necesario)
+        self.output_dir = os.path.join(root_dir, "outputs")
     
     def _cargar_configuracion(self) -> Dict[str, Any]:
         """
@@ -101,7 +111,16 @@ class InformeUrbanistico:
             if datos_registro:
                 cruce_registro = self._cruzar_registro_propiedad(datos_registro, datos_parcela)
             
-            return {
+            # Generar PDF si el módulo está disponible
+            url_pdf = None
+            if PDF_GENERATOR_AVAILABLE:
+                url_pdf = self._generar_pdf_informe(ref_catastral, datos_parcela, clasificacion_suelo, analisis_tecnico, afecciones)
+
+            # Generar CSV
+            url_csv = self._generar_csv_informe(ref_catastral, datos_parcela, clasificacion_suelo, analisis_tecnico, afecciones)
+
+            # Construir respuesta final
+            resultado = {
                 "referencia_catastral": ref_catastral,
                 "direccion": datos_parcela.get("direccion_completa", f"{via} {numero}, {municipio}, {provincia}" if via and numero else "Sin especificar"),
                 "datos_parcela": datos_parcela,
@@ -109,6 +128,8 @@ class InformeUrbanistico:
                 "analisis_tecnico": analisis_tecnico,
                 "afecciones_territoriales": afecciones,
                 "cruce_registro_propiedad": cruce_registro,
+                "url_csv": url_csv,
+                "url_pdf": url_pdf,
                 "fecha_informe": self._get_fecha_actual(),
                 "configuracion_aplicada": {
                     "coeficientes_usados": self.config['coeficientes_edificabilidad'],
@@ -118,6 +139,7 @@ class InformeUrbanistico:
                     "datos_registro_usados": datos_registro is not None
                 }
             }
+            return resultado
             
         except Exception as e:
             return {
@@ -125,6 +147,114 @@ class InformeUrbanistico:
                 "referencia_catastral": ref_catastral
             }
     
+    def _generar_pdf_informe(self, ref, datos_parcela, clasificacion, analisis, afecciones):
+        """
+        Adapta los datos y llama a AfeccionesPDF para generar el documento
+        """
+        try:
+            # 1. Buscar mapas existentes en la carpeta de salida
+            mapas = []
+            ref_dir = Path(self.output_dir) / ref
+            if ref_dir.exists():
+                # Priorizar composición y planos
+                for nombre in [f"{ref}_plano_con_ortofoto.png", f"{ref}_plano_catastro.png", f"{ref}_ortofoto_pnoa.jpg"]:
+                    p = ref_dir / nombre
+                    if p.exists():
+                        mapas.append(str(p))
+            
+            # 2. Adaptar estructura de datos para AfeccionesPDF
+            # AfeccionesPDF espera: detalle, parametros_urbanisticos, afecciones_detectadas
+            
+            # Adaptar afecciones para la tabla 'detalle'
+            detalle_afecciones = {}
+            lista_afecciones_detectadas = []
+            
+            for k, v in afecciones.items():
+                afectada = v.get('afectada', False) if isinstance(v, dict) else v
+                if afectada:
+                    detalle_afecciones[k] = 100.0 # Asumimos 100% si es booleano True
+                    lista_afecciones_detectadas.append({
+                        "tipo": "Afección Territorial",
+                        "capa": k,
+                        "elementos": "1",
+                        "descripcion": v.get('descripcion', '') if isinstance(v, dict) else "Detectada"
+                    })
+
+            # Adaptar parámetros urbanísticos
+            params_urb = {
+                "clasificacion": {"valor": clasificacion.get("clasificacion"), "nota": "Clase de suelo"},
+                "calificacion": {"valor": clasificacion.get("calificacion"), "nota": "Zona"},
+                "uso_principal": {"valor": clasificacion.get("uso_principal"), "nota": "Uso característico"},
+                "superficie_parcela": {"valor": analisis.get("superficie_terreno_m2"), "nota": "Catastro"},
+                "edificabilidad_maxima": {"valor": analisis.get("edificabilidad_maxima_m2"), "nota": "m² techo (Estimado)"},
+                "ocupacion_maxima": {"valor": f"{analisis.get('porcentaje_ocupacion')}%", "nota": "Estimada"},
+            }
+
+            # Estructura completa para el generador
+            datos_para_pdf = {
+                "area_parcela_m2": analisis.get("superficie_terreno_m2", 0),
+                "area_afectada_m2": 0, # Pendiente de cálculo geométrico real
+                "detalle": detalle_afecciones,
+                "total": 100.0 if detalle_afecciones else 0.0,
+                "analisis_avanzado": True,
+                "parametros_urbanisticos": params_urb,
+                "afecciones_detectadas": lista_afecciones_detectadas
+            }
+
+            # 3. Instanciar y generar
+            pdf_gen = AfeccionesPDF(output_dir=self.output_dir)
+            pdf_path = pdf_gen.generar(
+                referencia=ref,
+                resultados=datos_para_pdf,
+                mapas=mapas,
+                incluir_tabla=True
+            )
+            
+            if pdf_path:
+                # Devolver URL relativa
+                return f"/outputs/{pdf_path.name}"
+            return None
+
+        except Exception as e:
+            print(f"Error generando PDF integrado: {e}")
+            return None
+
+    def _generar_csv_informe(self, ref, datos_parcela, clasificacion, analisis, afecciones):
+        """Genera un archivo CSV con los datos del informe"""
+        try:
+            filename = f"{ref}_informe_urbanistico.csv"
+            # Asegurar que el directorio existe
+            ref_dir = Path(self.output_dir) / ref
+            ref_dir.mkdir(parents=True, exist_ok=True)
+            filepath = ref_dir / filename
+            
+            # Aplanar datos para CSV
+            row = {
+                "Referencia Catastral": ref,
+                "Direccion": datos_parcela.get("direccion_completa", ""),
+                "Uso Principal": datos_parcela.get("uso_principal", ""),
+                "Superficie Suelo (m2)": analisis.get("superficie_terreno_m2", 0),
+                "Superficie Construida (m2)": analisis.get("superficie_construida_m2", 0),
+                "Edificabilidad Max (m2)": analisis.get("edificabilidad_maxima_m2", 0),
+                "Clasificacion Suelo": clasificacion.get("clasificacion", ""),
+                "Calificacion": clasificacion.get("calificacion", "")
+            }
+            
+            # Añadir afecciones como columnas
+            for k, v in afecciones.items():
+                afectada = v.get('afectada', False) if isinstance(v, dict) else v
+                row[f"Afeccion_{k}"] = "SI" if afectada else "NO"
+
+            with open(filepath, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=row.keys(), delimiter=';')
+                writer.writeheader()
+                writer.writerow(row)
+                
+            return f"/outputs/{ref}/{filename}"
+        except Exception as e:
+            print(f"Error generando CSV: {e}")
+            return None
+
     def _obtener_datos_parcela(self, ref_catastral: str = None, provincia: str = None, 
                               municipio: str = None, via: str = None, numero: str = None) -> Dict[str, Any]:
         """
