@@ -1662,6 +1662,66 @@ async def analizar_afecciones(request: AfeccionesRequest):
     except Exception as e:
         return {"status": "error", "message": str(e), "data": None}
 
+
+@app.post("/api/analizar-avanzado")
+async def analizar_avanzado(request: ProcesoRequest):
+    """
+    Endpoint unificado premium que realiza análisis urbanístico y de afecciones.
+    Portado de catastro-saas.
+    """
+    try:
+        ref = request.referencia.strip()
+        
+        # 1. Obtener geometría y datos alfanuméricos
+        downloader = CatastroDownloader(output_dir=outputs_dir)
+        gml_descargado = downloader.descargar_parcela_gml(ref)
+        if not gml_descargado:
+             raise HTTPException(status_code=404, detail="Geometría catastral no encontrada")
+        
+        gml_path = Path(outputs_dir) / ref / f"{ref}_parcela.gml"
+        anillos = downloader.extraer_coordenadas_gml(str(gml_path))
+        
+        # 2. Análisis Urbanístico
+        res_urbanismo = {}
+        if URBANISMO_AVAILABLE and anillos:
+            res_urbanismo = urbanismo.realizar_analisis_urbanistico(anillos)
+        
+        # 3. Análisis de Afecciones
+        res_afecciones = []
+        if AFECCIONES_AVAILABLE and gml_path.exists():
+            capas_locales = afecciones.listar_capas_locales()
+            capas_wfs = afecciones.listar_capas_wfs("capas_wfs.csv")
+            capas_wms = afecciones.listar_capas_wms("capas/wms/capas_wms.csv")
+            config_titulos = afecciones.cargar_config_titulos()
+            
+            # Procesar afecciones (usamos CRS 25830 por defecto en España)
+            resultados_proc = afecciones.procesar_parcelas(
+                capas_locales, capas_wfs, capas_wms, "EPSG:25830", config_titulos,
+                ruta_input=str(gml_path),
+                output_dir_base=str(Path(outputs_dir) / ref)
+            )
+            
+            if resultados_proc:
+                for d in resultados_proc[0].get('datos', []):
+                    if d['porcentaje'] > 0.01:
+                        res_afecciones.append({
+                            "capa": d['capa'],
+                            "porcentaje": round(d['porcentaje'], 2),
+                            "origen": d.get('origen', 'Sistemas GIS')
+                        })
+
+        return {
+            "success": True,
+            "referencia": ref,
+            "urbanismo": res_urbanismo,
+            "afecciones": res_afecciones,
+            "message": "Análisis avanzado completado con éxito"
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/v1/generar-pdf")
 async def generar_pdf(request: GenerarPDFRequest):
     """Generar PDF personalizado (Endpoint compatible con visor_logic.js)"""

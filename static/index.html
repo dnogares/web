@@ -1,159 +1,289 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal Catastral</title>
+    <title>Portal de Gestión Territorial Premium</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Outfit:wght@300;400;600&display=swap"
+        rel="stylesheet">
     <style>
+        :root {
+            --primary: #3498db;
+            --secondary: #2c3e50;
+            --accent: #e67e22;
+            --premium: linear-gradient(135deg, #f1c40f 0%, #e67e22 100%);
+            --glass: rgba(255, 255, 255, 0.1);
+            --bg: #0f172a;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at top right, #1e293b, #0f172a);
             margin: 0;
             padding: 0;
-            height: 100vh;
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+            color: white;
+            overflow-x: hidden;
         }
 
         .container {
+            width: 100%;
+            max-width: 1200px;
+            padding: 40px 20px;
             text-align: center;
+            z-index: 1;
         }
 
         h1 {
-            color: #2c3e50;
-            margin-bottom: 40px;
-            font-size: 2.5rem;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 3rem;
+            margin-bottom: 50px;
+            background: linear-gradient(to right, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 4px;
+            animation: fadeInDown 1s ease-out;
         }
 
         .cards-wrapper {
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 30px;
-            justify-content: center;
-            flex-wrap: wrap;
+            perspective: 1000px;
         }
 
         .card {
-            background: white;
-            width: 300px;
-            height: 350px;
-            border-radius: 15px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px 20px;
+            text-decoration: none;
+            color: white;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: transform 0.3s, box-shadow 0.3s;
-            text-decoration: none;
-            color: inherit;
-            border: 1px solid rgba(0,0,0,0.05);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: 0.5s;
         }
 
         .card:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+            transform: translateY(-15px) rotateX(5deg);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--primary);
+            box-shadow: 0 20px 50px rgba(52, 152, 219, 0.2);
+        }
+
+        .card:hover::before {
+            left: 100%;
         }
 
         .icon-circle {
-            width: 100px;
-            height: 100px;
-            background: #eef2f5;
+            width: 90px;
+            height: 90px;
+            background: rgba(52, 152, 219, 0.1);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 20px;
-            transition: background 0.3s;
+            margin-bottom: 25px;
+            font-size: 2.5rem;
+            color: var(--primary);
+            transition: 0.3s;
+            border: 1px solid rgba(52, 152, 219, 0.2);
         }
 
         .card:hover .icon-circle {
-            background: #3498db;
-        }
-
-        .card:hover .icon-circle i {
+            background: var(--primary);
             color: white;
+            box-shadow: 0 0 20px var(--primary);
         }
 
-        .icon-circle i {
-            font-size: 3rem;
-            color: #3498db;
-            transition: color 0.3s;
+        /* PREMIUM CARD (Segunda Tarjeta) */
+        .card-premium {
+            border: 2px solid transparent;
+            background-image: linear-gradient(var(--bg), var(--bg)), var(--premium);
+            background-origin: border-box;
+            background-clip: content-box, border-box;
         }
 
-        .card h2 {
+        .card-premium:hover {
+            box-shadow: 0 20px 50px rgba(230, 126, 34, 0.3);
+        }
+
+        .card-premium .icon-circle {
+            color: #f1c40f;
+            background: rgba(241, 196, 15, 0.1);
+            border-color: rgba(241, 196, 15, 0.3);
+        }
+
+        .card-premium:hover .icon-circle {
+            background: var(--premium);
+            color: white;
+            box-shadow: 0 0 20px #e67e22;
+        }
+
+        .badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--premium);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        h2 {
             font-size: 1.5rem;
-            color: #34495e;
+            margin: 0 0 15px 0;
+            font-weight: 600;
+        }
+
+        p {
+            font-size: 0.95rem;
+            opacity: 0.7;
+            line-height: 1.6;
             margin: 0;
         }
 
-        .card p {
-            color: #7f8c8d;
-            padding: 0 20px;
-            font-size: 0.9rem;
-            line-height: 1.5;
+        /* Background Animated Particles */
+        .bg-blobs {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
         }
 
-        /* Specific Colors for Cards */
-        .card-urbanismo:hover .icon-circle { background: #e67e22; }
-        .card-urbanismo:hover .icon-circle i { color: white; }
-        .card-urbanismo .icon-circle i { color: #e67e22; }
+        .blob {
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: var(--primary);
+            filter: blur(100px);
+            opacity: 0.1;
+            border-radius: 50%;
+            animation: move 20s infinite alternate;
+        }
 
-        .card-afecciones:hover .icon-circle { background: #27ae60; }
-        .card-afecciones:hover .icon-circle i { color: white; }
-        .card-afecciones .icon-circle i { color: #27ae60; }
+        .blob-2 {
+            background: #e67e22;
+            top: 60%;
+            left: 70%;
+            animation-delay: -5s;
+        }
 
-        .card-informes:hover .icon-circle { background: #8e44ad; }
-        .card-informes:hover .icon-circle i { color: white; }
-        .card-informes .icon-circle i { color: #8e44ad; }
+        @keyframes move {
+            from {
+                transform: translate(-10%, -10%);
+            }
 
+            to {
+                transform: translate(10%, 10%);
+            }
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 60px;
+            font-size: 0.8rem;
+            opacity: 0.4;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
     </style>
 </head>
+
 <body>
 
+    <div class="bg-blobs">
+        <div class="blob"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
     <div class="container">
-        <h1>Portal de Gestión Territorial</h1>
-        
+        <h1>GEOPORTAL v2.5</h1>
+
         <div class="cards-wrapper">
-            <!-- Tarjeta 1: Catastro -->
+            <!-- Tarjeta 1: Visor -->
             <a href="/catastro_fin" class="card">
                 <div class="icon-circle">
                     <i class="fa-solid fa-map-location-dot"></i>
                 </div>
-                <h2>Catastro</h2>
-                <p>Visor catastral interactivo, consulta de parcelas y herramientas de medición.</p>
+                <h2>Visor Catastral</h2>
+                <p>Navegación cartográfica avanzada, herramientas de medición y consulta directa de parcelas.</p>
             </a>
 
-            <!-- Tarjeta 2: Análisis Urbanístico -->
-            <a href="/catastro_fin" class="card card-urbanismo">
+            <!-- Tarjeta 2: Análisis Avanzado (PREMIUM) -->
+            <a href="/static/informes_urbanisticos.html" class="card card-premium">
+                <div class="badge">PRO AI</div>
                 <div class="icon-circle">
-                    <i class="fa-solid fa-city"></i>
+                    <i class="fa-solid fa-microchip"></i>
                 </div>
-                <h2>Análisis Urbanístico</h2>
-                <p>Evaluación normativa, usos del suelo y planificación urbana.</p>
+                <h2>Análisis Inteligente</h2>
+                <p>Cálculo de edificabilidad automática y detección de afecciones territoriales mediante GIS & IA.</p>
             </a>
 
-            <!-- Tarjeta 3: Análisis Afecciones -->
-            <a href="/catastro_fin" class="card card-afecciones">
+            <!-- Tarjeta 3: Afecciones -->
+            <a href="/catastro_fin" class="card">
                 <div class="icon-circle">
-                    <i class="fa-solid fa-layer-group"></i>
+                    <i class="fa-solid fa-shield-halved"></i>
                 </div>
-                <h2>Análisis Afecciones</h2>
-                <p>Cruce con capas ambientales, riesgos y restricciones sectoriales.</p>
+                <h2>Gestión de Riesgos</h2>
+                <p>Análisis de inundabilidad, protección ambiental y servidumbres de infraestructuras.</p>
             </a>
 
             <!-- Tarjeta 4: Ajustes -->
-            <a href="/static/ajustes.html" class="card card-informes">
+            <a href="/static/ajustes.html" class="card">
                 <div class="icon-circle">
-                    <i class="fa-solid fa-gear"></i>
+                    <i class="fa-solid fa-sliders"></i>
                 </div>
-                <h2>Ajustes</h2>
-                <p>Panel de configuración del visor y preferencias del usuario.</p>
+                <h2>Configuración</h2>
+                <p>Personalización de capas WMS locales, gestión de base de datos PostGIS y ajustes de interfaz.</p>
             </a>
+        </div>
+
+        <div class="footer">
+            Antigravity Systems &copy; 2026 | Advanced Territorial Analysis
         </div>
     </div>
 
 </body>
+
 </html>
