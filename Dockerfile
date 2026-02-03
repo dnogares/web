@@ -1,5 +1,10 @@
 FROM python:3.10-slim
 
+
+# Configuración para instalaciones no interactivas
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TERM=linux
+
 # Instalar dependencias del sistema necesarias para GeoPandas y GDAL
 RUN apt-get update && apt-get install -y \
     gdal-bin \
