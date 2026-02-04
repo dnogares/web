@@ -373,7 +373,7 @@
                             <button class="btn btn-outline-secondary" type="button" id="batchBtn" onclick="document.getElementById('batchInput').click()" title="Cargar archivo TXT con referencias">
                                 <i class="fas fa-file-upload"></i> Lote TXT
                             </button>
-                            <input type="file" id="batchInput" accept=".txt" style="display: none;" onchange="handleBatchUpload(this)">
+                            <input type="file" id="batchInput" accept=".txt" style="display: none;" onchange="handleBatchUpload(this); this.value = null;">
                         </div>
                     </div>
                     <div class="col-md-4">
@@ -444,7 +444,9 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <h5 class="m-0"><i class="fas fa-download"></i> Descargas Globales</h5>
                             <div class="btn-group" role="group" style="display: flex !important; visibility: visible !important;">
-                                <button onclick="descargarGlobal('9755607VJ1195N')" class="btn btn-success btn-sm" title="Descargar todos los archivos generados" style="display: inline-block !important; visibility: visible !important; background-color: #28a745 !important;">
+                                async (params) => {
+                                    <button onclick="descargarGloba
+                                }l('9755607VJ1195N')" class="btn btn-success btn-sm" title="Descargar todos los archivos generados" style="display: inline-block !important; visibility: visible !important; background-color: #28a745 !important;">
                                     <i class="fas fa-download"></i> Descargar Global
                                 </button>
                                 <button onclick="descargarConjuntoOrganizado('9755607VJ1195N')" class="btn btn-warning btn-sm" title="Descargar conjunto organizado por categorías" style="display: inline-block !important; visibility: visible !important; background-color: #ffc107 !important;">
