@@ -712,39 +712,21 @@ async function procesarLoteActual() {
             <div style="padding: 10px; color: #e74c3c;">
                 <i class="fa-solid fa-circle-exclamation"></i> Error: ${e.message}
                 <button class="outline" style="margin-top: 10px; width: 100%;" onclick="mostrarPrevisualizacionLote(currentLoteRefs)">Reintentar</button>
+            </div>
+        `;
+    }
 }
 
-function mostrarPrevisualizacionLote(refs) {
-    const resBox = document.getElementById('res-catastro');
-    resBox.style.display = 'block';
+function pollProgress(expId, container) {
+    const interval = setInterval(async () => {
+        try {
+            const res = await fetch(`/api/v1/expedientes/${expId}/status`);
+            if (!res.ok) return;
 
-    const listaHtml = refs.map((ref, index) =>
-        `<div style="border-bottom: 1px solid #eee; padding: 6px 0; font-family: monospace; font-size:0.85rem; display:flex; align-items:center;">
-            <span style="color:#999; width:25px;">${index + 1}.</span> 
-            <span style="font-weight:600; color:#2c3e50;">${ref}</span>
-        </div>`
-    ).join('');
+            const data = await res.json();
+            const pct = data.progreso || 0;
+            const estado = data.estado || 'procesando';
 
-    resBox.innerHTML = `
-        <div style="padding: 5px;">
-            <div style="margin-bottom: 10px; color: var(--primary); font-weight: bold; display:flex; align-items:center; justify-content:space-between;">
-                <span><i class="fa-solid fa-list-check"></i> Referencias: ${refs.length}</span>
-                <span style="font-size:0.8rem; background:#e8f5e9; color:#27ae60; padding:2px 8px; border-radius:10px;">Listo</span>
-            </div>
-            <div style="max-height: 200px; overflow-y: auto; background: #fff; border: 1px solid #ddd; padding: 10px; margin-bottom: 15px; border-radius: 4px; box-shadow:inset 0 1px 3px rgba(0,0,0,0.05);">
-                ${listaHtml}
-            </div>
-            <div style="display: flex; gap: 10px;">
-                <button onclick="procesarLoteActual()" style="flex: 1; background:var(--secondary); border:none; color:white;">
-                    <i class="fa-solid fa-play"></i> Procesar
-                </button>
-                <button onclick="cancelarLote()" class="outline" style="flex: 1; border-color:#ccc; color:#666;">
-                    Cancelar
-                </button>
-            </div>
-        </div>
-    `;
-}
             const bar = document.getElementById('lote-progress');
             const status = document.getElementById('lote-status');
 
@@ -772,26 +754,104 @@ function mostrarPrevisualizacionLote(refs) {
                     </div>
                 `;
 
-                // Cargar KML en mapa si existe
+                // Cargar todas las referencias del lote en el mapa
+                if (data.items && data.items.length > 0) {
+                    cargarReferenciasLoteEnMapa(data.items, expId);
+                }
+
+                // Cargar KML global si existe (como capa adicional)
                 if (data.lote_outputs && data.lote_outputs.kml_global) {
-                    if (drawLayer) drawLayer.clearLayers();
-                    // URL relativa del KML
-                    const kmlUrl = `/outputs/expedientes/expediente_${expId}/lote/lote_${expId}.kml`;
-
-                    if (typeof omnivore !== 'undefined') {
-                        const layer = omnivore.kml(kmlUrl, null, L.geoJson(null, {
-                            style: { color: '#e74c3c', weight: 2, opacity: 1, fillOpacity: 0.2 }
-                        }));
-
-                        layer.on('ready', function () {
-                            drawLayer.addLayer(this);
-                            map.fitBounds(this.getBounds());
-                        });
-                    }
+                    cargarKMLGlobalLote(expId);
                 }
             }
         } catch (e) {
             console.error("Polling error", e);
         }
     }, 1000);
+}
+
+function cargarReferenciasLoteEnMapa(items, expId) {
+    console.log(` Cargando ${items.length} referencias del lote ${expId} en el mapa`);
+    
+    // Limpiar capa de dibujo anterior
+    if (drawLayer) {
+        drawLayer.clearLayers();
+    }
+    
+    let cargadas = 0;
+    let errores = 0;
+    
+    // Para cada referencia del lote, cargar su geometría
+    items.forEach(async (item, index) => {
+        try {
+            const ref = item.referencia;
+            console.log(` Cargando referencia ${index + 1}/${items.length}: ${ref}`);
+            
+            // Intentar cargar el KML de la referencia individual
+            const kmlUrl = `/outputs/expedientes/expediente_${expId}/${ref}/${ref}.kml`;
+            
+            try {
+                const response = await fetch(kmlUrl);
+                if (response.ok) {
+                    const kmlContent = await response.text();
+                    
+                    if (typeof omnivore !== 'undefined') {
+                        const layer = omnivore.kml.parse(kmlContent);
+                        layer.setStyle({ 
+                            color: '#e74c3c', 
+                            weight: 2, 
+                            fillOpacity: 0.3,
+                            fillColor: '#e74c3c'
+                        });
+                        
+                        layer.on('ready', function () {
+                            drawLayer.addLayer(this);
+                            cargadas++;
+                            
+                            // Ajustar vista cuando se cargue la última referencia
+                            if (cargadas + errores === items.length) {
+                                if (drawLayer.getLayers().length > 0) {
+                                    map.fitBounds(drawLayer.getBounds());
+                                    console.log(` Lote completado: ${cargadas} referencias cargadas, ${errores} errores`);
+                                }
+                            }
+                        });
+                    }
+                } else {
+                    errores++;
+                    console.warn(` No se encontró KML para ${ref}`);
+                }
+            } catch (e) {
+                errores++;
+                console.warn(` Error cargando KML para ${ref}:`, e);
+            }
+            
+        } catch (e) {
+            errores++;
+            console.error(` Error procesando item ${index}:`, e);
+        }
+    });
+}
+
+function cargarKMLGlobalLote(expId) {
+    console.log(` Cargando KML global del lote ${expId}`);
+    
+    const kmlUrl = `/outputs/expedientes/expediente_${expId}/lote/lote_${expId}.kml`;
+    
+    if (typeof omnivore !== 'undefined') {
+        const layer = omnivore.kml(kmlUrl, null, L.geoJson(null, {
+            style: { 
+                color: '#2ecc71', 
+                weight: 3, 
+                opacity: 1, 
+                fillOpacity: 0.1,
+                fillColor: '#2ecc71'
+            }
+        }));
+
+        layer.on('ready', function () {
+            drawLayer.addLayer(this);
+            console.log(` KML global cargado para lote ${expId}`);
+        });
+    }
 }

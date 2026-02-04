@@ -59,6 +59,37 @@
             color: white;
         }
 
+        /* FORZAR VISIBILIDAD ABSOLUTA DEL BOTÓN GLOBAL */
+        #globalDownloadSection {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            position: relative !important;
+            z-index: 1000 !important;
+            height: auto !important;
+            overflow: visible !important;
+            transform: none !important;
+            clip: none !important;
+            clip-path: none !important;
+        }
+
+        #globalDownloadSection button {
+            display: inline-block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            position: relative !important;
+            z-index: 1001 !important;
+            transform: none !important;
+            clip: none !important;
+            clip-path: none !important;
+        }
+
+        /* Asegurar que ningún CSS lo oculte */
+        #globalDownloadSection * {
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+
         .loading-spinner {
             display: none;
             text-align: center;
@@ -667,6 +698,34 @@
             initializeMap();
             loadLayers();
             setupEventListeners();
+            
+            // FORZAR VISIBILIDAD DEL BOTÓN GLOBAL
+            setTimeout(() => {
+                const globalSection = document.getElementById('globalDownloadSection');
+                if (globalSection) {
+                    console.log('🔧 Forzando visibilidad de globalDownloadSection');
+                    globalSection.style.display = 'block !important';
+                    globalSection.style.visibility = 'visible !important';
+                    globalSection.style.opacity = '1 !important';
+                    globalSection.style.position = 'relative !important';
+                    globalSection.style.zIndex = '1000 !important';
+                    globalSection.style.height = 'auto !important';
+                    globalSection.style.overflow = 'visible !important';
+                    
+                    // Forzar también todos los botones dentro
+                    const buttons = globalSection.querySelectorAll('button');
+                    buttons.forEach(btn => {
+                        btn.style.display = 'inline-block !important';
+                        btn.style.visibility = 'visible !important';
+                        btn.style.opacity = '1 !important';
+                        btn.style.position = 'relative !important';
+                        btn.style.zIndex = '1001 !important';
+                        console.log('✅ Botón forzado:', btn.textContent);
+                    });
+                } else {
+                    console.error('❌ No se encontró globalDownloadSection');
+                }
+            }, 500);
         });
 
         function initializeMap() {
@@ -947,6 +1006,95 @@
             });
         }
 
+        function toggleLayer(layerId, enabled, layerConfig, folderId) {
+            console.log(`🔄 Toggle layer: ${layerId}, enabled: ${enabled}`);
+            
+            if (enabled) {
+                // Activar capa
+                if (layerConfig.wmsParams) {
+                    // Capa WMS externa
+                    const wmsLayer = L.tileLayer.wms(layerConfig.wmsParams.url, {
+                        layers: layerConfig.wmsParams.layers,
+                        format: layerConfig.wmsParams.format || 'image/png',
+                        transparent: layerConfig.wmsParams.transparent !== false,
+                        version: layerConfig.wmsParams.version || '1.1.1',
+                        opacity: 0.7,
+                        zIndex: 100 + activeLayers.size
+                    });
+                    
+                    layerControls[layerId] = wmsLayer;
+                    wmsLayer.addTo(map);
+                    activeLayers.add(layerId);
+                    console.log(`✅ WMS Layer ${layerId} added to map`);
+                    
+                } else {
+                    // Capa simulada local (para demostración)
+                    const simulatedLayer = L.layerGroup();
+                    
+                    // Añadir algunas geometrías de ejemplo según el tipo de capa
+                    if (layerId.includes('parcela') || layerId.includes('suelo')) {
+                        // Generar polígonos de ejemplo en el área visible
+                        const bounds = map.getBounds();
+                        const center = bounds.getCenter();
+                        
+                        for (let i = 0; i < 3; i++) {
+                            const lat = center.lat + (Math.random() - 0.5) * 0.01;
+                            const lng = center.lng + (Math.random() - 0.5) * 0.01;
+                            
+                            const polygon = L.polygon([
+                                [lat - 0.001, lng - 0.001],
+                                [lat - 0.001, lng + 0.001],
+                                [lat + 0.001, lng + 0.001],
+                                [lat + 0.001, lng - 0.001]
+                            ], {
+                                color: layerConfig.color || '#3388ff',
+                                fillColor: layerConfig.color || '#3388ff',
+                                fillOpacity: 0.3,
+                                weight: 2
+                            });
+                            
+                            polygon.bindPopup(`<b>${layerConfig.name}</b><br>Capa simulada para demostración`);
+                            polygon.addTo(simulatedLayer);
+                        }
+                    }
+                    
+                    layerControls[layerId] = simulatedLayer;
+                    simulatedLayer.addTo(map);
+                    activeLayers.add(layerId);
+                    console.log(`✅ Simulated Layer ${layerId} added to map`);
+                }
+            } else {
+                // Desactivar capa
+                if (layerControls[layerId]) {
+                    map.removeLayer(layerControls[layerId]);
+                    delete layerControls[layerId];
+                    activeLayers.delete(layerId);
+                    console.log(`❌ Layer ${layerId} removed from map`);
+                }
+            }
+            
+            // Actualizar UI
+            updateLayersUI();
+        }
+
+        function updateLayersUI() {
+            // Actualizar contador de capas activas
+            const activeCount = activeLayers.size;
+            const maxLayers = parseInt(document.getElementById('maxLayers')?.value || 5);
+            
+            // Desactivar checkboxes si se alcanza el límite
+            document.querySelectorAll('[data-layer]').forEach(checkbox => {
+                const layerId = checkbox.dataset.layer;
+                if (!checkbox.checked && activeCount >= maxLayers) {
+                    checkbox.disabled = true;
+                    checkbox.title = `Límite de ${maxLayers} capas alcanzado`;
+                } else {
+                    checkbox.disabled = false;
+                    checkbox.title = '';
+                }
+            });
+        }
+
         function setupEventListeners() {
             // Botón de búsqueda
             document.getElementById('searchBtn').addEventListener('click', searchParcel);
@@ -982,6 +1130,9 @@
 
             // Botón guardar configuración
             document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+
+            // Control de máximo de capas
+            document.getElementById('maxLayers').addEventListener('change', updateLayersUI);
         }
 
         function toggleCatastroLayer() {

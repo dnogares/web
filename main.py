@@ -26,7 +26,7 @@ import uvicorn
 
 # --- CONFIGURACIÓN DE RETENCIÓN DE ARCHIVOS ---
 TIEMPO_RETENCION_ARCHIVOS = 24 * 60 * 60  # 24 horas en segundos
-ENABLE_FILE_RETENTION = False  # DESACTIVADO temporalmente para evitar borrado de ZIPs
+ENABLE_FILE_RETENTION = True  # Activar retención de archivos (con protección de ZIPs)
 
 # Estructura para trackear timestamps de archivos
 file_timestamps = {}
@@ -711,8 +711,7 @@ async def get_layer_data(layer_name: str, bbox: Optional[str] = Query(None)):
         sql = text(f"""
             SELECT *, ST_Transform(geom, 4326) as geom_wgs84 
             FROM {schema_name}.{table_name} 
-            {where_clause} 
-            LIMIT 3000
+            {where_clause}
         """)
         
         # Leemos indicando la nueva columna de geometría ya proyectada
@@ -1474,12 +1473,17 @@ async def procesar_lote_endpoint(request: LoteRequest, background_tasks: Backgro
     try:
         from expedientes.catastro_exp import crear_expediente_id
         
+        print(f"🚀 INICIANDO PROCESAMIENTO DE LOTE")
+        print(f"📊 Total referencias recibidas: {len(request.referencias)}")
+        print(f"📋 Referencias: {request.referencias}")
+        
         # Directorio base para expedientes
         exp_base = Path(outputs_dir) / "expedientes"
         exp_base.mkdir(exist_ok=True)
         
         # Generar ID y lanzar tarea
         exp_id = crear_expediente_id()
+        print(f"🆔 ID de expediente generado: {exp_id}")
         
         # Pre-crear directorio y manifiesto para evitar 404 en polling inmediato
         exp_dir = exp_base / f"expediente_{exp_id}"
