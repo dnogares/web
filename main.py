@@ -317,6 +317,12 @@ app.add_middleware(
     allow_methods=["*"],  # Permite todos los métodos (GET, POST, etc.)
     allow_headers=["*"],  # Permite todos los headers
 )
+
+# Health check endpoint para EasyPanel
+@app.get("/health")
+async def health_check():
+    """Health check para monitoreo de contenedor"""
+    return {"status": "healthy", "service": "webgis"}
 # Cargar expedientes (Bloque 1) - Catastro
 try:
     from expedientes.router import expedientes_router
