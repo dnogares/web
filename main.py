@@ -19,6 +19,7 @@ from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 # from src.utils.auto_detect_layers import inicializar_capas, obtener_capas
 # from src.utils.cruzador_capas import CruzadorCapas
 from pydantic import BaseModel
@@ -303,11 +304,39 @@ class PDFCompletoRequest(BaseModel):
 class LoteRequest(BaseModel):
     referencias: List[str]
 
+# Función para cargar configuración
+def cargar_configuracion():
+    """Carga la configuración desde el archivo JSON"""
+    config_path = Path("src/config/config.json")
+    if config_path.exists():
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+# Función de cleanup que usa cfg
+def cleanup_con_cfg(cfg):
+    """Función de cleanup que tiene acceso a cfg"""
+    print("Ejecutando cleanup con configuración...")
+    # Aquí tu lógica de cleanup que necesita cfg
+    pass
+
+# Context manager para el ciclo de vida de la app
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    cfg = cargar_configuracion()  # Define cfg aquí
+    print("Aplicación iniciada, configuración cargada")
+    yield {"cfg": cfg}  # Pasa cfg al contexto
+    # Shutdown - cfg está disponible aquí
+    cleanup_con_cfg(cfg)
+    print("Aplicación apagada, cleanup completado")
+
 # Crear aplicación FastAPI
 app = FastAPI(
     title="Visor Catastral API - Glassmorphism",
     version="2.0.0",
-    description="API para el visor catastral con diseño Glassmorphism"
+    description="API para el visor catastral con diseño Glassmorphism",
+    lifespan=lifespan
 )
 # ⭐ AÑADE ESTO JUSTO DESPUÉS DE CREAR LA APP ⭐
 app.add_middleware(
