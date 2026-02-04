@@ -90,6 +90,36 @@
             opacity: 1 !important;
         }
 
+        /* ESTILO UNIFICADO PARA TODAS LAS IMÁGENES */
+        .img-unified-border {
+            border-radius: 15px;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .img-unified-border:hover {
+            border-color: rgba(102, 126, 234, 0.6);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Aplicar a todas las imágenes por defecto */
+        img {
+            border-radius: 15px;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        img:hover {
+            border-color: rgba(102, 126, 234, 0.6);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+            transform: translateY(-2px);
+        }
+
         .loading-spinner {
             display: none;
             text-align: center;
