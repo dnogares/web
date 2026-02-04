@@ -450,6 +450,9 @@
                                 <button onclick="descargarConjuntoOrganizado('9755607VJ1195N')" class="btn btn-warning btn-sm" title="Descargar conjunto organizado por categorías" style="display: inline-block !important; visibility: visible !important; background-color: #ffc107 !important;">
                                     <i class="fas fa-folder-tree"></i> Bajar Conjunto
                                 </button>
+                                <button onclick="testDescargarGlobal()" class="btn btn-info btn-sm" title="Test función descargarGlobal" style="display: inline-block !important; visibility: visible !important; background-color: #17a2b8 !important;">
+                                    <i class="fas fa-bug"></i> Test
+                                </button>
                             </div>
                         </div>
                         <div class="mt-2">
@@ -1039,72 +1042,86 @@
         function toggleLayer(layerId, enabled, layerConfig, folderId) {
             console.log(`🔄 Toggle layer: ${layerId}, enabled: ${enabled}`);
             
-            if (enabled) {
-                // Activar capa
-                if (layerConfig.wmsParams) {
-                    // Capa WMS externa
-                    const wmsLayer = L.tileLayer.wms(layerConfig.wmsParams.url, {
-                        layers: layerConfig.wmsParams.layers,
-                        format: layerConfig.wmsParams.format || 'image/png',
-                        transparent: layerConfig.wmsParams.transparent !== false,
-                        version: layerConfig.wmsParams.version || '1.1.1',
-                        opacity: 0.7,
-                        zIndex: 100 + activeLayers.size
-                    });
-                    
-                    layerControls[layerId] = wmsLayer;
-                    wmsLayer.addTo(map);
-                    activeLayers.add(layerId);
-                    console.log(`✅ WMS Layer ${layerId} added to map`);
-                    
-                } else {
-                    // Capa simulada local (para demostración)
-                    const simulatedLayer = L.layerGroup();
-                    
-                    // Añadir algunas geometrías de ejemplo según el tipo de capa
-                    if (layerId.includes('parcela') || layerId.includes('suelo')) {
-                        // Generar polígonos de ejemplo en el área visible
-                        const bounds = map.getBounds();
-                        const center = bounds.getCenter();
-                        
-                        for (let i = 0; i < 3; i++) {
-                            const lat = center.lat + (Math.random() - 0.5) * 0.01;
-                            const lng = center.lng + (Math.random() - 0.5) * 0.01;
-                            
-                            const polygon = L.polygon([
-                                [lat - 0.001, lng - 0.001],
-                                [lat - 0.001, lng + 0.001],
-                                [lat + 0.001, lng + 0.001],
-                                [lat + 0.001, lng - 0.001]
-                            ], {
-                                color: layerConfig.color || '#3388ff',
-                                fillColor: layerConfig.color || '#3388ff',
-                                fillOpacity: 0.3,
-                                weight: 2
-                            });
-                            
-                            polygon.bindPopup(`<b>${layerConfig.name}</b><br>Capa simulada para demostración`);
-                            polygon.addTo(simulatedLayer);
-                        }
-                    }
-                    
-                    layerControls[layerId] = simulatedLayer;
-                    simulatedLayer.addTo(map);
-                    activeLayers.add(layerId);
-                    console.log(`✅ Simulated Layer ${layerId} added to map`);
-                }
-            } else {
-                // Desactivar capa
-                if (layerControls[layerId]) {
-                    map.removeLayer(layerControls[layerId]);
-                    delete layerControls[layerId];
-                    activeLayers.delete(layerId);
-                    console.log(`❌ Layer ${layerId} removed from map`);
-                }
+            // Debounce para evitar múltiples toggles rápidos
+            if (window.toggleTimeout) {
+                clearTimeout(window.toggleTimeout);
             }
             
-            // Actualizar UI
-            updateLayersUI();
+            window.toggleTimeout = setTimeout(() => {
+                if (enabled) {
+                    // Activar capa
+                    if (layerConfig.wmsParams) {
+                        // Capa WMS externa con optimización
+                        const wmsLayer = L.tileLayer.wms(layerConfig.wmsParams.url, {
+                            layers: layerConfig.wmsParams.layers,
+                            format: layerConfig.wmsParams.format || 'image/png',
+                            transparent: layerConfig.wmsParams.transparent !== false,
+                            version: layerConfig.wmsParams.version || '1.1.1',
+                            opacity: 0.7,
+                            zIndex: 100 + activeLayers.size,
+                            // Optimizaciones de rendimiento
+                            maxZoom: 18,
+                            minZoom: 1,
+                            updateWhenIdle: true,
+                            updateWhenZooming: false,
+                            keepBuffer: 2,
+                            maxNativeZoom: 18
+                        });
+                        
+                        layerControls[layerId] = wmsLayer;
+                        wmsLayer.addTo(map);
+                        activeLayers.add(layerId);
+                        console.log(`✅ WMS Layer ${layerId} added to map`);
+                        
+                    } else {
+                        // Capa simulada local (para demostración)
+                        const simulatedLayer = L.layerGroup();
+                        
+                        // Añadir algunas geometrías de ejemplo según el tipo de capa
+                        if (layerId.includes('parcela') || layerId.includes('suelo')) {
+                            // Generar polígonos de ejemplo en el área visible
+                            const bounds = map.getBounds();
+                            const center = bounds.getCenter();
+                            
+                            for (let i = 0; i < 3; i++) {
+                                const lat = center.lat + (Math.random() - 0.5) * 0.01;
+                                const lng = center.lng + (Math.random() - 0.5) * 0.01;
+                                
+                                const polygon = L.polygon([
+                                    [lat - 0.001, lng - 0.001],
+                                    [lat - 0.001, lng + 0.001],
+                                    [lat + 0.001, lng + 0.001],
+                                    [lat + 0.001, lng - 0.001]
+                                ], {
+                                    color: layerConfig.color || '#3388ff',
+                                    fillColor: layerConfig.color || '#3388ff',
+                                    fillOpacity: 0.3,
+                                    weight: 2
+                                });
+                                
+                                polygon.bindPopup(`<b>${layerConfig.name}</b><br>Capa simulada para demostración`);
+                                polygon.addTo(simulatedLayer);
+                            }
+                        }
+                        
+                        layerControls[layerId] = simulatedLayer;
+                        simulatedLayer.addTo(map);
+                        activeLayers.add(layerId);
+                        console.log(`✅ Simulated Layer ${layerId} added to map`);
+                    }
+                } else {
+                    // Desactivar capa
+                    if (layerControls[layerId]) {
+                        map.removeLayer(layerControls[layerId]);
+                        delete layerControls[layerId];
+                        activeLayers.delete(layerId);
+                        console.log(`❌ Layer ${layerId} removed from map`);
+                    }
+                }
+                
+                // Actualizar UI
+                updateLayersUI();
+            }, 100); // 100ms debounce
         }
 
         function updateLayersUI() {
@@ -1126,43 +1143,97 @@
         }
 
         function setupEventListeners() {
-            // Botón de búsqueda
-            document.getElementById('searchBtn').addEventListener('click', searchParcel);
+            // Botón de búsqueda con debounce
+            const searchBtn = document.getElementById('searchBtn');
+            if (searchBtn) {
+                let searchTimeout;
+                searchBtn.addEventListener('click', function() {
+                    if (searchTimeout) clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(searchParcel, 50);
+                });
+            }
 
-            // Enter en campo de búsqueda
-            document.getElementById('searchInput').addEventListener('keypress', function (e) {
-                if (e.key === 'Enter') {
-                    searchParcel();
-                }
-            });
+            // Enter en campo de búsqueda con debounce
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                let inputTimeout;
+                searchInput.addEventListener('keypress', function (e) {
+                    if (e.key === 'Enter') {
+                        if (inputTimeout) clearTimeout(inputTimeout);
+                        inputTimeout = setTimeout(searchParcel, 50);
+                    }
+                });
+            }
 
             // Botón generar informe
-            document.getElementById('generateBtn').addEventListener('click', generateInforme);
+            const generateBtn = document.getElementById('generateBtn');
+            if (generateBtn) {
+                generateBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    // Usar requestIdleCallback si está disponible
+                    if (window.requestIdleCallback) {
+                        window.requestIdleCallback(() => generateInforme());
+                    } else {
+                        setTimeout(generateInforme, 0);
+                    }
+                });
+            }
 
             // Botón toggle catastro
-            document.getElementById('toggleCatastroBtn').addEventListener('click', toggleCatastroLayer);
+            const toggleCatastroBtn = document.getElementById('toggleCatastroBtn');
+            if (toggleCatastroBtn) {
+                toggleCatastroBtn.addEventListener('click', toggleCatastroLayer);
+            }
 
             // Botón buscar municipio
-            document.getElementById('buscarMunicipioBtn').addEventListener('click', buscarMunicipio);
+            const buscarMunicipioBtn = document.getElementById('buscarMunicipioBtn');
+            if (buscarMunicipioBtn) {
+                let municipioTimeout;
+                buscarMunicipioBtn.addEventListener('click', function() {
+                    if (municipioTimeout) clearTimeout(municipioTimeout);
+                    municipioTimeout = setTimeout(buscarMunicipio, 50);
+                });
+            }
 
             // Enter en campo de municipio
-            document.getElementById('municipio-input').addEventListener('keypress', function (e) {
-                if (e.key === 'Enter') {
-                    buscarMunicipio();
-                }
-            });
+            const municipioInput = document.getElementById('municipio-input');
+            if (municipioInput) {
+                let municipioInputTimeout;
+                municipioInput.addEventListener('keypress', function (e) {
+                    if (e.key === 'Enter') {
+                        if (municipioInputTimeout) clearTimeout(municipioInputTimeout);
+                        municipioInputTimeout = setTimeout(buscarMunicipio, 50);
+                    }
+                });
+            }
 
             // Botón cancelar
-            document.getElementById('cancelBtn').addEventListener('click', cancelOperation);
+            const btnCancel = document.getElementById('btnCancelarLote');
+            if (btnCancel) {
+                btnCancel.addEventListener('click', cancelOperation);
+            }
 
             // Botón panel de ajustes
-            document.getElementById('settingsBtn').addEventListener('click', openSettings);
+            const settingsBtn = document.getElementById('settingsBtn');
+            if (settingsBtn) {
+                settingsBtn.addEventListener('click', openSettings);
+            }
 
             // Botón guardar configuración
-            document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+            const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+            if (saveSettingsBtn) {
+                saveSettingsBtn.addEventListener('click', saveSettings);
+            }
 
-            // Control de máximo de capas
-            document.getElementById('maxLayers').addEventListener('change', updateLayersUI);
+            // Control de máximo de capas con debounce
+            const maxLayersInput = document.getElementById('maxLayers');
+            if (maxLayersInput) {
+                let layersTimeout;
+                maxLayersInput.addEventListener('change', function() {
+                    if (layersTimeout) clearTimeout(layersTimeout);
+                    layersTimeout = setTimeout(updateLayersUI, 50);
+                });
+            }
         }
 
         function toggleCatastroLayer() {
@@ -2306,17 +2377,28 @@ async function descargarConjuntoOrganizado(ref) {
 
         // Función para descargar ZIP global
         async function descargarGlobal(ref) {
+            console.log(`🔥 INICIANDO DESCARGA GLOBAL para ref: ${ref}`);
+            
             try {
                 showProgress('Generando ZIP global...', 50);
                 
+                console.log(`📡 Haciendo petición a: /api/v1/descargar-global/${ref}`);
                 const response = await fetch(`/api/v1/descargar-global/${ref}`);
                 
+                console.log(`📊 Response status: ${response.status}`);
+                console.log(`📊 Response headers:`, [...response.headers.entries()]);
+                
                 if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`❌ Error response: ${errorText}`);
                     throw new Error(`Error ${response.status}: ${response.statusText}`);
                 }
                 
                 // Obtener el blob y descargar
                 const blob = await response.blob();
+                console.log(`📦 Blob size: ${blob.size} bytes`);
+                console.log(`📦 Blob type: ${blob.type}`);
+                
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -2330,9 +2412,36 @@ async function descargarConjuntoOrganizado(ref) {
                 setTimeout(hideProgress, 2000);
                 
             } catch (error) {
-                console.error('Error descargando ZIP global:', error);
+                console.error('❌ Error descargando ZIP global:', error);
                 alert(`Error descargando ZIP global: ${error.message}`);
                 hideProgress();
+            }
+        }
+
+        // Función de test para descargarGlobal
+        function testDescargarGlobal() {
+            console.log('🧪 TEST: Iniciando test de descargarGlobal');
+            
+            // Verificar que la función existe
+            if (typeof descargarGlobal === 'function') {
+                console.log('✅ TEST: La función descargarGlobal existe');
+                
+                // Verificar botón
+                const btn = document.querySelector('button[onclick*="descargarGlobal"]');
+                if (btn) {
+                    console.log('✅ TEST: Botón encontrado:', btn.textContent);
+                    console.log('✅ TEST: Botón visible:', btn.style.display !== 'none');
+                    console.log('✅ TEST: Botón onclick:', btn.onclick);
+                } else {
+                    console.error('❌ TEST: No se encontró el botón');
+                }
+                
+                // Llamar a la función con la referencia de prueba
+                console.log('🧪 TEST: Llamando a descargarGlobal con ref de prueba...');
+                descargarGlobal('9755607VJ1195N');
+                
+            } else {
+                console.error('❌ TEST: La función descargarGlobal no existe');
             }
         }
 
