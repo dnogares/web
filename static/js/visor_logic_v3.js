@@ -393,36 +393,69 @@ function loadGeoJson(content) {
 }
 
 /**
- * Parser básico para GML de Catastro (INSPIRE)
+ * Parser mejorado para GML de Catastro (INSPIRE) - Soporta anillos
  */
 function loadGml(content) {
     try {
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(content, "text/xml");
 
-        // Buscar posList (formato INSPIRE común)
-        const posLists = xmlDoc.getElementsByTagNameNS("*", "posList");
+        // Buscar diferentes tipos de geometrías GML
+        const geometries = [
+            ...xmlDoc.getElementsByTagNameNS("*", "Polygon"),
+            ...xmlDoc.getElementsByTagNameNS("*", "MultiPolygon"),
+            ...xmlDoc.getElementsByTagNameNS("*", "Surface"),
+            ...xmlDoc.getElementsByTagNameNS("*", "MultiSurface")
+        ];
+
         let found = false;
 
-        for (let i = 0; i < posLists.length; i++) {
-            const coordsText = posLists[i].textContent.trim().split(/\s+/);
-            const latlngs = [];
-
-            for (let j = 0; j < coordsText.length; j += 2) {
-                const v1 = parseFloat(coordsText[j]);
-                const v2 = parseFloat(coordsText[j + 1]);
-
-                // Determinar orden (muy básico: España está entre lat 35-44 y lon -10-5)
-                if (v1 > 30 && v1 < 50) {
-                    latlngs.push([v1, v2]);
-                } else {
-                    latlngs.push([v2, v1]);
+        for (let geom of geometries) {
+            try {
+                // Para polígonos simples y superficies
+                if (geom.tagName.includes("Polygon") || geom.tagName.includes("Surface")) {
+                    const polygon = processPolygonOrSurface(geom);
+                    if (polygon) {
+                        polygon.addTo(drawLayer);
+                        found = true;
+                    }
                 }
+                // Para polígonos múltiples
+                else if (geom.tagName.includes("MultiPolygon") || geom.tagName.includes("MultiSurface")) {
+                    const multiPolygon = processMultiPolygonOrSurface(geom);
+                    if (multiPolygon) {
+                        multiPolygon.addTo(drawLayer);
+                        found = true;
+                    }
+                }
+            } catch (e) {
+                console.warn("Error procesando geometría:", e);
             }
+        }
 
-            if (latlngs.length > 0) {
-                L.polygon(latlngs, { color: '#3498db', weight: 3, fillOpacity: 0.2 }).addTo(drawLayer);
-                found = true;
+        // Fallback: buscar posList directo (método antiguo)
+        if (!found) {
+            const posLists = xmlDoc.getElementsByTagNameNS("*", "posList");
+            for (let i = 0; i < posLists.length; i++) {
+                const coordsText = posLists[i].textContent.trim().split(/\s+/);
+                const latlngs = [];
+
+                for (let j = 0; j < coordsText.length; j += 2) {
+                    const v1 = parseFloat(coordsText[j]);
+                    const v2 = parseFloat(coordsText[j + 1]);
+
+                    // Determinar orden (muy básico: España está entre lat 35-44 y lon -10-5)
+                    if (v1 > 30 && v1 < 50) {
+                        latlngs.push([v1, v2]);
+                    } else {
+                        latlngs.push([v2, v1]);
+                    }
+                }
+
+                if (latlngs.length > 0) {
+                    L.polygon(latlngs, { color: '#3498db', weight: 3, fillOpacity: 0.2 }).addTo(drawLayer);
+                    found = true;
+                }
             }
         }
 
@@ -434,6 +467,115 @@ function loadGml(content) {
         }
     } catch (err) {
         alert("Error al procesar GML: " + err.message);
+        console.error("Error GML:", err);
+    }
+}
+
+function processPolygonOrSurface(polygonElement) {
+    try {
+        // Buscar anillos exterior e interior
+        const exteriorRings = polygonElement.getElementsByTagNameNS("*", "exterior");
+        const interiorRings = polygonElement.getElementsByTagNameNS("*", "interior");
+        
+        let latlngs = [];
+        
+        // Procesar anillo exterior (boundary principal)
+        if (exteriorRings.length > 0) {
+            const exteriorRing = exteriorRings[0];
+            const posList = exteriorRing.getElementsByTagNameNS("*", "posList")[0];
+            
+            if (posList) {
+                const coordsText = posList.textContent.trim().split(/\s+/);
+                const ring = [];
+                
+                for (let j = 0; j < coordsText.length; j += 2) {
+                    const v1 = parseFloat(coordsText[j]);
+                    const v2 = parseFloat(coordsText[j + 1]);
+                    
+                    // Determinar orden
+                    if (v1 > 30 && v1 < 50) {
+                        ring.push([v1, v2]);
+                    } else {
+                        ring.push([v2, v1]);
+                    }
+                }
+                
+                if (ring.length > 0) {
+                    latlngs.push(ring);
+                }
+            }
+        }
+        
+        // Procesar anillos interiores (huecos)
+        for (let i = 0; i < interiorRings.length; i++) {
+            const interiorRing = interiorRings[i];
+            const posList = interiorRing.getElementsByTagNameNS("*", "posList")[0];
+            
+            if (posList) {
+                const coordsText = posList.textContent.trim().split(/\s+/);
+                const hole = [];
+                
+                for (let j = 0; j < coordsText.length; j += 2) {
+                    const v1 = parseFloat(coordsText[j]);
+                    const v2 = parseFloat(coordsText[j + 1]);
+                    
+                    // Determinar orden
+                    if (v1 > 30 && v1 < 50) {
+                        hole.push([v1, v2]);
+                    } else {
+                        hole.push([v2, v1]);
+                    }
+                }
+                
+                if (hole.length > 0) {
+                    latlngs.push(hole);
+                }
+            }
+        }
+        
+        if (latlngs.length > 0) {
+            return L.polygon(latlngs, { 
+                color: '#e74c3c', 
+                weight: 3, 
+                fillOpacity: 0.3,
+                fillColor: '#e74c3c'
+            });
+        }
+        
+        return null;
+    } catch (e) {
+        console.warn("Error procesando polígono:", e);
+        return null;
+    }
+}
+
+function processMultiPolygonOrSurface(multiElement) {
+    try {
+        const polygonMembers = [
+            ...multiElement.getElementsByTagNameNS("*", "polygonMember"),
+            ...multiElement.getElementsByTagNameNS("*", "surfaceMember")
+        ];
+        
+        const group = L.layerGroup();
+        let found = false;
+        
+        for (let member of polygonMembers) {
+            const polygons = member.getElementsByTagNameNS("*", "Polygon");
+            const surfaces = member.getElementsByTagNameNS("*", "Surface");
+            
+            for (let geom of [...polygons, ...surfaces]) {
+                const polygon = processPolygonOrSurface(geom);
+                if (polygon) {
+                    polygon.addTo(group);
+                    found = true;
+                }
+            }
+        }
+        
+        return found ? group : null;
+    } catch (e) {
+        console.warn("Error procesando multi-polígono:", e);
+        return null;
     }
 }
 

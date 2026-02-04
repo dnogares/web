@@ -305,7 +305,7 @@
                         </h4>
                         <div class="input-group mb-3">
                             <input type="text" class="form-control" id="searchInput"
-                                placeholder="Ingrese referencia catastral o dirección">
+                                placeholder="Ingrese referencia catastral">
                             <button class="btn btn-primary" type="button" id="searchBtn">
                                 <i class="fas fa-search"></i> Buscar
                             </button>
@@ -376,6 +376,28 @@
 
                     <div class="catastro-section mb-4" id="catastroSection" style="display: none;">
                         <!-- Los archivos de catastro se cargarán aquí dinámicamente -->
+                    </div>
+                    
+                    <!-- BOTÓN GLOBAL PERMANENTE - SIEMPRE VISIBLE -->
+                    <div class="info-card mb-4" id="globalDownloadSection" style="display: block !important; visibility: visible !important;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="m-0"><i class="fas fa-download"></i> Descargas Globales</h5>
+                            <div class="btn-group" role="group" style="display: flex !important; visibility: visible !important;">
+                                <button onclick="descargarGlobal('9755607VJ1195N')" class="btn btn-success btn-sm" title="Descargar todos los archivos generados" style="display: inline-block !important; visibility: visible !important; background-color: #28a745 !important;">
+                                    <i class="fas fa-download"></i> Descargar Global
+                                </button>
+                                <button onclick="descargarConjuntoOrganizado('9755607VJ1195N')" class="btn btn-warning btn-sm" title="Descargar conjunto organizado por categorías" style="display: inline-block !important; visibility: visible !important; background-color: #ffc107 !important;">
+                                    <i class="fas fa-folder-tree"></i> Bajar Conjunto
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i> 
+                                Referencia actual: <strong>9755607VJ1195N</strong> - 
+                                Usa estos botones para descargar todos los archivos generados
+                            </small>
+                        </div>
                     </div>
 
                     <div class="results-section" id="resultsSection">
@@ -1519,10 +1541,16 @@ async function procesarLoteGlobal(refsString, auto = false) {
             btn.innerHTML = originalText;
             btn.disabled = false;
         }
+    }
+}
+
+function mostrarArchivosCatastro(resultados, zipPath, ref) {
+    console.log('🎯 mostrarArchivosCatastro llamado con:', { resultados, zipPath, ref });
+    
     const catastroSection = document.getElementById('catastroSection');
     
     if (!catastroSection) {
-        console.error(' catastroSection no encontrado');
+        console.error('❌ catastroSection no encontrado');
         return;
     }
     
@@ -1530,15 +1558,15 @@ async function procesarLoteGlobal(refsString, auto = false) {
         <div class="info-card">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="m-0"><i class="fas fa-folder-open"></i> Documentación Generada</h5>
-                <div class="btn-group" role="group">
-                    ${zipPath ? `<a href="${zipPath}" download class="btn btn-primary btn-sm"><i class="fas fa-file-archive"></i> ZIP Catastro</a>` : '<span class="text-muted small">ZIP no disponible</span>'}
-                    <button onclick="descargarGlobal('${ref}')" class="btn btn-success btn-sm" title="Descargar todos los archivos generados">
+                <div class="btn-group" role="group" style="display: flex !important; visibility: visible !important;">
+                    ${zipPath ? `<a href="${zipPath}" download class="btn btn-primary btn-sm" style="display: inline-block !important; visibility: visible !important;"><i class="fas fa-file-archive"></i> ZIP Catastro</a>` : '<span class="text-muted small">ZIP no disponible</span>'}
+                    <button onclick="descargarGlobal('${ref}')" class="btn btn-success btn-sm" title="Descargar todos los archivos generados" style="display: inline-block !important; visibility: visible !important;">
                         <i class="fas fa-download"></i> Descargar Global
                     </button>
-                    <button onclick="descargarConjuntoOrganizado('${ref}')" class="btn btn-warning btn-sm" title="Descargar conjunto organizado por categorías">
+                    <button onclick="descargarConjuntoOrganizado('${ref}')" class="btn btn-warning btn-sm" title="Descargar conjunto organizado por categorías" style="display: inline-block !important; visibility: visible !important;">
                         <i class="fas fa-folder-tree"></i> Bajar Conjunto
                     </button>
-                    <button onclick="listarArchivos('${ref}')" class="btn btn-info btn-sm" title="Ver todos los archivos disponibles">
+                    <button onclick="listarArchivos('${ref}')" class="btn btn-info btn-sm" title="Ver todos los archivos disponibles" style="display: inline-block !important; visibility: visible !important;">
                         <i class="fas fa-list"></i> Listar Archivos
                     </button>
                 </div>
@@ -1621,9 +1649,23 @@ async function procesarLoteGlobal(refsString, auto = false) {
     `;
 
     catastroSection.innerHTML = html;
-    catastroSection.style.display = 'block';
+    catastroSection.style.display = 'block !important';
+    catastroSection.style.visibility = 'visible !important';
+    catastroSection.style.opacity = '1 !important';
     
-    console.log(' mostrarArchivosCatastro completado, archivos mostrados:', archivosMostrados);
+    console.log('✅ mostrarArchivosCatastro completado, archivos mostrados:', archivosMostrados);
+    console.log('✅ Botón "Descargar Global" debería ser visible ahora');
+    
+    // Forzar visibilidad de los botones después de un pequeño delay
+    setTimeout(() => {
+        const buttons = document.querySelectorAll('button[onclick*="descargarGlobal"]');
+        buttons.forEach(btn => {
+            btn.style.display = 'inline-block !important';
+            btn.style.visibility = 'visible !important';
+            btn.style.opacity = '1 !important';
+            console.log('✅ Botón Descargar Global forzado a visible');
+        });
+    }, 100);
 }
 
 // Función para descargar conjunto organizado por categorías

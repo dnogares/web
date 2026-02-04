@@ -26,7 +26,7 @@ import uvicorn
 
 # --- CONFIGURACIÓN DE RETENCIÓN DE ARCHIVOS ---
 TIEMPO_RETENCION_ARCHIVOS = 24 * 60 * 60  # 24 horas en segundos
-ENABLE_FILE_RETENTION = True  # Activar retención de archivos
+ENABLE_FILE_RETENTION = False  # DESACTIVADO temporalmente para evitar borrado de ZIPs
 
 # Estructura para trackear timestamps de archivos
 file_timestamps = {}
@@ -59,6 +59,12 @@ def cleanup_archivos_expirados():
             if outputs_path.exists():
                 for ref_dir in outputs_path.iterdir():
                     if ref_dir.is_dir() and not ref_dir.name.startswith('.'):
+                        # PROTEGER ARCHIVOS ZIP IMPORTANTES
+                        zip_files = list(ref_dir.glob("*.zip"))
+                        if zip_files:
+                            print(f"🔒 Protegiendo ZIPs en {ref_dir.name}: {[f.name for f in zip_files]}")
+                            continue  # Saltar directorios con ZIPs
+                        
                         timestamp_file = ref_dir / ".retention"
                         if timestamp_file.exists():
                             try:
@@ -2522,6 +2528,44 @@ async def obtener_capas_disponibles():
         "capas": [],
         "message": "Módulo de detección de capas no disponible temporalmente"
     }
+
+@app.get("/api/v1/verificar-zips")
+async def verificar_zips():
+    """Verifica el estado de los archivos ZIP en el sistema"""
+    try:
+        outputs_dir = cfg.get("rutas", {}).get("outputs", "outputs")
+        outputs_path = Path(outputs_dir)
+        
+        zip_info = []
+        total_zips = 0
+        
+        if outputs_path.exists():
+            for ref_dir in outputs_path.iterdir():
+                if ref_dir.is_dir() and not ref_dir.name.startswith('.'):
+                    zip_files = list(ref_dir.glob("**/*.zip"))
+                    for zip_file in zip_files:
+                        stat = zip_file.stat()
+                        zip_info.append({
+                            "referencia": ref_dir.name,
+                            "archivo": zip_file.name,
+                            "ruta": str(zip_file.relative_to(outputs_path)),
+                            "tamano": stat.st_size,
+                            "creado": datetime.fromtimestamp(stat.st_ctime).isoformat(),
+                            "modificado": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                            "existe": zip_file.exists()
+                        })
+                        total_zips += 1
+        
+        return {
+            "status": "success",
+            "total_zips": total_zips,
+            "retention_enabled": ENABLE_FILE_RETENTION,
+            "retention_hours": TIEMPO_RETENCION_ARCHIVOS / 3600,
+            "zips": zip_info
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @app.get("/api/v1/expedientes/{expediente_id}/afecciones")
 async def obtener_afecciones_expediente(expediente_id: str):
