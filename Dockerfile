@@ -1,6 +1,5 @@
 FROM python:3.10-slim
 
-
 # Configuración para instalaciones no interactivas
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TERM=linux
@@ -11,6 +10,10 @@ RUN apt-get update && apt-get install -y \
     libgdal-dev \
     libspatialindex-dev \
     g++ \
+    # Dependencias adicionales para matplotlib/plotly
+    libfreetype6-dev \
+    libpng-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # Configurar variables de entorno para GDAL
@@ -31,5 +34,5 @@ COPY . .
 ENV PORT=80
 EXPOSE 80
 
-# Comando de inicio
-CMD ["python", "main.py"]
+# Comando de inicio con uvicorn directamente
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
