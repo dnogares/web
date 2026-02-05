@@ -25,6 +25,14 @@ from contextlib import asynccontextmanager
 from pydantic import BaseModel
 import uvicorn
 
+# --- CORRECCIÓN DE RUTAS ---
+# Asegurar que el servidor siempre trabaje en el directorio del script
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+# Configuración
+CONFIG_FILE = "config_web.json"
+MAPA_FILE = "mapa_municipios.json"
+
 # --- CONFIGURACIÓN DE RETENCIÓN DE ARCHIVOS ---
 TIEMPO_RETENCION_ARCHIVOS = 24 * 60 * 60  # 24 horas en segundos
 ENABLE_FILE_RETENTION = True  # Activar retención de archivos (con protección de ZIPs)
@@ -48,6 +56,26 @@ def registrar_archivo(ref: str, filepath: Path):
                 "expiry": expiry_time,
                 "ref": ref
             }, f)
+
+# Cargar configuración
+def cargar_config():
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {
+            "rutas": {
+                "outputs": "outputs",
+                "layers": "layers",
+                "results": "results"
+            },
+            "urls": {
+                "catastro_wfs": "https://www.catastro.minhaf.es/INSPIRE/WFS",
+                "ign_pnoa": "https://www.ign.es/wms/pnoa"
+            }
+        }
+
+cfg = cargar_config()
 
 def cleanup_archivos_expirados():
     """Limpia solo archivos expirados (ejecutado en background)"""
@@ -95,6 +123,10 @@ if ENABLE_FILE_RETENTION:
 # Asegurar que el servidor siempre trabaje en el directorio del script
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
+# Configuración
+CONFIG_FILE = "config_web.json"
+MAPA_FILE = "mapa_municipios.json"
+
 # Agregar ruta de referenciaspy
 REFERENCIASPY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "referenciaspy")
 if os.path.exists(REFERENCIASPY_PATH):
@@ -102,10 +134,6 @@ if os.path.exists(REFERENCIASPY_PATH):
     print(f"✅ Ruta de referenciaspy agregada: {REFERENCIASPY_PATH}")
 else:
     print(f"⚠️ Ruta de referenciaspy no encontrada: {REFERENCIASPY_PATH}")
-
-# Configuración
-CONFIG_FILE = "config_web.json"
-MAPA_FILE = "mapa_municipios.json"
 
 # --- CONFIGURACIÓN DE RUTAS DE CAPAS ---
 # Prioridad:
@@ -359,26 +387,6 @@ try:
     print("✅ Expedientes router cargado en /api/v1")
 except Exception as e:
     print(f"⚠️ Expedientes router no disponible: {e}")
-# Cargar configuración
-def cargar_config():
-    try:
-        with open(CONFIG_FILE, "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {
-            "rutas": {
-                "outputs": "outputs",
-                "layers": "layers",
-                "results": "results"
-            },
-            "urls": {
-                "catastro_wfs": "https://www.catastro.minhaf.es/INSPIRE/WFS",
-                "ign_pnoa": "https://www.ign.es/wms/pnoa"
-            }
-        }
-
-cfg = cargar_config()
-
 # Crear y montar directorio de salidas
 outputs_dir = cfg.get("rutas", {}).get("outputs", "outputs")
 Path(outputs_dir).mkdir(exist_ok=True)
@@ -993,32 +1001,6 @@ async def get_referencia_geojson(ref: str):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/v1/referencia/{ref}/geojson_old")
-async def get_referencia_geojson_old(ref: str):
-    """Obtener GeoJSON de una referencia catastral"""
-    try:
-        # ... (código antiguo)
-        # ...
-        if coords_poligono:
-            # ...
-            if len(coords_poligono) > 0:
-                # ...
-                return {
-                    "type": "Feature",
-                    "geometry": {"type": "Polygon", "coordinates": [coords_poligono]},
-                    "properties": {"referencia": ref, "fuente_geometria": "GML Real", "anillos": len(coords_poligono)}
-                }
-        else:
-            # Sin GML: devolver error para que el frontend muestre mensaje claro
-            raise HTTPException(status_code=404, detail=f"No hay geometría GML disponible para la referencia {ref}")
-        
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.post("/api/v1/procesar-lote")
 async def procesar_lote(request: LoteRequest):
     """
@@ -1501,52 +1483,6 @@ del sistema de análisis territorial.
 ═══════════════════════════════════════════════════════════════
 """
     return readme
-
-@app.post("/api/v1/procesar-lote")
-async def procesar_lote_endpoint(request: LoteRequest, background_tasks: BackgroundTasks):
-    """Procesa un lote de referencias y genera un expediente conjunto"""
-    try:
-        from expedientes.catastro_exp import crear_expediente_id
-        
-        print(f"🚀 INICIANDO PROCESAMIENTO DE LOTE")
-        print(f"📊 Total referencias recibidas: {len(request.referencias)}")
-        print(f"📋 Referencias: {request.referencias}")
-        
-        # Directorio base para expedientes
-        exp_base = Path(outputs_dir) / "expedientes"
-        exp_base.mkdir(exist_ok=True)
-        
-        # Generar ID y lanzar tarea
-        exp_id = crear_expediente_id()
-        print(f"🆔 ID de expediente generado: {exp_id}")
-        
-        # Pre-crear directorio y manifiesto para evitar 404 en polling inmediato
-        exp_dir = exp_base / f"expediente_{exp_id}"
-        exp_dir.mkdir(parents=True, exist_ok=True)
-        
-        initial_manifest = {
-            "expediente_id": exp_id,
-            "estado": "iniciando",
-            "progreso": 0,
-            "numero_referencias": len(request.referencias),
-            "referencias": request.referencias,
-            "fecha_creacion": datetime.now().isoformat(),
-            "items": []
-        }
-        
-        with open(exp_dir / "manifest.json", "w", encoding="utf-8") as f:
-            json.dump(initial_manifest, f, indent=2, ensure_ascii=False)
-            
-        background_tasks.add_task(background_lote_worker, request.referencias, exp_base, exp_id)
-        
-        return {
-            "status": "processing",
-            "expediente_id": exp_id,
-            "message": "Procesamiento iniciado en segundo plano"
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/analizar-referencia")
 async def analizar_referencia(referencia: dict):
@@ -2552,29 +2488,12 @@ async def listar_archivos_ref(ref: str):
         return {"status": "error", "message": str(e), "archivos": []}
 
 
-# ==========================================
-# ENDPOINTS DE CAPAS Y AFECCIONES (TEMPORALMENTE DESACTIVADOS)
-# ==========================================
-
-@app.get("/api/v1/capas/disponibles")
-async def obtener_capas_disponibles():
-    """Retorna lista de todas las capas disponibles"""
-    # Temporal: respuesta simulada hasta que los módulos estén disponibles
-    return {
-        "status": "success",
-        "total": 0,
-        "por_tipo": {},
-        "capas": [],
-        "message": "Módulo de detección de capas no disponible temporalmente"
-    }
-
 @app.get("/api/v1/verificar-zips")
 async def verificar_zips():
     """Verifica el estado de los archivos ZIP en el sistema"""
     try:
         outputs_dir = cfg.get("rutas", {}).get("outputs", "outputs")
         outputs_path = Path(outputs_dir)
-        
         zip_info = []
         total_zips = 0
         
@@ -2647,15 +2566,7 @@ if __name__ == "__main__":
     print("🎨 Diseño: Glassmorphism")
     print(f"📂 referenciaspy: {REFERENCIASPY_PATH}")
     
-    # DESHABILITADO: ngrok causaba bloqueos al arrancar
-    # try:
-    #     from pyngrok import ngrok
-    #     public_url = ngrok.connect(PORT).public_url
-    #     print(f"🌐 Visor Público (ngrok): {public_url}/static/visor.html")
-    # except ImportError:
-    #     print("ℹ️  Para acceso público: pip install pyngrok")
-    # except Exception:
-    #     pass
+
         
     # Iniciar el servidor
     uvicorn.run(app, host="0.0.0.0", port=PORT)
