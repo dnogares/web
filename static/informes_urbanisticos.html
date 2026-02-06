@@ -1109,11 +1109,6 @@
                         activeLayers.add(layerId);
                         console.log(`✅ Simulated Layer ${layerId} added to map`);
                     }
-
-                    // Mostrar leyenda si la capa tiene información
-                    if (layerConfig.hasInfo) {
-                        showLegend(layerConfig, folderId);
-                    }
                 } else {
                     // Desactivar capa
                     if (layerControls[layerId]) {
@@ -1121,11 +1116,6 @@
                         delete layerControls[layerId];
                         activeLayers.delete(layerId);
                         console.log(`❌ Layer ${layerId} removed from map`);
-                    }
-
-                    // Ocultar leyenda si no hay capas activas con información
-                    if (!hasActiveLayersWithInfo()) {
-                        hideLegend();
                     }
                 }
                 
@@ -2588,4 +2578,38 @@ async function descargarConjuntoOrganizado(ref) {
     </script>
     </body>
 </html>
-}
+        // Función para mostrar sección de archivos catastrales
+function mostrarArchivosCatastro(archivosMostrados) {
+    const archivosSection = document.getElementById('archivosSection');
+        let html = `
+        <div class="info-card">
+            <h5><i class="fas fa-download"></i> Archivos Catastrales Disponibles</h5>
+            <div class="row">
+    `;
+
+    for (let i = 0; i < archivosMostrados.length; i++) {
+        const archivo = archivosMostrados[i];
+        html += `
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">${archivo.nombre}</h6>
+                        <p class="card-text">${archivo.tamano}</p>
+                        <a href="${archivo.url}" class="btn btn-primary btn-sm" target="_blank">Ver</a>
+                        <a href="${archivo.url}" class="btn btn-success btn-sm" download>Descargar</a>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    html += `
+            </div>
+        </div>
+    `;
+
+    archivosSection.innerHTML = html;
+}        
+    </script>
+    </body>
+</html>
