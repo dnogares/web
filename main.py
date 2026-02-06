@@ -119,14 +119,6 @@ if ENABLE_FILE_RETENTION:
     cleanup_thread.start()
     print(f"✅ Sistema de retención de archivos activado ({TIEMPO_RETENCION_ARCHIVOS/3600:.1f} horas)")
 
-# --- CORRECCIÓN DE RUTAS ---
-# Asegurar que el servidor siempre trabaje en el directorio del script
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
-
-# Configuración
-CONFIG_FILE = "config_web.json"
-MAPA_FILE = "mapa_municipios.json"
-
 # Agregar ruta de referenciaspy
 REFERENCIASPY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "referenciaspy")
 if os.path.exists(REFERENCIASPY_PATH):

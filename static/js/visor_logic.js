@@ -7,6 +7,15 @@ var measureMode = null;
 var redStyle = { color: '#ff0000', weight: 3, opacity: 1, fillOpacity: 0.1, fillColor: '#ff0000' };
 var datosProceso = {}; // Para el PDF
 
+// Helper para obtener referencia (Solución: Referencia hardcodeada)
+function getCurrentRef() {
+    if (window.currentParcelData && window.currentParcelData.ref_catastral) {
+        return window.currentParcelData.ref_catastral;
+    }
+    const input = document.getElementById('ref-input');
+    return input ? input.value.trim().toUpperCase() : '';
+}
+
 // --- INICIALIZACIÓN DEL MAPA ---
 function initVisor() {
     // Limpiar mapa previo si existe
@@ -20,6 +29,16 @@ function initVisor() {
     var savedZoom = localStorage.getItem('visor_map_zoom');
     var initialCenter = savedCenter ? JSON.parse(savedCenter) : [40.4168, -3.7038];
     var initialZoom = savedZoom ? parseInt(savedZoom) : 6;
+
+    // Solución: Mapa no visible (CSS fix)
+    const mapDiv = document.getElementById('map');
+    if (mapDiv) {
+        mapDiv.style.position = 'relative';
+        if (!mapDiv.style.height || mapDiv.clientHeight === 0) {
+            mapDiv.style.height = '100%';
+            mapDiv.style.minHeight = '600px';
+        }
+    }
 
     // Crear mapa
     map = L.map('map', { zoomControl: false }).setView(initialCenter, initialZoom);
@@ -294,7 +313,7 @@ function limpiarMapa() {
 }
 
 async function cargarReferencia() {
-    var ref = document.getElementById('ref-input').value.trim().toUpperCase();
+    var ref = getCurrentRef();
     if (!ref) return alert("Introduce una referencia");
 
     const resultsEl = document.getElementById('ref-results-checklist');
@@ -349,10 +368,11 @@ async function buscarMunicipio() {
     } catch (e) { resDiv.innerHTML = 'Error.'; }
 }
 
-async function analizarUrbanismo() {
-    const fileInput = document.getElementById('file-urbanismo');
-    const refInput = document.getElementById('ref-input');
-    const resEl = document.getElementById('urbanismo-resultados');
+// Solución: Código duplicado en funciones y Falta de manejo de errores
+async function performAnalysis(endpoint, fileInputId, resultElementId, renderCallback) {
+    const fileInput = document.getElementById(fileInputId);
+    const resEl = document.getElementById(resultElementId);
+    const ref = getCurrentRef();
 
     if (fileInput && fileInput.files.length > 0) handleFileUpload(fileInput);
 
@@ -362,46 +382,40 @@ async function analizarUrbanismo() {
     }
 
     try {
-        const ref = refInput ? refInput.value : "Archivo";
-        const res = await fetch('/api/v1/analizar-urbanismo', {
+        const payload = { referencia: ref || "Archivo" };
+        const res = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ referencia: ref || "Archivo" })
+            body: JSON.stringify(payload)
         });
+        
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        
         const data = await res.json();
         if (data.status === 'success' && resEl) {
-            const u = data.data.analisis_urbanistico;
-            resEl.innerHTML = `<div style="background:#e8f5e9; padding:10px; border-radius:4px; color:#333;"><b>Suelo:</b> ${u.suelo}<br><b>Edificabilidad:</b> ${u.edificabilidad}</div>`;
+            resEl.innerHTML = renderCallback(data);
+        } else if (resEl) {
+            resEl.innerHTML = `<div style="color:red;">Error: ${data.message || data.error || 'Desconocido'}</div>`;
         }
-    } catch (e) { if (resEl) resEl.innerHTML = 'Error.'; }
+    } catch (e) {
+        console.error("Analysis error:", e);
+        if (resEl) resEl.innerHTML = `<div style="color:red;">Error de conexión: ${e.message}</div>`;
+    }
+}
+
+async function analizarUrbanismo() {
+    await performAnalysis('/api/v1/analizar-urbanismo', 'file-urbanismo', 'urbanismo-resultados', (data) => {
+        const u = data.data.analisis_urbanistico;
+        return `<div style="background:#e8f5e9; padding:10px; border-radius:4px; color:#333;"><b>Suelo:</b> ${u.suelo}<br><b>Edificabilidad:</b> ${u.edificabilidad}</div>`;
+    });
 }
 
 async function analizarAfecciones() {
-    const fileInput = document.getElementById('file-afecciones');
-    const refInput = document.getElementById('ref-input');
-    const resEl = document.getElementById('analisis-resultados');
-
-    if (fileInput && fileInput.files.length > 0) handleFileUpload(fileInput);
-
-    if (resEl) {
-        resEl.style.display = 'block';
-        resEl.innerHTML = '⏳ Analizando...';
-    }
-
-    try {
-        const ref = refInput ? refInput.value : "Archivo";
-        const res = await fetch('/api/v1/analizar-afecciones', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ referencia: ref || "Archivo" })
-        });
-        const data = await res.json();
-        if (data.status === 'success' && resEl) {
-            let html = '';
-            data.data.afecciones.forEach(a => html += `<div style="background:#ffebee; padding:5px; margin-block-start:5px; border-radius:4px; color:#333;">⚠️ <b>${a.tipo}</b>: ${a.afectacion}</div>`);
-            resEl.innerHTML = html;
-        }
-    } catch (e) { if (resEl) resEl.innerHTML = 'Error.'; }
+    await performAnalysis('/api/v1/analizar-afecciones', 'file-afecciones', 'analisis-resultados', (data) => {
+        let html = '';
+        data.data.afecciones.forEach(a => html += `<div style="background:#ffebee; padding:5px; margin-block-start:5px; border-radius:4px; color:#333;">⚠️ <b>${a.tipo}</b>: ${a.afectacion}</div>`);
+        return html;
+    });
 }
 
 // --- HERRAMIENTAS ---
@@ -538,8 +552,7 @@ async function cargarContenidosDisponibles() {
     contenedor.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> Cargando contenidos disponibles...</div>';
 
     try {
-        const refInput = document.getElementById('ref-input');
-        const ref = refInput ? refInput.value.trim().toUpperCase() : "";
+        const ref = getCurrentRef();
 
         if (!ref) {
             contenedor.innerHTML = '<div style="text-align: center; color: #e74c3c; padding: 20px;">Introduce una referencia catastral primero</div>';
@@ -602,8 +615,7 @@ async function cargarContenidosDisponibles() {
 }
 
 async function generarPDFSeleccionado() {
-    const refInput = document.getElementById('ref-input');
-    const ref = refInput ? refInput.value.trim() : "";
+    const ref = getCurrentRef();
     const empresa = document.getElementById('empresa-nombre') ? document.getElementById('empresa-nombre').value.trim() : "";
     const colegiado = document.getElementById('colegiado-numero') ? document.getElementById('colegiado-numero').value.trim() : "";
 
@@ -885,6 +897,46 @@ async function loadTheme(url) {
     }
 }
 
+// Solución: openSettings() mal implementada (Implementación de modal)
+function openSettings() {
+    if (!document.getElementById('settingsModal')) {
+        createSettingsModal();
+    }
+    document.getElementById('settingsModal').style.display = 'flex';
+    loadSettings();
+}
+
+function createSettingsModal() {
+    const modal = document.createElement('div');
+    modal.id = 'settingsModal';
+    modal.style.cssText = 'display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10001; justify-content: center; align-items: center;';
+    modal.innerHTML = `
+        <div style="background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h3 style="margin-top: 0;">Ajustes</h3>
+            <div id="settings-content" style="min-height: 100px;">Cargando...</div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button onclick="document.getElementById('settingsModal').style.display='none'" style="padding: 8px 16px; cursor: pointer; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 4px;">Cerrar</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function loadSettings() {
+    const content = document.getElementById('settings-content');
+    try {
+        const res = await fetch('/api/v1/ajustes/capas');
+        const data = await res.json();
+        if (data.status === 'success') {
+            content.innerHTML = `<p>Max capas visibles: <b>${data.config.max_visible_layers}</b></p><p>Configuración cargada correctamente.</p>`;
+        } else {
+            content.innerHTML = '<div style="color:red">Error cargando ajustes.</div>';
+        }
+    } catch (e) {
+        content.innerHTML = '<div style="color:red">Error de conexión.</div>';
+    }
+}
+
 // --- LEYENDA ---
 function injectLegendModal() {
     if (document.getElementById('leyendaDialog')) return;
@@ -1016,7 +1068,7 @@ function injectExportButton() {
 }
 
 async function generarInformeHTML() {
-    const ref = document.getElementById('ref-input') ? document.getElementById('ref-input').value : 'N/A';
+    const ref = getCurrentRef() || 'N/A';
     const fecha = new Date().toLocaleDateString('es-ES');
     const coords = map.getCenter();
 
@@ -1147,4 +1199,3 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.style.opacity = '1';
     }
 });
-

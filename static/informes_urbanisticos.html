@@ -1109,6 +1109,11 @@
                         activeLayers.add(layerId);
                         console.log(`✅ Simulated Layer ${layerId} added to map`);
                     }
+
+                    // Mostrar leyenda si la capa tiene información
+                    if (layerConfig.hasInfo) {
+                        showLegend(layerConfig, folderId);
+                    }
                 } else {
                     // Desactivar capa
                     if (layerControls[layerId]) {
@@ -1116,6 +1121,11 @@
                         delete layerControls[layerId];
                         activeLayers.delete(layerId);
                         console.log(`❌ Layer ${layerId} removed from map`);
+                    }
+
+                    // Ocultar leyenda si no hay capas activas con información
+                    if (!hasActiveLayersWithInfo()) {
+                        hideLegend();
                     }
                 }
                 
