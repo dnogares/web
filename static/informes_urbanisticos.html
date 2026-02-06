@@ -762,7 +762,7 @@
         });
 
         function initializeMap() {
-            map = L.map('map').setView([40.4168, -3.7038], 6);
+          map = L.map('map').setView([40.4168, -3.7038], 6);
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
@@ -2610,6 +2610,9 @@ function mostrarArchivosCatastro(archivosMostrados) {
 
     archivosSection.innerHTML = html;
 }        
+document.addEventListener("DOMContentLoaded", function () {
+    initializeMap();
+});
     </script>
     </body>
 </html>
