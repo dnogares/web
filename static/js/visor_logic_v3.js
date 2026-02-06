@@ -164,21 +164,73 @@ function analizarUrbanismo() {
 }
 
 // --- FUNCIONES DE AFECCIONES ---
-function calcularAfecciones() {
+async function calcularAfecciones() {
+    // Obtener referencia de cualquiera de los inputs activos
+    const ref = document.getElementById('input-urb-ref')?.value || document.getElementById('input-ref')?.value;
+
+    if (!ref) {
+        alert("Por favor, introduce una referencia catastral para analizar.");
+        return;
+    }
+
     const resBox = document.getElementById('res-afecciones');
     resBox.style.display = 'block';
-    resBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cruzando capas espaciales...';
+    resBox.innerHTML = '<div style="text-align:center; padding:15px; color:#666;"><i class="fa-solid fa-spinner fa-spin"></i> Realizando cruce espacial de capas...</div>';
 
-    setTimeout(() => {
-        resBox.innerHTML = `
-            <strong>2 Afecciones Detectadas:</strong>
-            <ul style="margin:5px 0; padding-left:20px;">
-                <li>Vía Pecuaria (Cañada Real) - 25m</li>
-                <li>Zona de Policía de Cauces - 100m</li>
-            </ul>
-            <div style="color:green"><i class="fa-solid fa-check"></i> Fuera de Red Natura 2000</div>
-        `;
-    }, 2000);
+    try {
+        const response = await fetch('/api/v1/analizar-afecciones', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ referencia: ref })
+        });
+
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            const afecciones = data.data.afecciones || [];
+            const mapas = data.data.mapas || [];
+            const totalCapas = data.data.capas_analizadas || '?';
+
+            let html = `<div style="margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;">
+                            <strong>Resultados del Cruce:</strong>
+                            <div style="font-size:0.8rem; color:#666;">Analizadas ${totalCapas} capas de afección</div>
+                        </div>`;
+
+            if (afecciones.length > 0) {
+                html += `<ul style="margin:0; padding-left:20px; font-size:0.9rem;">`;
+                afecciones.forEach(af => {
+                    const isTotal = af.porcentaje > 99;
+                    const color = isTotal ? '#e74c3c' : '#f39c12';
+                    html += `<li style="margin-bottom:8px;">
+                        <span style="color:${color}; font-weight:bold;">${af.tipo}</span><br>
+                        ${af.descripcion} <span style="background:#eee; padding:1px 5px; border-radius:4px; font-size:0.8em;">${af.porcentaje.toFixed(1)}%</span>
+                    </li>`;
+                });
+                html += `</ul>`;
+            } else {
+                html += `<div style="color:#27ae60; padding:10px; background:#e8f5e9; border-radius:4px;">
+                            <i class="fa-solid fa-check-circle"></i> No se han detectado intersecciones.
+                         </div>`;
+            }
+
+            // Mostrar mapas generados
+            if (mapas.length > 0) {
+                html += `<div style="margin-top:15px; font-size:0.85rem; font-weight:bold; color:#2c3e50;">Mapas de Afección:</div>`;
+                html += `<div style="display:flex; gap:10px; overflow-x:auto; padding:10px 0;">`;
+                mapas.forEach(url => {
+                    html += `<a href="${url}" target="_blank"><img src="${url}" style="height:80px; border:1px solid #ddd; border-radius:4px;"></a>`;
+                });
+                html += `</div>`;
+            }
+
+            resBox.innerHTML = html;
+        } else {
+            throw new Error(data.message || "Error al procesar afecciones");
+        }
+    } catch (e) {
+        console.error(e);
+        resBox.innerHTML = `<div style="color:#c0392b; padding:10px;"><i class="fa-solid fa-circle-xmark"></i> Error: ${e.message}</div>`;
+    }
 }
 
 // --- HERRAMIENTAS DE MAPA ---
@@ -476,22 +528,22 @@ function processPolygonOrSurface(polygonElement) {
         // Buscar anillos exterior e interior
         const exteriorRings = polygonElement.getElementsByTagNameNS("*", "exterior");
         const interiorRings = polygonElement.getElementsByTagNameNS("*", "interior");
-        
+
         let latlngs = [];
-        
+
         // Procesar anillo exterior (boundary principal)
         if (exteriorRings.length > 0) {
             const exteriorRing = exteriorRings[0];
             const posList = exteriorRing.getElementsByTagNameNS("*", "posList")[0];
-            
+
             if (posList) {
                 const coordsText = posList.textContent.trim().split(/\s+/);
                 const ring = [];
-                
+
                 for (let j = 0; j < coordsText.length; j += 2) {
                     const v1 = parseFloat(coordsText[j]);
                     const v2 = parseFloat(coordsText[j + 1]);
-                    
+
                     // Determinar orden
                     if (v1 > 30 && v1 < 50) {
                         ring.push([v1, v2]);
@@ -499,26 +551,26 @@ function processPolygonOrSurface(polygonElement) {
                         ring.push([v2, v1]);
                     }
                 }
-                
+
                 if (ring.length > 0) {
                     latlngs.push(ring);
                 }
             }
         }
-        
+
         // Procesar anillos interiores (huecos)
         for (let i = 0; i < interiorRings.length; i++) {
             const interiorRing = interiorRings[i];
             const posList = interiorRing.getElementsByTagNameNS("*", "posList")[0];
-            
+
             if (posList) {
                 const coordsText = posList.textContent.trim().split(/\s+/);
                 const hole = [];
-                
+
                 for (let j = 0; j < coordsText.length; j += 2) {
                     const v1 = parseFloat(coordsText[j]);
                     const v2 = parseFloat(coordsText[j + 1]);
-                    
+
                     // Determinar orden
                     if (v1 > 30 && v1 < 50) {
                         hole.push([v1, v2]);
@@ -526,22 +578,22 @@ function processPolygonOrSurface(polygonElement) {
                         hole.push([v2, v1]);
                     }
                 }
-                
+
                 if (hole.length > 0) {
                     latlngs.push(hole);
                 }
             }
         }
-        
+
         if (latlngs.length > 0) {
-            return L.polygon(latlngs, { 
-                color: '#e74c3c', 
-                weight: 3, 
+            return L.polygon(latlngs, {
+                color: '#e74c3c',
+                weight: 3,
                 fillOpacity: 0.3,
                 fillColor: '#e74c3c'
             });
         }
-        
+
         return null;
     } catch (e) {
         console.warn("Error procesando polígono:", e);
@@ -555,14 +607,14 @@ function processMultiPolygonOrSurface(multiElement) {
             ...multiElement.getElementsByTagNameNS("*", "polygonMember"),
             ...multiElement.getElementsByTagNameNS("*", "surfaceMember")
         ];
-        
+
         const group = L.layerGroup();
         let found = false;
-        
+
         for (let member of polygonMembers) {
             const polygons = member.getElementsByTagNameNS("*", "Polygon");
             const surfaces = member.getElementsByTagNameNS("*", "Surface");
-            
+
             for (let geom of [...polygons, ...surfaces]) {
                 const polygon = processPolygonOrSurface(geom);
                 if (polygon) {
@@ -571,7 +623,7 @@ function processMultiPolygonOrSurface(multiElement) {
                 }
             }
         }
-        
+
         return found ? group : null;
     } catch (e) {
         console.warn("Error procesando multi-polígono:", e);
@@ -704,6 +756,22 @@ async function procesarLoteActual() {
 
         if (data.status === 'processing') {
             pollProgress(data.expediente_id, resBox);
+        } else if (data.status === 'success') {
+            // Manejar éxito inmediato (síncrono)
+            const zipUrl = data.zip_path || data.zip_url;
+            resBox.innerHTML = `
+                <div style="padding: 10px;">
+                    <div style="color: green; font-weight: bold; margin-bottom: 5px;">
+                        <i class="fa-solid fa-check-circle"></i> Lote Completado
+                    </div>
+                    <div style="font-size: 0.9rem; margin-bottom: 10px;">
+                        Lote: ${data.lote_id || 'Procesado'}
+                    </div>
+                    <button class="outline" onclick="window.open('${zipUrl}')">
+                        <i class="fa-solid fa-download"></i> Descargar ZIP
+                    </button>
+                </div>
+            `;
         } else {
             throw new Error(data.message || "Error al iniciar el procesamiento");
         }
@@ -772,42 +840,42 @@ function pollProgress(expId, container) {
 
 function cargarReferenciasLoteEnMapa(items, expId) {
     console.log(` Cargando ${items.length} referencias del lote ${expId} en el mapa`);
-    
+
     // Limpiar capa de dibujo anterior
     if (drawLayer) {
         drawLayer.clearLayers();
     }
-    
+
     let cargadas = 0;
     let errores = 0;
-    
+
     // Para cada referencia del lote, cargar su geometría
     items.forEach(async (item, index) => {
         try {
             const ref = item.referencia;
             console.log(` Cargando referencia ${index + 1}/${items.length}: ${ref}`);
-            
+
             // Intentar cargar el KML de la referencia individual
             const kmlUrl = `/outputs/expedientes/expediente_${expId}/${ref}/${ref}.kml`;
-            
+
             try {
                 const response = await fetch(kmlUrl);
                 if (response.ok) {
                     const kmlContent = await response.text();
-                    
+
                     if (typeof omnivore !== 'undefined') {
                         const layer = omnivore.kml.parse(kmlContent);
-                        layer.setStyle({ 
-                            color: '#e74c3c', 
-                            weight: 2, 
+                        layer.setStyle({
+                            color: '#e74c3c',
+                            weight: 2,
                             fillOpacity: 0.3,
                             fillColor: '#e74c3c'
                         });
-                        
+
                         layer.on('ready', function () {
                             drawLayer.addLayer(this);
                             cargadas++;
-                            
+
                             // Ajustar vista cuando se cargue la última referencia
                             if (cargadas + errores === items.length) {
                                 if (drawLayer.getLayers().length > 0) {
@@ -825,7 +893,7 @@ function cargarReferenciasLoteEnMapa(items, expId) {
                 errores++;
                 console.warn(` Error cargando KML para ${ref}:`, e);
             }
-            
+
         } catch (e) {
             errores++;
             console.error(` Error procesando item ${index}:`, e);
@@ -835,15 +903,15 @@ function cargarReferenciasLoteEnMapa(items, expId) {
 
 function cargarKMLGlobalLote(expId) {
     console.log(` Cargando KML global del lote ${expId}`);
-    
+
     const kmlUrl = `/outputs/expedientes/expediente_${expId}/lote/lote_${expId}.kml`;
-    
+
     if (typeof omnivore !== 'undefined') {
         const layer = omnivore.kml(kmlUrl, null, L.geoJson(null, {
-            style: { 
-                color: '#2ecc71', 
-                weight: 3, 
-                opacity: 1, 
+            style: {
+                color: '#2ecc71',
+                weight: 3,
+                opacity: 1,
                 fillOpacity: 0.1,
                 fillColor: '#2ecc71'
             }

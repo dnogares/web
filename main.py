@@ -1742,6 +1742,8 @@ async def analizar_afecciones(request: AfeccionesRequest):
                 output_dir_base=str(ref_dir)
             )
             
+            total_capas = len(capas_locales) + len(capas_wfs) + len(capas_wms)
+            
             # 4. Formatear respuesta
             mapas_urls = []
             detalles_afeccion = []
@@ -1776,6 +1778,7 @@ async def analizar_afecciones(request: AfeccionesRequest):
                     "referencia": ref,
                     "afecciones": detalles_afeccion,
                     "mapas": mapas_urls,
+                    "capas_analizadas": total_capas,
                     "source": "PostGIS + GeoPandas (Hybrid)"
                 },
                 "message": f"Análisis completado. {len(detalles_afeccion)} afecciones detectadas."
