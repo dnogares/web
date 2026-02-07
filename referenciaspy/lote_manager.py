@@ -119,7 +119,7 @@ class LoteManager:
                     # 2. Análisis de afecciones (DEACTIVADO por defecto)
                     # Desactivado para mejorar rendimiento en lotes grandes
                     # Para activar, cambiar ANALISIS_AFECCIONES_ACTIVO = True
-                    ANALISIS_AFECCIONES_ACTIVO = False
+                    ANALISIS_AFECCIONES_ACTIVO = True
                     
                     if ANALISIS_AFECCIONES_ACTIVO and analyzer:
                         logger.info("  🔍 Analizando afecciones...")
