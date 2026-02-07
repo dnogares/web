@@ -454,7 +454,8 @@ class CatastroDownloader:
         # Buscar GML en la raíz o en subcarpeta gml/
         posibles_gml = [
             self.output_dir / f"{ref}_parcela.gml",
-            self.output_dir / f"{ref}_parcela.gml"  # Fallback redundante por compatibilidad
+            self.output_dir / ref / f"{ref}_parcela.gml",
+            self.output_dir / f"{ref}_parcela.gml" 
         ]
         
         gml_file = None
@@ -464,7 +465,7 @@ class CatastroDownloader:
                 break
         
         if not gml_file:
-            print("  ⚠ No existe GML de parcela, no se puede dibujar contorno")
+            print(f"  ⚠ No existe GML de parcela para {ref}, no se puede dibujar contorno")
             return False
 
         coords_rings = self.extraer_coordenadas_gml(gml_file)
@@ -473,19 +474,20 @@ class CatastroDownloader:
 
         exito = False
 
+        # Lista ampliada de imágenes a procesar para asegurar que NINGUNA se quede sin contorno
         imagenes = [
-            (
-                self.output_dir / f"{ref}_ortofoto_pnoa{suffix}.jpg",
-                self.output_dir / f"{ref}_ortofoto_pnoa{suffix}_contorno.jpg",
-            ),
-            (
-                self.output_dir / f"{ref}_plano_catastro{suffix}.png",
-                self.output_dir / f"{ref}_plano_catastro{suffix}_contorno.png",
-            ),
-            (
-                self.output_dir / f"{ref}_plano_con_ortofoto{suffix}.png",
-                self.output_dir / f"{ref}_plano_con_ortofoto{suffix}_contorno.png",
-            ),
+            # PNOA Ortofoto
+            (self.output_dir / f"{ref}_ortofoto_pnoa{suffix}.jpg", self.output_dir / f"{ref}_ortofoto_pnoa{suffix}_contorno.jpg"),
+            (self.output_dir / f"{ref}_ortofoto_pnoa{suffix}.png", self.output_dir / f"{ref}_ortofoto_pnoa{suffix}_contorno.png"),
+            # Catastro Ortofoto (Respaldo)
+            (self.output_dir / f"{ref}_ortofoto_catastro{suffix}.jpg", self.output_dir / f"{ref}_ortofoto_catastro{suffix}_contorno.jpg"),
+            (self.output_dir / f"{ref}_ortofoto_catastro{suffix}.png", self.output_dir / f"{ref}_ortofoto_catastro{suffix}_contorno.png"),
+            # Plano Catastral
+            (self.output_dir / f"{ref}_plano_catastro{suffix}.png", self.output_dir / f"{ref}_plano_catastro{suffix}_contorno.png"),
+            (self.output_dir / f"{ref}_plano_catastro{suffix}.jpg", self.output_dir / f"{ref}_plano_catastro{suffix}_contorno.jpg"),
+            # Composición Plano + Ortofoto
+            (self.output_dir / f"{ref}_plano_con_ortofoto{suffix}.png", self.output_dir / f"{ref}_plano_con_ortofoto{suffix}_contorno.png"),
+            (self.output_dir / f"{ref}_plano_con_ortofoto{suffix}.jpg", self.output_dir / f"{ref}_plano_con_ortofoto{suffix}_contorno.jpg"),
         ]
 
         for in_path, out_path in imagenes:
@@ -501,12 +503,38 @@ class CatastroDownloader:
                         if pixels:
                             all_rings_pixels.append(pixels)
 
-                    if all_rings_pixels and self.dibujar_contorno_en_imagen(
-                        in_path, all_rings_pixels, out_path
-                    ):
-                        exito = True
+                    if all_rings_pixels:
+                        # 1. Guardar versión con sufijo _contorno (para compatibilidad con el visor)
+                        self.dibujar_contorno_en_imagen(in_path, all_rings_pixels, out_path)
+                        
+                        # 2. SOBREESCRIBIR la imagen original para que "todas las fotos tengan contorno"
+                        if self.dibujar_contorno_en_imagen(in_path, all_rings_pixels, in_path):
+                            exito = True
+                            
                 except Exception as e:
                     print(f"  ⚠ Error procesando imagen {in_path}: {e}")
+
+        # ÚLTIMO RECURSO: Escanear el directorio para cualquier otra imagen que pueda haber sido generada
+        try:
+            for ext in ['.jpg', '.png', '.jpeg']:
+                for img_path in self.output_dir.glob(f"{ref}*{suffix}*{ext}"):
+                    if "_contorno" not in img_path.name:
+                        # Si no fue procesada ya (no está en la lista de arriba)
+                        # O simplemente para asegurar:
+                        with Image.open(img_path) as img:
+                            w, h = img.size
+                        pixels_list = []
+                        for ring in coords_rings:
+                            px = self.convertir_coordenadas_a_pixel(ring, bbox_wgs84, w, h)
+                            if px: pixels_list.append(px)
+                        
+                        if pixels_list:
+                            self.dibujar_contorno_en_imagen(img_path, pixels_list, img_path)
+                            # También crear la versión _contorno por si acaso
+                            out_c = img_path.parent / (img_path.stem + "_contorno" + img_path.suffix)
+                            self.dibujar_contorno_en_imagen(img_path, pixels_list, out_c)
+        except Exception as e:
+            print(f"  ⚠ Error en escaneo final de contornos: {e}")
 
         return exito
 

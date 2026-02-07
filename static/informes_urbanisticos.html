@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Informes Urbanísticos</title>
+    <title>Informes catastrasles y Urbanísticos</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -125,7 +125,8 @@
         .map-wrapper {
             position: relative;
             width: 100%;
-            padding-top: 100%; /* 1:1 Aspect Ratio (Cuadrado) */
+            padding-top: 100%;
+            /* 1:1 Aspect Ratio (Cuadrado) */
         }
 
         .map-container {
@@ -173,7 +174,7 @@
             background: rgba(255, 255, 255, 0.9);
             padding: 10px;
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
             max-width: 250px;
             max-height: 300px;
             overflow-y: auto;
@@ -263,12 +264,14 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
             transition: all 0.2s;
         }
+
         .map-tool-btn:hover {
             background: #f0f0f0;
         }
+
         .map-tool-btn.active {
             background: #667eea;
             color: white;
@@ -276,11 +279,12 @@
 
         .file-card {
             transition: all 0.2s ease;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
         }
+
         .file-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
             border-color: #667eea !important;
         }
 
@@ -323,10 +327,13 @@
                             <button class="btn btn-primary" type="button" id="searchBtn">
                                 <i class="fas fa-search"></i> Buscar
                             </button>
-                            <button class="btn btn-outline-secondary" type="button" id="batchBtn" onclick="document.getElementById('batchInput').click()" title="Cargar archivo TXT con referencias">
+                            <button class="btn btn-outline-secondary" type="button" id="batchBtn"
+                                onclick="document.getElementById('batchInput').click()"
+                                title="Cargar archivo TXT con referencias">
                                 <i class="fas fa-file-upload"></i> Lote TXT
                             </button>
-                            <input type="file" id="batchInput" accept=".txt" style="display: none;" onchange="handleBatchUpload(this); this.value = null;">
+                            <input type="file" id="batchInput" accept=".txt" style="display: none;"
+                                onchange="handleBatchUpload(this); this.value = null;">
                         </div>
                     </div>
                     <div class="col-md-4">
@@ -369,13 +376,17 @@
 
                     <div class="map-wrapper mb-4">
                         <div class="map-container" id="map"></div>
-                        
+
                         <!-- Herramientas del mapa -->
                         <div class="map-tools">
-                            <button class="map-tool-btn" onclick="toggleMeasure('distance')" title="Medir Distancia"><i class="fas fa-ruler"></i></button>
-                            <button class="map-tool-btn" onclick="toggleMeasure('area')" title="Medir Área"><i class="fas fa-draw-polygon"></i></button>
-                            <button class="map-tool-btn" onclick="locateUser()" title="¿Dónde estoy?"><i class="fas fa-location-arrow"></i></button>
-                            <button class="map-tool-btn text-danger" onclick="clearMapTools()" title="Limpiar"><i class="fas fa-trash"></i></button>
+                            <button class="map-tool-btn" onclick="toggleMeasure('distance')" title="Medir Distancia"><i
+                                    class="fas fa-ruler"></i></button>
+                            <button class="map-tool-btn" onclick="toggleMeasure('area')" title="Medir Área"><i
+                                    class="fas fa-draw-polygon"></i></button>
+                            <button class="map-tool-btn" onclick="locateUser()" title="¿Dónde estoy?"><i
+                                    class="fas fa-location-arrow"></i></button>
+                            <button class="map-tool-btn text-danger" onclick="clearMapTools()" title="Limpiar"><i
+                                    class="fas fa-trash"></i></button>
                         </div>
 
                         <!-- Leyenda -->
@@ -383,14 +394,16 @@
                             <h5><i class="fas fa-info-circle"></i> Leyenda</h5>
                             <div id="legendContent"></div>
                         </div>
-                        
+
                         <!-- Resultado medición -->
-                        <div id="measurementResult" style="position: absolute; top: 10px; left: 60px; z-index: 1000; background: white; padding: 5px 10px; border-radius: 5px; display: none; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-weight: bold; color: #667eea;"></div>
+                        <div id="measurementResult"
+                            style="position: absolute; top: 10px; left: 60px; z-index: 1000; background: white; padding: 5px 10px; border-radius: 5px; display: none; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-weight: bold; color: #667eea;">
+                        </div>
                     </div>
 
                     <!-- Sección de descargas (se mostrará dinámicamente) -->
                     <div class="catastro-section mb-4" id="catastroSection" style="display: none;"></div>
-                    
+
                     <!-- Sección de descargas globales (se actualizará dinámicamente) -->
                     <div class="info-card mb-4" id="globalDownloadSection" style="display: none;">
                         <!-- Se llenará dinámicamente -->
@@ -405,11 +418,12 @@
                     <div class="controls-section" style="height: auto; min-height: 600px; overflow-y: auto;">
                         <h4 class="mb-3"><i class="fas fa-layer-group"></i> Capas</h4>
                         <div id="layersList"></div>
-                        
+
                         <div class="mt-3 pt-3 border-top">
                             <div class="mb-2">
                                 <label for="maxLayers" class="form-label small">Máximo capas:</label>
-                                <input type="number" class="form-control form-control-sm" id="maxLayers" value="5" min="1" max="10">
+                                <input type="number" class="form-control form-control-sm" id="maxLayers" value="5"
+                                    min="1" max="10">
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="showShaded">
@@ -427,7 +441,7 @@
                         <i class="fas fa-city"></i> Descarga Municipal
                     </h5>
                     <div class="input-group mb-3">
-                        <input type="text" class="form-control" id="municipio-input" 
+                        <input type="text" class="form-control" id="municipio-input"
                             placeholder="Ej: Madrid (o vacío para ver todos)">
                         <button class="btn btn-outline-primary" type="button" id="buscarMunicipioBtn">
                             <i class="fas fa-search"></i> Buscar
@@ -523,10 +537,12 @@
                             <div class="mb-3">
                                 <label for="buffer_mapa" class="form-label">Zoom / Buffer del mapa (metros):</label>
                                 <div class="input-group">
-                                    <input type="number" class="form-control" id="buffer_mapa" placeholder="0 = Automático" min="0" step="10">
+                                    <input type="number" class="form-control" id="buffer_mapa"
+                                        placeholder="0 = Automático" min="0" step="10">
                                     <span class="input-group-text">metros</span>
                                 </div>
-                                <div class="form-text">Radio en metros alrededor de la parcela. Dejar en 0 o vacío para ajuste automático.</div>
+                                <div class="form-text">Radio en metros alrededor de la parcela. Dejar en 0 o vacío para
+                                    ajuste automático.</div>
                             </div>
                         </div>
                     </div>
@@ -570,7 +586,7 @@
         let activeLayers = new Set();
         let layerControls = {};
         let currentRequest = null;
-        
+
         // Variables para herramientas
         let measureMode = null;
         let measurePoints = [];
@@ -596,11 +612,11 @@
                 icon: 'fa-tractor',
                 description: 'Sistema de Información Geográfica de Parcelas Agrícolas',
                 layers: [
-                    { 
+                    {
                         id: 'sigpac_parcelas', name: 'Parcelas SIGPAC', icon: 'fa-vector-square', color: '#2ecc71', hasInfo: true, description: 'Delimitación agrícola',
                         wmsParams: { url: 'https://wms.mapama.gob.es/sig/Agricultura/Sigpac/wms.aspx', layers: 'SIGPAC:Parcela', format: 'image/png', transparent: true, version: '1.3.0' }
                     },
-                    { 
+                    {
                         id: 'sigpac_recintos', name: 'Recintos SIGPAC', icon: 'fa-layer-group', color: '#f1c40f', hasInfo: true, description: 'Usos del suelo',
                         wmsParams: { url: 'https://wms.mapama.gob.es/sig/Agricultura/Sigpac/wms.aspx', layers: 'SIGPAC:Recinto', format: 'image/png', transparent: true, version: '1.3.0' }
                     },
@@ -689,7 +705,7 @@
             map.on('dblclick', finishMeasure);
 
             // Evento de click para obtener información del catastro
-            map.on('click', function(e) {
+            map.on('click', function (e) {
                 if (!window.measureMode) {
                     identificarMetadatosCatastro(e.latlng);
                 }
@@ -702,11 +718,11 @@
                 clearMapTools();
                 return;
             }
-            
+
             clearMapTools(); // Limpiar estado anterior
             measureMode = mode;
             window.measureMode = mode; // Global para evitar clicks de info
-            
+
             // Activar botón visualmente
             const btnIcon = mode === 'distance' ? 'fa-ruler' : 'fa-draw-polygon';
             const btns = document.querySelectorAll('.map-tool-btn i');
@@ -715,28 +731,28 @@
                     i.parentElement.classList.add('active');
                 }
             });
-            
+
             map.getContainer().style.cursor = 'crosshair';
-            
+
             const msg = mode === 'distance' ? '📏 Midiendo distancia (Click para puntos, Doble click terminar)' : '📐 Midiendo área (Click para vértices, Doble click cerrar)';
             showMeasurementResult(msg);
         }
 
         function handleMapClick(e) {
             if (!measureMode) return;
-            
+
             const latlng = e.latlng;
             measurePoints.push(latlng);
-            
+
             // Marcador
-            L.circleMarker(latlng, {radius: 5, color: '#667eea', fillColor: 'white', fillOpacity: 1}).addTo(measureLayer);
-            
+            L.circleMarker(latlng, { radius: 5, color: '#667eea', fillColor: 'white', fillOpacity: 1 }).addTo(measureLayer);
+
             if (measurePoints.length > 1) {
                 if (measureMode === 'distance') {
-                    const line = L.polyline(measurePoints, {color: '#667eea', weight: 3}).addTo(measureLayer);
+                    const line = L.polyline(measurePoints, { color: '#667eea', weight: 3 }).addTo(measureLayer);
                     updateMeasurementResult();
                 } else if (measureMode === 'area') {
-                    const poly = L.polygon(measurePoints, {color: '#667eea', weight: 3, fillOpacity: 0.2}).addTo(measureLayer);
+                    const poly = L.polygon(measurePoints, { color: '#667eea', weight: 3, fillOpacity: 0.2 }).addTo(measureLayer);
                     // Limpiar polígonos anteriores intermedios para solo dejar el actual
                     measureLayer.eachLayer(l => {
                         if (l instanceof L.Polygon && l !== poly) measureLayer.removeLayer(l);
@@ -757,23 +773,23 @@
 
         function updateMeasurementResult(final = false) {
             if (measurePoints.length < 2) return;
-            
+
             let text = '';
             if (measureMode === 'distance') {
                 let dist = 0;
-                for(let i=0; i<measurePoints.length-1; i++) {
-                    dist += map.distance(measurePoints[i], measurePoints[i+1]);
+                for (let i = 0; i < measurePoints.length - 1; i++) {
+                    dist += map.distance(measurePoints[i], measurePoints[i + 1]);
                 }
-                text = `📏 Distancia: ${dist < 1000 ? dist.toFixed(1) + ' m' : (dist/1000).toFixed(2) + ' km'}`;
+                text = `📏 Distancia: ${dist < 1000 ? dist.toFixed(1) + ' m' : (dist / 1000).toFixed(2) + ' km'}`;
             } else if (measureMode === 'area' && measurePoints.length > 2) {
                 // Usar L.GeometryUtil si está disponible, sino aproximación simple
                 let area = 0;
                 if (L.GeometryUtil) {
                     area = L.GeometryUtil.geodesicArea(measurePoints);
                 }
-                text = `📐 Área: ${area < 10000 ? area.toFixed(1) + ' m²' : (area/10000).toFixed(2) + ' ha'}`;
+                text = `📐 Área: ${area < 10000 ? area.toFixed(1) + ' m²' : (area / 10000).toFixed(2) + ' ha'}`;
             }
-            
+
             if (final) text += ' (Finalizado)';
             showMeasurementResult(text);
         }
@@ -807,19 +823,19 @@
 
         function identificarMetadatosCatastro(latlng) {
             console.log('Click en mapa - identificando metadatos catastro:', latlng);
-            
+
             const catastroLayer = window.catastroLayer;
-            
+
             if (!catastroLayer) {
                 console.error('No se encontró la capa de catastro');
                 return;
             }
-            
+
             console.log('Capa catastro encontrada:', catastroLayer);
-            
+
             const url = getWMSGetFeatureInfoUrl(catastroLayer, latlng);
             console.log('URL WMS GetFeatureInfo:', url);
-            
+
             if (url) {
                 // Mostrar popup de carga
                 const popup = L.popup()
@@ -932,11 +948,11 @@
 
         function toggleLayer(layerId, enabled, layerConfig, folderId) {
             console.log(`🔄 Toggle layer: ${layerId}, enabled: ${enabled}`);
-            
+
             if (window.toggleTimeout) {
                 clearTimeout(window.toggleTimeout);
             }
-            
+
             window.toggleTimeout = setTimeout(() => {
                 if (enabled) {
                     if (layerConfig.wmsParams) {
@@ -954,22 +970,22 @@
                             keepBuffer: 2,
                             maxNativeZoom: 18
                         });
-                        
+
                         layerControls[layerId] = wmsLayer;
                         wmsLayer.addTo(map);
                         activeLayers.add(layerId);
                         console.log(`✅ WMS Layer ${layerId} added to map`);
                     } else {
                         const simulatedLayer = L.layerGroup();
-                        
+
                         if (layerId.includes('parcela') || layerId.includes('suelo')) {
                             const bounds = map.getBounds();
                             const center = bounds.getCenter();
-                            
+
                             for (let i = 0; i < 3; i++) {
                                 const lat = center.lat + (Math.random() - 0.5) * 0.01;
                                 const lng = center.lng + (Math.random() - 0.5) * 0.01;
-                                
+
                                 const polygon = L.polygon([
                                     [lat - 0.001, lng - 0.001],
                                     [lat - 0.001, lng + 0.001],
@@ -981,12 +997,12 @@
                                     fillOpacity: 0.3,
                                     weight: 2
                                 });
-                                
+
                                 polygon.bindPopup(`<b>${layerConfig.name}</b><br>Capa simulada para demostración`);
                                 polygon.addTo(simulatedLayer);
                             }
                         }
-                        
+
                         layerControls[layerId] = simulatedLayer;
                         simulatedLayer.addTo(map);
                         activeLayers.add(layerId);
@@ -1000,7 +1016,7 @@
                         console.log(`❌ Layer ${layerId} removed from map`);
                     }
                 }
-                
+
                 updateLayersUI();
             }, 100);
         }
@@ -1008,7 +1024,7 @@
         function updateLayersUI() {
             const activeCount = activeLayers.size;
             const maxLayers = parseInt(document.getElementById('maxLayers')?.value || 5);
-            
+
             document.querySelectorAll('[data-layer]').forEach(checkbox => {
                 if (!checkbox.checked && activeCount >= maxLayers) {
                     checkbox.disabled = true;
@@ -1037,7 +1053,7 @@
 
             const generateBtn = document.getElementById('generateBtn');
             if (generateBtn) {
-                generateBtn.addEventListener('click', function(e) {
+                generateBtn.addEventListener('click', function (e) {
                     e.preventDefault();
                     generateInforme();
                 });
@@ -1086,7 +1102,7 @@
         function toggleCatastroLayer() {
             const btn = document.getElementById('toggleCatastroBtn');
             const isActive = map.hasLayer(window.catastroLayer);
-            
+
             if (isActive) {
                 map.removeLayer(window.catastroLayer);
                 btn.classList.remove('btn-info');
@@ -1216,19 +1232,19 @@
 
             // Guardar la referencia actual
             currentRef = searchTerm;
-            
+
             showProgress('Consultando Catastro...', 10);
 
             try {
                 showProgress('Descargando documentación catastral...', 20);
-                
+
                 const settings = getSettings();
                 const buffer = settings.buffer_mapa ? parseInt(settings.buffer_mapa) : 0;
 
                 const catastroResponse = await fetch('/api/v1/procesar-completo', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
+                    body: JSON.stringify({
                         referencia: searchTerm,
                         buffer_metros: buffer
                     })
@@ -1240,7 +1256,7 @@
                 }
 
                 const catastroData = await catastroResponse.json();
-                
+
                 if (catastroData.status !== 'success') {
                     throw new Error(catastroData.error || 'Error procesando documentación catastral');
                 }
@@ -1260,7 +1276,7 @@
 
                 const res = await response.json();
                 const data = res.data;
-                
+
                 console.log('Datos recibidos del backend:', data);
 
                 if (!data || data.coordenadas_y === undefined) {
@@ -1297,9 +1313,9 @@
                 map.setView(coordinates, 18);
 
                 showProgress('Mostrando archivos generados...', 80);
-                
+
                 mostrarArchivosCatastro(catastroData.resultados || {}, catastroData.zip_path, searchTerm);
-                
+
                 const catastroSection = document.getElementById('catastroSection');
                 if (catastroSection) {
                     catastroSection.style.display = 'block';
@@ -1331,15 +1347,15 @@
         async function handleBatchUpload(input) {
             const file = input.files[0];
             if (!file) return;
-            
+
             const text = await file.text();
             const refs = text.split(/\r?\n/).map(r => r.trim()).filter(r => r && r.length > 5);
-            
+
             if (refs.length === 0) {
                 alert("No se encontraron referencias válidas en el archivo.");
                 return;
             }
-            
+
             const confirmMsg = `Se han encontrado ${refs.length} referencias:\n\n${refs.slice(0, 10).join('\n')}${refs.length > 10 ? '\n...' : ''}\n\n¿Desea comenzar el procesamiento del lote?`;
             if (!confirm(confirmMsg)) {
                 input.value = '';
@@ -1347,7 +1363,7 @@
             }
 
             let batchContainer = document.getElementById('batchContainer');
-            
+
             if (!batchContainer) {
                 batchContainer = document.createElement('div');
                 batchContainer.id = 'batchContainer';
@@ -1357,7 +1373,7 @@
             batchContainer.innerHTML = '';
 
             window.batchCancelled = false;
-            
+
             const batchResults = document.createElement('div');
             batchResults.className = 'p-3 bg-white rounded shadow-sm border';
             batchResults.innerHTML = `
@@ -1375,11 +1391,11 @@
                     </table>
                 </div>
             `;
-            
+
             batchContainer.appendChild(batchResults);
-            
+
             const tbody = document.getElementById('batchTableBody');
-            
+
             for (const ref of refs) {
                 if (window.batchCancelled) {
                     const tr = document.createElement('tr');
@@ -1392,25 +1408,25 @@
                 const tr = document.createElement('tr');
                 tr.innerHTML = `<td>${ref}</td><td><span class="spinner-border spinner-border-sm text-primary"></span> Procesando...</td><td>-</td><td>-</td>`;
                 tbody.appendChild(tr);
-                
+
                 try {
                     const catastroRes = await fetch('/api/v1/procesar-completo', {
-                        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({referencia: ref})
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ referencia: ref })
                     });
-                    
+
                     const res = await fetch('/api/v1/urbanismo/generar-informe', {
-                        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ref_catastral: ref})
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ref_catastral: ref })
                     });
-                    
+
                     const catastroData = await catastroRes.json();
                     const data = await res.json();
-                    
+
                     if (data.status === 'success' || (data.data && !data.error)) {
                         const d = data.data || data;
-                        
+
                         const pdfLink = d.url_pdf ? `<a href="${d.url_pdf}" target="_blank" class="btn btn-sm btn-danger" title="Informe PDF"><i class="fas fa-file-pdf"></i> PDF</a>` : '<span class="text-muted">-</span>';
                         const csvLink = d.url_csv ? `<a href="${d.url_csv}" download class="btn btn-sm btn-info text-white" title="Datos CSV"><i class="fas fa-file-csv"></i> CSV</a>` : '<span class="text-muted">-</span>';
-                        
+
                         let zipLink = '<span class="text-muted">-</span>';
                         if (catastroData.zip_path) {
                             zipLink = `<a href="${catastroData.zip_path}" download class="btn btn-sm btn-primary" title="ZIP Catastro"><i class="fas fa-file-archive"></i> ZIP</a>`;
@@ -1432,9 +1448,9 @@
                     tr.innerHTML = `<td>${ref}</td><td><span class="badge bg-danger">Fallo Red</span></td><td colspan="4">-</td>`;
                 }
             }
-            
+
             const btnCancel = document.getElementById('btnCancelarLote');
-            if(btnCancel) btnCancel.style.display = 'none';
+            if (btnCancel) btnCancel.style.display = 'none';
 
             input.value = '';
 
@@ -1444,10 +1460,10 @@
         }
 
         function cancelarLote() {
-            if(confirm("¿Está seguro de que desea detener el procesamiento del lote? Las referencias pendientes no se procesarán.")) {
+            if (confirm("¿Está seguro de que desea detener el procesamiento del lote? Las referencias pendientes no se procesarán.")) {
                 window.batchCancelled = true;
                 const btn = document.getElementById('btnCancelarLote');
-                if(btn) {
+                if (btn) {
                     btn.disabled = true;
                     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deteniendo...';
                 }
@@ -1455,14 +1471,14 @@
         }
 
         async function procesarLoteGlobal(refsString, auto = false) {
-            if(!auto && !confirm("Esto generará un mapa global y un ZIP unificado. Puede tardar unos segundos. ¿Continuar?")) return;
-            
+            if (!auto && !confirm("Esto generará un mapa global y un ZIP unificado. Puede tardar unos segundos. ¿Continuar?")) return;
+
             let btn = null;
             if (!auto && typeof event !== 'undefined' && event && event.target) {
                 btn = event.target.closest('button');
             }
             const originalText = btn ? btn.innerHTML : '';
-            if(btn) {
+            if (btn) {
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
                 btn.disabled = true;
             }
@@ -1470,10 +1486,10 @@
             const refs = refsString.split(',');
             try {
                 const res = await fetch('/api/v1/procesar-lote', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({referencias: refs})
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ referencias: refs })
                 });
                 const data = await res.json();
-                if(data.status === 'success') {
+                if (data.status === 'success') {
                     if (data.mapa_global_url) {
                         const batchContainer = document.getElementById('batchContainer');
                         let previewDiv = document.getElementById('batchGlobalPreview');
@@ -1483,7 +1499,7 @@
                             previewDiv.className = 'mt-3 p-3 bg-light rounded border';
                             batchContainer.appendChild(previewDiv);
                         }
-                        
+
                         previewDiv.innerHTML = `
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h6 class="m-0 text-primary"><i class="fas fa-map"></i> Mapa Global del Lote</h6>
@@ -1497,17 +1513,17 @@
                                 <a href="${data.mapa_global_url}" download class="btn btn-outline-primary"><i class="fas fa-image"></i> Descargar Imagen</a>
                             </div>
                         `;
-                        previewDiv.scrollIntoView({behavior: 'smooth'});
+                        previewDiv.scrollIntoView({ behavior: 'smooth' });
                     } else {
                         alert(`Lote Global Generado.\nZIP: ${data.zip_path}`);
                         window.open(data.zip_path, '_blank');
                     }
                 }
-            } catch(e) { 
+            } catch (e) {
                 console.error(e);
-                alert("Error generando lote global"); 
+                alert("Error generando lote global");
             } finally {
-                if(btn) {
+                if (btn) {
                     btn.innerHTML = originalText;
                     btn.disabled = false;
                 }
@@ -1516,14 +1532,14 @@
 
         function mostrarArchivosCatastro(resultados, zipPath, ref) {
             console.log('🎯 mostrarArchivosCatastro llamado con:', { resultados, zipPath, ref });
-            
+
             const catastroSection = document.getElementById('catastroSection');
-            
+
             if (!catastroSection) {
                 console.error('❌ catastroSection no encontrado');
                 return;
             }
-            
+
             let html = `
                 <div class="info-card">
                     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -1556,16 +1572,16 @@
             ];
 
             let archivosMostrados = 0;
-            
+
             items.forEach(item => {
                 const disponible = resultados[item.k];
-                
+
                 if (disponible || ['consulta_descriptiva', 'plano_ortofoto', 'informe_pdf'].includes(item.k)) {
                     let fileToUse = item.file;
                     if (item.fallback) {
                         fileToUse = item.file;
                     }
-                    
+
                     html += `
                         <div class="col-md-6 col-lg-4">
                             <div class="file-card p-2 border rounded d-flex align-items-center justify-content-between bg-white h-100">
@@ -1615,7 +1631,7 @@
 
             catastroSection.innerHTML = html;
             catastroSection.style.display = 'block';
-            
+
             // Actualizar la sección de descargas globales con la referencia actual
             actualizarDescargasGlobales(ref);
         }
@@ -1623,7 +1639,7 @@
         function actualizarDescargasGlobales(ref) {
             const globalSection = document.getElementById('globalDownloadSection');
             if (!globalSection) return;
-            
+
             globalSection.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="m-0"><i class="fas fa-download"></i> Descargas Globales</h5>
@@ -1653,15 +1669,15 @@
         async function descargarConjuntoOrganizado(ref) {
             try {
                 showProgress('Generando conjunto organizado...', 30);
-                
+
                 const response = await fetch(`/api/v1/descargar-conjunto-organizado/${ref}`);
-                
+
                 if (!response.ok) {
                     throw new Error(`Error ${response.status}: ${response.statusText}`);
                 }
-                
+
                 showProgress('Descargando conjunto organizado...', 80);
-                
+
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -1671,10 +1687,10 @@
                 a.click();
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
-                
+
                 showProgress(' Conjunto organizado descargado', 100);
                 setTimeout(hideProgress, 2000);
-                
+
             } catch (error) {
                 console.error('Error descargando conjunto organizado:', error);
                 alert(`Error descargando conjunto organizado: ${error.message}`);
@@ -1785,7 +1801,7 @@
                     <p><strong>Fecha del Informe:</strong> ${data.fecha_informe}</p>
                 </div>
             `;
-            
+
             if (data.url_pdf) {
                 html += `
                     <div class="alert alert-success d-flex align-items-center justify-content-between" role="alert">
@@ -1796,7 +1812,7 @@
                     </div>
                 `;
             }
-            
+
             if (data.url_csv) {
                 html += `
                     <div class="alert alert-info d-flex align-items-center justify-content-between mt-2" role="alert">
@@ -1943,24 +1959,24 @@
 
         async function descargarGlobal(ref) {
             console.log(`🔥 INICIANDO DESCARGA GLOBAL para ref: ${ref}`);
-            
+
             try {
                 showProgress('Generando ZIP global...', 50);
-                
+
                 console.log(`📡 Haciendo petición a: /api/v1/descargar-global/${ref}`);
                 const response = await fetch(`/api/v1/descargar-global/${ref}`);
-                
+
                 console.log(`📊 Response status: ${response.status}`);
-                
+
                 if (!response.ok) {
                     const errorText = await response.text();
                     console.error(`❌ Error response: ${errorText}`);
                     throw new Error(`Error ${response.status}: ${response.statusText}`);
                 }
-                
+
                 const blob = await response.blob();
                 console.log(`📦 Blob size: ${blob.size} bytes`);
-                
+
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -1969,10 +1985,10 @@
                 a.click();
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
-                
+
                 showProgress('✅ ZIP global descargado', 100);
                 setTimeout(hideProgress, 2000);
-                
+
             } catch (error) {
                 console.error('❌ Error descargando ZIP global:', error);
                 alert(`Error descargando ZIP global: ${error.message}`);
@@ -1982,12 +1998,12 @@
 
         function testDescargarGlobal() {
             console.log('🧪 TEST: Iniciando test de descargarGlobal');
-            
+
             if (!currentRef) {
                 alert('Primero debe buscar una referencia catastral');
                 return;
             }
-            
+
             if (typeof descargarGlobal === 'function') {
                 console.log('✅ TEST: La función descargarGlobal existe');
                 console.log('🧪 TEST: Llamando a descargarGlobal con ref:', currentRef);
@@ -2000,16 +2016,16 @@
         async function listarArchivos(ref) {
             try {
                 showProgress('Listando archivos...', 30);
-                
+
                 const response = await fetch(`/api/v1/listar-archivos/${ref}`);
                 const data = await response.json();
-                
+
                 if (data.status !== 'success') {
                     throw new Error(data.message || 'Error listando archivos');
                 }
-                
+
                 showProgress('Mostrando archivos...', 80);
-                
+
                 const modal = document.createElement('div');
                 modal.className = 'modal fade';
                 modal.innerHTML = `
@@ -2068,17 +2084,17 @@
                         </div>
                     </div>
                 `;
-                
+
                 document.body.appendChild(modal);
                 const bsModal = new bootstrap.Modal(modal);
                 bsModal.show();
-                
+
                 modal.addEventListener('hidden.bs.modal', () => {
                     document.body.removeChild(modal);
                 });
-                
+
                 hideProgress();
-                
+
             } catch (error) {
                 console.error('Error listando archivos:', error);
                 alert(`Error listando archivos: ${error.message}`);
@@ -2125,4 +2141,5 @@
         }
     </script>
 </body>
+
 </html>
