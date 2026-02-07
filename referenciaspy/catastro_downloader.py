@@ -303,40 +303,71 @@ class CatastroDownloader:
             
             all_rings = []
             
-            # Encuentra todos los polígonos en el GML
-            for polygon in root.findall('.//gml:Polygon', namespaces):
-                
-                def parse_ring(pos_list_element):
-                    ring = []
-                    if pos_list_element is not None and pos_list_element.text:
-                        parts = pos_list_element.text.strip().split()
-                        step = 3 if len(parts) > 2 and len(parts) % 3 == 0 else 2
-                        for i in range(0, len(parts), step):
-                            if i + 1 < len(parts):
-                                ring.append((float(parts[i]), float(parts[i+1])))
-                    return ring
+            # Encuentra todos los elementos que puedan contener anillos (Polygon o PolygonPatch)
+            polygons = root.findall('.//gml:Polygon', namespaces)
+            if not polygons:
+                polygons = root.findall('.//gml:PolygonPatch', namespaces)
+            
+            # Si aún no hay nada, buscar LinearRings directamente (algunos GMLs son así)
+            if not polygons:
+                # Buscamos LinearRings que tengan un posList
+                linear_rings = root.findall('.//gml:LinearRing', namespaces)
+                for lr in linear_rings:
+                    poslist = lr.find('gml:posList', namespaces)
+                    if poslist is not None:
+                        # Simulamos una estructura de polígono para el loop siguiente
+                        # Pero es más fácil procesarlos aquí directamente
+                        pass
 
-                # Anillo exterior
-                exterior_poslist = polygon.find('.//gml:exterior/gml:LinearRing/gml:posList', namespaces)
-                exterior_ring = parse_ring(exterior_poslist)
-                if exterior_ring:
-                    all_rings.append(exterior_ring)
-                
-                # Anillos interiores (huecos)
-                for interior_poslist in polygon.findall('.//gml:interior/gml:LinearRing/gml:posList', namespaces):
-                    interior_ring = parse_ring(interior_poslist)
-                    if interior_ring:
-                        all_rings.append(interior_ring)
+            def parse_ring(pos_list_element):
+                ring = []
+                if pos_list_element is not None and pos_list_element.text:
+                    parts = pos_list_element.text.strip().split()
+                    # Algunos GML traen 3 coordenadas por punto (Lon, Lat, Elevación)
+                    # El Catastro suele traer 2 (Lat, Lon) en EPSG:4326
+                    step = 3 if len(parts) > 2 and len(parts) % 3 == 0 else 2
+                    for i in range(0, len(parts), step):
+                        if i + 1 < len(parts):
+                            try:
+                                ring.append((float(parts[i]), float(parts[i+1])))
+                            except ValueError:
+                                continue
+                return ring
+
+            if polygons:
+                for polygon in polygons:
+                    # Anillo exterior
+                    exterior_poslist = polygon.find('.//gml:exterior//gml:posList', namespaces)
+                    if exterior_poslist is None:
+                        # Reintento con ruta más corta
+                        exterior_poslist = polygon.find('.//gml:exterior/gml:LinearRing/gml:posList', namespaces)
+                        
+                    exterior_ring = parse_ring(exterior_poslist)
+                    if exterior_ring:
+                        all_rings.append(exterior_ring)
+                    
+                    # Anillos interiores (huecos)
+                    for interior in polygon.findall('.//gml:interior', namespaces):
+                        interior_poslist = interior.find('.//gml:posList', namespaces)
+                        interior_ring = parse_ring(interior_poslist)
+                        if interior_ring:
+                            all_rings.append(interior_ring)
+            else:
+                # Fallback: buscar cualquier posList que parezca un anillo
+                for poslist in root.findall('.//gml:posList', namespaces):
+                    ring = parse_ring(poslist)
+                    if ring and len(ring) > 2:
+                        all_rings.append(ring)
 
             if all_rings:
                 print(f"  ✓ Extraídos {len(all_rings)} anillos del GML")
                 return all_rings
 
-            print("  ⚠ No se encontraron anillos de polígono en el GML")
+            print(f"  ⚠ No se encontraron anillos de polígono válidos en el GML ({gml_file})")
             return None
 
         except Exception as e:
-            print(f"  ⚠ Error extrayendo coordenadas del GML: {e}")
+            print(f"  ⚠ Error extrayendo coordenadas del GML {gml_file}: {e}")
             return None
 
     def convertir_coordenadas_a_pixel(self, coords, bbox, width, height):
@@ -416,6 +447,10 @@ class CatastroDownloader:
                     # Cerrar el polígono
                     if pixels[0] != pixels[-1]:
                         pixels = pixels + [pixels[0]]
+                    
+                    # Estilo premium: Línea blanca gruesa debajo, línea roja más fina encima
+                    # para asegurar visibilidad en cualquier fondo
+                    draw.line(pixels, fill=(255, 255, 255, 255), width=width + 2)
                     draw.line(pixels, fill=color + (255,), width=width)
             
             # 2. Dibujar relleno con huecos (usando máscara)
@@ -609,8 +644,11 @@ class CatastroDownloader:
                                  pixel_rings.append(pixels)
                         
                         if pixel_rings:
-                            # Contornos
+                            # Contornos - Estilo Premium (Blanco debajo de Rojo)
                             for pixels in pixel_rings:
+                                # Línea de contraste blanca
+                                draw.line(pixels, fill=(255, 255, 255, 255), width=5)
+                                # Línea roja principal
                                 draw.line(pixels, fill=(255, 0, 0, 255), width=3)
                             
                             # Relleno con huecos

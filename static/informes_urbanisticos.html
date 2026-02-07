@@ -28,7 +28,7 @@
 
         .header-title {
             background: linear-gradient(45deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
+            j: text;
             -webkit-text-fill-color: transparent;
             font-weight: bold;
             font-size: 2.5rem;
@@ -1382,6 +1382,7 @@
                     <div>
                         <button class="btn btn-sm btn-danger me-2" id="btnCancelarLote" onclick="cancelarLote()"><i class="fas fa-stop-circle"></i> Detener</button>
                         <button class="btn btn-sm btn-outline-primary" onclick="procesarLoteGlobal('${refs.join(',')}')" title="Generar ZIP unificado y mapa global"><i class="fas fa-globe"></i> Generar Globales</button>
+                        <a id="btnDescargarGlobalZip" href="#" class="btn btn-sm btn-success ms-2" style="display:none;" title="Descargar ZIP Global"><i class="fas fa-file-archive"></i> ZIP Global</a>
                     </div>
                 </div>
                 <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
@@ -1490,6 +1491,13 @@
                 });
                 const data = await res.json();
                 if (data.status === 'success') {
+                    // Mostrar botón de descarga en la barra de herramientas
+                    const btnDownload = document.getElementById('btnDescargarGlobalZip');
+                    if (btnDownload) {
+                        btnDownload.href = data.zip_path;
+                        btnDownload.style.display = 'inline-block';
+                    }
+
                     if (data.mapa_global_url) {
                         const batchContainer = document.getElementById('batchContainer');
                         let previewDiv = document.getElementById('batchGlobalPreview');
