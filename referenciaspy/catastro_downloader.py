@@ -1329,16 +1329,25 @@ class CatastroDownloader:
                 lat, lon = coords[0]
                 kml.append(f'<Point><coordinates>{lon},{lat},0</coordinates></Point>')
             else:
-                kml.append('<Polygon><outerBoundaryIs><LinearRing><coordinates>')
-                for p in coords:
-                    # Heurística simple para Lat/Lon vs Lon/Lat
-                    v1, v2 = p
-                    # España: Lat 36-44, Lon -10-5
-                    if 35 < v1 < 45: # v1 es Lat
-                        kml.append(f"{v2},{v1},0")
-                    else: # v1 es Lon
-                        kml.append(f"{v1},{v2},0")
-                kml.append('</coordinates></LinearRing></outerBoundaryIs></Polygon>')
+                kml.append('<Polygon>')
+                # Iterar sobre los anillos (el primero es exterior, resto interiores)
+                for i, ring in enumerate(coords):
+                    boundary_tag = "outerBoundaryIs" if i == 0 else "innerBoundaryIs"
+                    kml.append(f'<{boundary_tag}><LinearRing><coordinates>')
+                    
+                    coord_strings = []
+                    for p in ring:
+                        # Heurística simple para Lat/Lon vs Lon/Lat
+                        v1, v2 = p
+                        # España: Lat 36-44, Lon -10-5
+                        if 35 < v1 < 45: # v1 es Lat
+                            coord_strings.append(f"{v2},{v1},0")
+                        else: # v1 es Lon
+                            coord_strings.append(f"{v1},{v2},0")
+                    
+                    kml.append(" ".join(coord_strings))
+                    kml.append(f'</coordinates></LinearRing></{boundary_tag}>')
+                kml.append('</Polygon>')
 
             kml.append('</Placemark></Document></kml>')
             
