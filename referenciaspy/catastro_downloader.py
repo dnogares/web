@@ -66,7 +66,7 @@ class CatastroDownloader:
 
     def limpiar_referencia(self, ref):
         """Limpia la referencia catastral eliminando espacios."""
-        return ref.replace(" ", "").strip()
+        return str(ref).replace(" ", "").strip()
 
     def extraer_del_mun(self, ref):
         """Extrae el código de delegación (2 dígitos) y municipio (3 dígitos) de la referencia."""
@@ -552,7 +552,9 @@ class CatastroDownloader:
         # ÚLTIMO RECURSO: Escanear el directorio para cualquier otra imagen que pueda haber sido generada
         try:
             for ext in ['.jpg', '.png', '.jpeg']:
-                for img_path in self.output_dir.glob(f"{ref}*{suffix}*{ext}"):
+                # Evitar patrón inválido con doble asterisco si suffix está vacío
+                pattern = f"{ref}*{suffix}*{ext}" if suffix else f"{ref}*{ext}"
+                for img_path in self.output_dir.glob(pattern):
                     if "_contorno" not in img_path.name:
                         # Si no fue procesada ya (no está en la lista de arriba)
                         # O simplemente para asegurar:
@@ -861,14 +863,15 @@ class CatastroDownloader:
                     if coords_gml:
                         lats = []
                         lons = []
-                        for v1, v2 in coords_gml:
-                            # Heurística: España Lat 36-44, Lon -10-5
-                            if 35 < v1 < 45: 
-                                lats.append(v1)
-                                lons.append(v2)
-                            else: 
-                                lons.append(v1)
-                                lats.append(v2)
+                        for ring in coords_gml:
+                            for v1, v2 in ring:
+                                # Heurística: España Lat 36-44, Lon -10-5
+                                if 35 < v1 < 45: 
+                                    lats.append(v1)
+                                    lons.append(v2)
+                                else: 
+                                    lons.append(v1)
+                                    lats.append(v2)
                         
                         if lats and lons:
                             min_lat, max_lat = min(lats), max(lats)

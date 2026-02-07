@@ -1480,7 +1480,7 @@ del sistema de análisis territorial.
 async def analizar_referencia(referencia: dict):
     """Analizar una referencia catastral completa con estructura de datos ampliada"""
     try:
-        ref = referencia.get("referencia", "")
+        ref = str(referencia.get("referencia", ""))
         print(f"🔍 Analizando referencia: {ref}")
         
         if not ref:
