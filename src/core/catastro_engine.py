@@ -1177,9 +1177,12 @@ class CatastroDownloader:
                         # Combinar con imagen original
                         img_with_contour = Image.alpha_composite(img.convert('RGBA'), overlay)
                         
-                        # Guardar como PNG para mantener calidad
+                        # 1. Guardar versión con sufijo _contorno
                         final_output = out_path.with_suffix('.png') if out_path.suffix.lower() == '.jpg' else out_path
                         img_with_contour.convert('RGB').save(final_output, quality=95)
+                        
+                        # 2. SOBREESCRIBIR la imagen original para que todas las fotos tengan contorno
+                        img_with_contour.convert('RGB').save(img_path, quality=95)
                         
                         # Si el archivo original era JPG y creamos PNG, también guardar versión JPG
                         if out_path.suffix.lower() == '.jpg' and final_output.suffix.lower() == '.png':
@@ -1261,7 +1264,12 @@ class CatastroDownloader:
                         draw.line(pixels + [pixels[0]], fill=(255, 255, 255), width=2)
                         
                         img_with_contour = Image.alpha_composite(img.convert('RGBA'), overlay)
+                        
+                        # 1. Guardar versión _contorno
                         img_with_contour.convert('RGB').save(out_path, quality=95)
+                        
+                        # 2. SOBREESCRIBIR original
+                        img_with_contour.convert('RGB').save(img_path, quality=95)
                         
                         exitos += 1
                         print(f"    ✓ Contorno en {img_path.name}")

@@ -476,22 +476,22 @@ function processPolygonOrSurface(polygonElement) {
         // Buscar anillos exterior e interior
         const exteriorRings = polygonElement.getElementsByTagNameNS("*", "exterior");
         const interiorRings = polygonElement.getElementsByTagNameNS("*", "interior");
-        
+
         let latlngs = [];
-        
+
         // Procesar anillo exterior (boundary principal)
         if (exteriorRings.length > 0) {
             const exteriorRing = exteriorRings[0];
             const posList = exteriorRing.getElementsByTagNameNS("*", "posList")[0];
-            
+
             if (posList) {
                 const coordsText = posList.textContent.trim().split(/\s+/);
                 const ring = [];
-                
+
                 for (let j = 0; j < coordsText.length; j += 2) {
                     const v1 = parseFloat(coordsText[j]);
                     const v2 = parseFloat(coordsText[j + 1]);
-                    
+
                     // Determinar orden
                     if (v1 > 30 && v1 < 50) {
                         ring.push([v1, v2]);
@@ -499,26 +499,26 @@ function processPolygonOrSurface(polygonElement) {
                         ring.push([v2, v1]);
                     }
                 }
-                
+
                 if (ring.length > 0) {
                     latlngs.push(ring);
                 }
             }
         }
-        
+
         // Procesar anillos interiores (huecos)
         for (let i = 0; i < interiorRings.length; i++) {
             const interiorRing = interiorRings[i];
             const posList = interiorRing.getElementsByTagNameNS("*", "posList")[0];
-            
+
             if (posList) {
                 const coordsText = posList.textContent.trim().split(/\s+/);
                 const hole = [];
-                
+
                 for (let j = 0; j < coordsText.length; j += 2) {
                     const v1 = parseFloat(coordsText[j]);
                     const v2 = parseFloat(coordsText[j + 1]);
-                    
+
                     // Determinar orden
                     if (v1 > 30 && v1 < 50) {
                         hole.push([v1, v2]);
@@ -526,22 +526,22 @@ function processPolygonOrSurface(polygonElement) {
                         hole.push([v2, v1]);
                     }
                 }
-                
+
                 if (hole.length > 0) {
                     latlngs.push(hole);
                 }
             }
         }
-        
+
         if (latlngs.length > 0) {
-            return L.polygon(latlngs, { 
-                color: '#e74c3c', 
-                weight: 3, 
+            return L.polygon(latlngs, {
+                color: '#e74c3c',
+                weight: 3,
                 fillOpacity: 0.3,
                 fillColor: '#e74c3c'
             });
         }
-        
+
         return null;
     } catch (e) {
         console.warn("Error procesando polígono:", e);
@@ -555,14 +555,14 @@ function processMultiPolygonOrSurface(multiElement) {
             ...multiElement.getElementsByTagNameNS("*", "polygonMember"),
             ...multiElement.getElementsByTagNameNS("*", "surfaceMember")
         ];
-        
+
         const group = L.layerGroup();
         let found = false;
-        
+
         for (let member of polygonMembers) {
             const polygons = member.getElementsByTagNameNS("*", "Polygon");
             const surfaces = member.getElementsByTagNameNS("*", "Surface");
-            
+
             for (let geom of [...polygons, ...surfaces]) {
                 const polygon = processPolygonOrSurface(geom);
                 if (polygon) {
@@ -571,7 +571,7 @@ function processMultiPolygonOrSurface(multiElement) {
                 }
             }
         }
-        
+
         return found ? group : null;
     } catch (e) {
         console.warn("Error procesando multi-polígono:", e);
@@ -772,42 +772,42 @@ function pollProgress(expId, container) {
 
 function cargarReferenciasLoteEnMapa(items, expId) {
     console.log(` Cargando ${items.length} referencias del lote ${expId} en el mapa`);
-    
+
     // Limpiar capa de dibujo anterior
     if (drawLayer) {
         drawLayer.clearLayers();
     }
-    
+
     let cargadas = 0;
     let errores = 0;
-    
+
     // Para cada referencia del lote, cargar su geometría
     items.forEach(async (item, index) => {
         try {
             const ref = item.referencia;
             console.log(` Cargando referencia ${index + 1}/${items.length}: ${ref}`);
-            
+
             // Intentar cargar el KML de la referencia individual
             const kmlUrl = `/outputs/expedientes/expediente_${expId}/${ref}/${ref}.kml`;
-            
+
             try {
                 const response = await fetch(kmlUrl);
                 if (response.ok) {
                     const kmlContent = await response.text();
-                    
+
                     if (typeof omnivore !== 'undefined') {
                         const layer = omnivore.kml.parse(kmlContent);
-                        layer.setStyle({ 
-                            color: '#e74c3c', 
-                            weight: 2, 
+                        layer.setStyle({
+                            color: '#e74c3c',
+                            weight: 2,
                             fillOpacity: 0.3,
                             fillColor: '#e74c3c'
                         });
-                        
+
                         layer.on('ready', function () {
                             drawLayer.addLayer(this);
                             cargadas++;
-                            
+
                             // Ajustar vista cuando se cargue la última referencia
                             if (cargadas + errores === items.length) {
                                 if (drawLayer.getLayers().length > 0) {
@@ -825,7 +825,7 @@ function cargarReferenciasLoteEnMapa(items, expId) {
                 errores++;
                 console.warn(` Error cargando KML para ${ref}:`, e);
             }
-            
+
         } catch (e) {
             errores++;
             console.error(` Error procesando item ${index}:`, e);
@@ -835,15 +835,15 @@ function cargarReferenciasLoteEnMapa(items, expId) {
 
 function cargarKMLGlobalLote(expId) {
     console.log(` Cargando KML global del lote ${expId}`);
-    
+
     const kmlUrl = `/outputs/expedientes/expediente_${expId}/lote/lote_${expId}.kml`;
-    
+
     if (typeof omnivore !== 'undefined') {
         const layer = omnivore.kml(kmlUrl, null, L.geoJson(null, {
-            style: { 
-                color: '#2ecc71', 
-                weight: 3, 
-                opacity: 1, 
+            style: {
+                color: '#2ecc71',
+                weight: 3,
+                opacity: 1,
                 fillOpacity: 0.1,
                 fillColor: '#2ecc71'
             }

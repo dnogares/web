@@ -66,7 +66,7 @@ class CatastroDownloader:
 
     def limpiar_referencia(self, ref):
         """Limpia la referencia catastral eliminando espacios."""
-        return ref.replace(" ", "").strip()
+        return str(ref).replace(" ", "").strip()
 
     def extraer_del_mun(self, ref):
         """Extrae el código de delegación (2 dígitos) y municipio (3 dígitos) de la referencia."""
@@ -303,40 +303,71 @@ class CatastroDownloader:
             
             all_rings = []
             
-            # Encuentra todos los polígonos en el GML
-            for polygon in root.findall('.//gml:Polygon', namespaces):
-                
-                def parse_ring(pos_list_element):
-                    ring = []
-                    if pos_list_element is not None and pos_list_element.text:
-                        parts = pos_list_element.text.strip().split()
-                        step = 3 if len(parts) > 2 and len(parts) % 3 == 0 else 2
-                        for i in range(0, len(parts), step):
-                            if i + 1 < len(parts):
-                                ring.append((float(parts[i]), float(parts[i+1])))
-                    return ring
+            # Encuentra todos los elementos que puedan contener anillos (Polygon o PolygonPatch)
+            polygons = root.findall('.//gml:Polygon', namespaces)
+            if not polygons:
+                polygons = root.findall('.//gml:PolygonPatch', namespaces)
+            
+            # Si aún no hay nada, buscar LinearRings directamente (algunos GMLs son así)
+            if not polygons:
+                # Buscamos LinearRings que tengan un posList
+                linear_rings = root.findall('.//gml:LinearRing', namespaces)
+                for lr in linear_rings:
+                    poslist = lr.find('gml:posList', namespaces)
+                    if poslist is not None:
+                        # Simulamos una estructura de polígono para el loop siguiente
+                        # Pero es más fácil procesarlos aquí directamente
+                        pass
 
-                # Anillo exterior
-                exterior_poslist = polygon.find('.//gml:exterior/gml:LinearRing/gml:posList', namespaces)
-                exterior_ring = parse_ring(exterior_poslist)
-                if exterior_ring:
-                    all_rings.append(exterior_ring)
-                
-                # Anillos interiores (huecos)
-                for interior_poslist in polygon.findall('.//gml:interior/gml:LinearRing/gml:posList', namespaces):
-                    interior_ring = parse_ring(interior_poslist)
-                    if interior_ring:
-                        all_rings.append(interior_ring)
+            def parse_ring(pos_list_element):
+                ring = []
+                if pos_list_element is not None and pos_list_element.text:
+                    parts = pos_list_element.text.strip().split()
+                    # Algunos GML traen 3 coordenadas por punto (Lon, Lat, Elevación)
+                    # El Catastro suele traer 2 (Lat, Lon) en EPSG:4326
+                    step = 3 if len(parts) > 2 and len(parts) % 3 == 0 else 2
+                    for i in range(0, len(parts), step):
+                        if i + 1 < len(parts):
+                            try:
+                                ring.append((float(parts[i]), float(parts[i+1])))
+                            except ValueError:
+                                continue
+                return ring
+
+            if polygons:
+                for polygon in polygons:
+                    # Anillo exterior
+                    exterior_poslist = polygon.find('.//gml:exterior//gml:posList', namespaces)
+                    if exterior_poslist is None:
+                        # Reintento con ruta más corta
+                        exterior_poslist = polygon.find('.//gml:exterior/gml:LinearRing/gml:posList', namespaces)
+                        
+                    exterior_ring = parse_ring(exterior_poslist)
+                    if exterior_ring:
+                        all_rings.append(exterior_ring)
+                    
+                    # Anillos interiores (huecos)
+                    for interior in polygon.findall('.//gml:interior', namespaces):
+                        interior_poslist = interior.find('.//gml:posList', namespaces)
+                        interior_ring = parse_ring(interior_poslist)
+                        if interior_ring:
+                            all_rings.append(interior_ring)
+            else:
+                # Fallback: buscar cualquier posList que parezca un anillo
+                for poslist in root.findall('.//gml:posList', namespaces):
+                    ring = parse_ring(poslist)
+                    if ring and len(ring) > 2:
+                        all_rings.append(ring)
 
             if all_rings:
                 print(f"  ✓ Extraídos {len(all_rings)} anillos del GML")
                 return all_rings
 
-            print("  ⚠ No se encontraron anillos de polígono en el GML")
+            print(f"  ⚠ No se encontraron anillos de polígono válidos en el GML ({gml_file})")
             return None
 
         except Exception as e:
-            print(f"  ⚠ Error extrayendo coordenadas del GML: {e}")
+            print(f"  ⚠ Error extrayendo coordenadas del GML {gml_file}: {e}")
             return None
 
     def convertir_coordenadas_a_pixel(self, coords, bbox, width, height):
@@ -416,6 +447,10 @@ class CatastroDownloader:
                     # Cerrar el polígono
                     if pixels[0] != pixels[-1]:
                         pixels = pixels + [pixels[0]]
+                    
+                    # Estilo premium: Línea blanca gruesa debajo, línea roja más fina encima
+                    # para asegurar visibilidad en cualquier fondo
+                    draw.line(pixels, fill=(255, 255, 255, 255), width=width + 2)
                     draw.line(pixels, fill=color + (255,), width=width)
             
             # 2. Dibujar relleno con huecos (usando máscara)
@@ -454,7 +489,8 @@ class CatastroDownloader:
         # Buscar GML en la raíz o en subcarpeta gml/
         posibles_gml = [
             self.output_dir / f"{ref}_parcela.gml",
-            self.output_dir / f"{ref}_parcela.gml"  # Fallback redundante por compatibilidad
+            self.output_dir / ref / f"{ref}_parcela.gml",
+            self.output_dir / f"{ref}_parcela.gml" 
         ]
         
         gml_file = None
@@ -464,7 +500,7 @@ class CatastroDownloader:
                 break
         
         if not gml_file:
-            print("  ⚠ No existe GML de parcela, no se puede dibujar contorno")
+            print(f"  ⚠ No existe GML de parcela para {ref}, no se puede dibujar contorno")
             return False
 
         coords_rings = self.extraer_coordenadas_gml(gml_file)
@@ -473,19 +509,20 @@ class CatastroDownloader:
 
         exito = False
 
+        # Lista ampliada de imágenes a procesar para asegurar que NINGUNA se quede sin contorno
         imagenes = [
-            (
-                self.output_dir / f"{ref}_ortofoto_pnoa{suffix}.jpg",
-                self.output_dir / f"{ref}_ortofoto_pnoa{suffix}_contorno.jpg",
-            ),
-            (
-                self.output_dir / f"{ref}_plano_catastro{suffix}.png",
-                self.output_dir / f"{ref}_plano_catastro{suffix}_contorno.png",
-            ),
-            (
-                self.output_dir / f"{ref}_plano_con_ortofoto{suffix}.png",
-                self.output_dir / f"{ref}_plano_con_ortofoto{suffix}_contorno.png",
-            ),
+            # PNOA Ortofoto
+            (self.output_dir / f"{ref}_ortofoto_pnoa{suffix}.jpg", self.output_dir / f"{ref}_ortofoto_pnoa{suffix}_contorno.jpg"),
+            (self.output_dir / f"{ref}_ortofoto_pnoa{suffix}.png", self.output_dir / f"{ref}_ortofoto_pnoa{suffix}_contorno.png"),
+            # Catastro Ortofoto (Respaldo)
+            (self.output_dir / f"{ref}_ortofoto_catastro{suffix}.jpg", self.output_dir / f"{ref}_ortofoto_catastro{suffix}_contorno.jpg"),
+            (self.output_dir / f"{ref}_ortofoto_catastro{suffix}.png", self.output_dir / f"{ref}_ortofoto_catastro{suffix}_contorno.png"),
+            # Plano Catastral
+            (self.output_dir / f"{ref}_plano_catastro{suffix}.png", self.output_dir / f"{ref}_plano_catastro{suffix}_contorno.png"),
+            (self.output_dir / f"{ref}_plano_catastro{suffix}.jpg", self.output_dir / f"{ref}_plano_catastro{suffix}_contorno.jpg"),
+            # Composición Plano + Ortofoto
+            (self.output_dir / f"{ref}_plano_con_ortofoto{suffix}.png", self.output_dir / f"{ref}_plano_con_ortofoto{suffix}_contorno.png"),
+            (self.output_dir / f"{ref}_plano_con_ortofoto{suffix}.jpg", self.output_dir / f"{ref}_plano_con_ortofoto{suffix}_contorno.jpg"),
         ]
 
         for in_path, out_path in imagenes:
@@ -501,12 +538,40 @@ class CatastroDownloader:
                         if pixels:
                             all_rings_pixels.append(pixels)
 
-                    if all_rings_pixels and self.dibujar_contorno_en_imagen(
-                        in_path, all_rings_pixels, out_path
-                    ):
-                        exito = True
+                    if all_rings_pixels:
+                        # 1. Guardar versión con sufijo _contorno (para compatibilidad con el visor)
+                        self.dibujar_contorno_en_imagen(in_path, all_rings_pixels, out_path)
+                        
+                        # 2. SOBREESCRIBIR la imagen original para que "todas las fotos tengan contorno"
+                        if self.dibujar_contorno_en_imagen(in_path, all_rings_pixels, in_path):
+                            exito = True
+                            
                 except Exception as e:
                     print(f"  ⚠ Error procesando imagen {in_path}: {e}")
+
+        # ÚLTIMO RECURSO: Escanear el directorio para cualquier otra imagen que pueda haber sido generada
+        try:
+            for ext in ['.jpg', '.png', '.jpeg']:
+                # Evitar patrón inválido con doble asterisco si suffix está vacío
+                pattern = f"{ref}*{suffix}*{ext}" if suffix else f"{ref}*{ext}"
+                for img_path in self.output_dir.glob(pattern):
+                    if "_contorno" not in img_path.name:
+                        # Si no fue procesada ya (no está en la lista de arriba)
+                        # O simplemente para asegurar:
+                        with Image.open(img_path) as img:
+                            w, h = img.size
+                        pixels_list = []
+                        for ring in coords_rings:
+                            px = self.convertir_coordenadas_a_pixel(ring, bbox_wgs84, w, h)
+                            if px: pixels_list.append(px)
+                        
+                        if pixels_list:
+                            self.dibujar_contorno_en_imagen(img_path, pixels_list, img_path)
+                            # También crear la versión _contorno por si acaso
+                            out_c = img_path.parent / (img_path.stem + "_contorno" + img_path.suffix)
+                            self.dibujar_contorno_en_imagen(img_path, pixels_list, out_c)
+        except Exception as e:
+            print(f"  ⚠ Error en escaneo final de contornos: {e}")
 
         return exito
 
@@ -581,8 +646,11 @@ class CatastroDownloader:
                                  pixel_rings.append(pixels)
                         
                         if pixel_rings:
-                            # Contornos
+                            # Contornos - Estilo Premium (Blanco debajo de Rojo)
                             for pixels in pixel_rings:
+                                # Línea de contraste blanca
+                                draw.line(pixels, fill=(255, 255, 255, 255), width=5)
+                                # Línea roja principal
                                 draw.line(pixels, fill=(255, 0, 0, 255), width=3)
                             
                             # Relleno con huecos
@@ -795,14 +863,15 @@ class CatastroDownloader:
                     if coords_gml:
                         lats = []
                         lons = []
-                        for v1, v2 in coords_gml:
-                            # Heurística: España Lat 36-44, Lon -10-5
-                            if 35 < v1 < 45: 
-                                lats.append(v1)
-                                lons.append(v2)
-                            else: 
-                                lons.append(v1)
-                                lats.append(v2)
+                        for ring in coords_gml:
+                            for v1, v2 in ring:
+                                # Heurística: España Lat 36-44, Lon -10-5
+                                if 35 < v1 < 45: 
+                                    lats.append(v1)
+                                    lons.append(v2)
+                                else: 
+                                    lons.append(v1)
+                                    lats.append(v2)
                         
                         if lats and lons:
                             min_lat, max_lat = min(lats), max(lats)
@@ -1263,16 +1332,25 @@ class CatastroDownloader:
                 lat, lon = coords[0]
                 kml.append(f'<Point><coordinates>{lon},{lat},0</coordinates></Point>')
             else:
-                kml.append('<Polygon><outerBoundaryIs><LinearRing><coordinates>')
-                for p in coords:
-                    # Heurística simple para Lat/Lon vs Lon/Lat
-                    v1, v2 = p
-                    # España: Lat 36-44, Lon -10-5
-                    if 35 < v1 < 45: # v1 es Lat
-                        kml.append(f"{v2},{v1},0")
-                    else: # v1 es Lon
-                        kml.append(f"{v1},{v2},0")
-                kml.append('</coordinates></LinearRing></outerBoundaryIs></Polygon>')
+                kml.append('<Polygon>')
+                # Iterar sobre los anillos (el primero es exterior, resto interiores)
+                for i, ring in enumerate(coords):
+                    boundary_tag = "outerBoundaryIs" if i == 0 else "innerBoundaryIs"
+                    kml.append(f'<{boundary_tag}><LinearRing><coordinates>')
+                    
+                    coord_strings = []
+                    for p in ring:
+                        # Heurística simple para Lat/Lon vs Lon/Lat
+                        v1, v2 = p
+                        # España: Lat 36-44, Lon -10-5
+                        if 35 < v1 < 45: # v1 es Lat
+                            coord_strings.append(f"{v2},{v1},0")
+                        else: # v1 es Lon
+                            coord_strings.append(f"{v1},{v2},0")
+                    
+                    kml.append(" ".join(coord_strings))
+                    kml.append(f'</coordinates></LinearRing></{boundary_tag}>')
+                kml.append('</Polygon>')
 
             kml.append('</Placemark></Document></kml>')
             

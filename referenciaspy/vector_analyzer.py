@@ -22,7 +22,7 @@ class VectorAnalyzer:
         self.config_titulos = self.cargar_config_titulos()
         self.urbanismo_service = urbanismo_service
 
-    def analizar(self, parcela_path, capa_input, campo_clasificacion="tipo", layer=None):
+    def analizar(self, parcela_path, capa_input, campo_clasificacion="tipo", layer=None, output_dir=None):
         """
         Analiza intersección entre parcela y capa vectorial
         
@@ -31,6 +31,7 @@ class VectorAnalyzer:
             capa_input: Ruta o nombre del archivo de la capa
             campo_clasificacion: Campo para clasificar afecciones
             layer: Nombre de la capa específica (para archivos multicapa)
+            output_dir: Directorio donde guardar la imagen de la intersección (opcional)
         """
         try:
             import os
@@ -92,6 +93,42 @@ class VectorAnalyzer:
             if interseccion.empty:
                 return {"afecciones": [], "total_afectado_percent": 0.0, "afecciones_detectadas": False}
 
+            # Generar imagen de intersección si se solicita
+            mapa_interseccion = None
+            if output_dir:
+                try:
+                    output_dir = Path(output_dir)
+                    output_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    fig, ax = plt.subplots(figsize=(10, 10))
+                    
+                    # Dibujar parcela (contorno azul)
+                    parcela_gdf.plot(ax=ax, facecolor='none', edgecolor='blue', linewidth=2, zorder=5, label='Parcela')
+                    
+                    # Dibujar intersección (relleno rojo)
+                    interseccion.plot(ax=ax, color='red', alpha=0.5, edgecolor='darkred', zorder=6, label='Afección')
+                    
+                    # Añadir mapa base si contextily está disponible
+                    if cx:
+                        try:
+                            cx.add_basemap(ax, crs=parcela_gdf.crs.to_string(), source=cx.providers.OpenStreetMap.Mapnik)
+                        except Exception:
+                            pass
+                    
+                    # Título y guardado
+                    nombre_capa = Path(capa_input).stem
+                    plt.title(f"Afección: {nombre_capa}")
+                    plt.axis('off')
+                    
+                    filename = f"interseccion_{nombre_capa}_{datetime.now().strftime('%H%M%S')}.png"
+                    filepath = output_dir / filename
+                    plt.savefig(filepath, bbox_inches='tight', dpi=150)
+                    plt.close()
+                    
+                    mapa_interseccion = str(filepath)
+                except Exception as e:
+                    print(f"Error generando imagen intersección: {e}")
+
             # Calcular áreas y porcentajes
             interseccion["area_afectada"] = interseccion.geometry.area
             total_afectado = interseccion["area_afectada"].sum()
@@ -119,7 +156,8 @@ class VectorAnalyzer:
                 "total_afectado_percent": round(total_percent, 2),
                 "total_afectado_m2": round(total_afectado, 2),
                 "area_parcela_m2": round(area_total, 2),
-                "afecciones_detectadas": True
+                "afecciones_detectadas": True,
+                "mapa_interseccion": mapa_interseccion
             }
 
         except Exception as e:

@@ -1391,7 +1391,7 @@ del sistema de análisis territorial.
 async def analizar_referencia(referencia: dict):
     """Analizar una referencia catastral completa con estructura de datos ampliada"""
     try:
-        ref = referencia.get("referencia", "")
+        ref = str(referencia.get("referencia", ""))
         print(f"🔍 Analizando referencia: {ref}")
         
         if not ref:
@@ -1653,6 +1653,14 @@ async def analizar_afecciones(request: AfeccionesRequest):
                 output_dir_base=str(ref_dir)
             )
             
+            total_capas = len(capas_locales) + len(capas_wfs) + len(capas_wms)
+            
+            # Lista de capas analizadas
+            lista_capas = []
+            for c in capas_locales: lista_capas.append(c.get("nombre", "Capa Local"))
+            for c in capas_wfs: lista_capas.append(c.get("nombre", "Capa WFS"))
+            for c in capas_wms: lista_capas.append(c.get("nombre", "Capa WMS"))
+            
             # 4. Formatear respuesta
             mapas_urls = []
             detalles_afeccion = []
@@ -1687,6 +1695,8 @@ async def analizar_afecciones(request: AfeccionesRequest):
                     "referencia": ref,
                     "afecciones": detalles_afeccion,
                     "mapas": mapas_urls,
+                    "capas_analizadas": total_capas,
+                    "lista_capas": lista_capas,
                     "source": "PostGIS + GeoPandas (Hybrid)"
                 },
                 "message": f"Análisis completado. {len(detalles_afeccion)} afecciones detectadas."
