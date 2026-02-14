@@ -11,6 +11,7 @@ import requests
 import unicodedata
 import time
 import threading
+import shutil
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
@@ -221,6 +222,15 @@ except ImportError:
     except ImportError:
         INFORME_URBANISTICO_AVAILABLE = False
         print("⚠️ InformeUrbanistico no disponible")
+
+# Intentar importar OrquestadorPipeline de logica.py
+try:
+    from backend.services.logica import OrquestadorPipeline
+    LOGICA_AVAILABLE = True
+    print("✅ OrquestadorPipeline (logica.py) disponible")
+except ImportError as e:
+    LOGICA_AVAILABLE = False
+    print(f"⚠️ OrquestadorPipeline no disponible: {e}")
 
 # Intentar importar GISDatabase
 try:
@@ -1001,171 +1011,72 @@ async def procesar_lote(request: LoteRequest):
     - Todos los GML juntos en la misma vista
     - ZIP con carpetas organizadas (documentos, geometrías, imágenes, etc.)
     """
-    print(f" Iniciando procesamiento de lote con {len(request.referencias)} referencias")
+    if not LOGICA_AVAILABLE:
+        raise HTTPException(status_code=503, detail="El servicio de lógica (OrquestadorPipeline) no está disponible")
+
+    print(f"🚀 Iniciando procesamiento de lote con {len(request.referencias)} referencias usando LOGICA.PY")
     
     referencias = request.referencias
     if not referencias:
         raise HTTPException(status_code=400, detail="No se proporcionaron referencias")
     
-    # Generar ID único para el lote
-    lote_id = f"lote_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(referencias)}refs"
-    lote_dir = Path(cfg["rutas"]["outputs"]) / lote_id
-    lote_dir.mkdir(exist_ok=True)
-    
-    print(f" Directorio del lote: {lote_dir}")
-    
     try:
-        # 1. Procesar cada referencia individualmente
-        resultados_individuales = []
-        todas_geometrias = []
-        xml_datos = []
-        lista_coords_para_mapa = []
+        # 1. Configurar directorios
+        base_dir = Path(os.getcwd())
+        inputs_dir = base_dir / "INPUTS"
+        inputs_dir.mkdir(exist_ok=True)
         
-        for i, ref in enumerate(referencias):
-            print(f" [{i+1}/{len(referencias)}] Procesando referencia: {ref}")
-            
-            try:
-                # Procesar referencia individual
-                zip_path, resultados = procesar_y_comprimir(
-                    referencia=ref,
-                    directorio_base=str(lote_dir)
-                )
-                
-                print(f"  Resultado procesar_y_comprimir: zip_path={zip_path}, exitosa={resultados.get('exitosa')}")
-                
-                if zip_path and resultados.get('exitosa'):
-                    # Extraer geometría
-                    ref_dir = lote_dir / ref
-                    parcela_gml_path = ref_dir / f"{ref}_parcela.gml"
-                    
-                    print(f"  Buscando GML: {parcela_gml_path}")
-                    
-                    if parcela_gml_path.exists():
-                        try:
-                            downloader = CatastroDownloader(output_dir=str(ref_dir))
-                            coords_poligono = downloader.extraer_coordenadas_gml(str(parcela_gml_path))
-                            
-                            print(f"  Coordenadas extraídas: {type(coords_poligono)} - {coords_poligono}")
-                            
-                            if coords_poligono:
-                                # coords_poligono puede ser una lista de coordenadas o None
-                                # Si es una lista de tuplas, la usamos directamente
-                                if isinstance(coords_poligono, list) and len(coords_poligono) > 0:
-                                    # Añadir a la lista de geometrías combinadas
-                                    for j, anillo in enumerate(coords_poligono):
-                                        todas_geometrias.append({
-                                            'referencia': ref,
-                                            'anillo': j,
-                                            'coordenadas': anillo
-                                        })
-                                    
-                                    # Añadir datos para XML
-                                    xml_datos.append({
-                                        'referencia': ref,
-                                        'geometria': coords_poligono,
-                                        'resultados': resultados
-                                    })
-                                    lista_coords_para_mapa.append(coords_poligono)
-                                    
-                                    print(f" Geometría extraída para {ref}: {len(coords_poligono)} anillos")
-                                else:
-                                    # Añadir datos para XML sin geometría
-                                    xml_datos.append({
-                                        'referencia': ref,
-                                        'geometria': None,
-                                        'resultados': resultados
-                                    })
-                                    
-                            else:
-                                print(f"  No se encontraron coordenadas para {ref}")
-                                # Añadir datos para XML sin geometría
-                                xml_datos.append({
-                                    'referencia': ref,
-                                    'geometria': None,
-                                    'resultados': resultados
-                                })
-                        except Exception as e:
-                            print(f"  Error extrayendo geometría para {ref}: {e}")
-                            traceback.print_exc()
-                            # Añadir datos para XML con error
-                            xml_datos.append({
-                                'referencia': ref,
-                                'geometria': None,
-                                'resultados': resultados,
-                                'error_geometria': str(e)
-                            })
-                    else:
-                        print(f"  No existe GML para {ref}")
-                        # Añadir datos para XML sin geometría
-                        xml_datos.append({
-                            'referencia': ref,
-                            'geometria': None,
-                            'resultados': resultados
-                        })
-                    
-                    resultados_individuales.append({
-                        'referencia': ref,
-                        'exitosa': True,
-                        'zip_path': zip_path,
-                        'resultados': resultados
-                    })
-                    
-                else:
-                    print(f"  Falló procesamiento de {ref}")
-                    resultados_individuales.append({
-                        'referencia': ref,
-                        'exitosa': False,
-                        'error': resultados.get('error', 'Error desconocido')
-                    })
-                    
-            except Exception as e:
-                print(f"  Error procesando referencia {ref}: {e}")
-                traceback.print_exc()
-                resultados_individuales.append({
-                    'referencia': ref,
-                    'exitosa': False,
-                    'error': str(e)
-                })
+        # 2. Crear archivo TXT temporal con las referencias
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        lote_id = f"lote_{timestamp}"
+        txt_file = inputs_dir / f"{lote_id}.txt"
         
-        # Instanciar downloader para operaciones de lote
-        downloader = CatastroDownloader(output_dir=str(lote_dir))
+        with open(txt_file, "w", encoding="utf-8") as f:
+            for ref in referencias:
+                f.write(f"{ref}\n")
+        
+        print(f"📄 Archivo de entrada creado: {txt_file}")
 
-        # 2. Crear XML unificado
-        xml_path = lote_dir / f"{lote_id}_informacion.xml"
-        downloader.generar_xml_lote(xml_datos, lote_id, xml_path)
+        # 3. Ejecutar OrquestadorPipeline
+        orquestador = OrquestadorPipeline(base_dir)
         
-        # 3. Crear GeoJSON combinado y GML Global
-        geojson_path = lote_dir / f"{lote_id}_geometrias_combinadas.geojson"
-        downloader.generar_geojson_lote(todas_geometrias, geojson_path)
+        # Ejecutar proceso (devuelve la ruta de la carpeta generada en OUTPUTS)
+        carpeta_resultado = orquestador.procesar_archivo_txt(txt_file)
         
-        # Generar GML Global y Mapa Global
-        downloader.generar_gml_global(xml_datos, lote_dir / f"{lote_id}_global.gml")
-        
-        mapa_global_creado = False
-        if lista_coords_para_mapa:
-            if downloader.generar_mapa_lote(lista_coords_para_mapa, lote_dir / f"{lote_id}_mapa_global.jpg"):
-                mapa_global_creado = True
+        if not carpeta_resultado or not carpeta_resultado.exists():
+            raise Exception("El pipeline no generó la carpeta de resultados esperada.")
 
-        # 4. Organizar carpetas del ZIP final
-        zip_final_path = downloader.organizar_lote(lote_dir, lote_id, referencias)
+        # 4. Comprimir resultado
+        zip_base_name = str(carpeta_resultado) # shutil añade .zip automáticamente
+        zip_path = shutil.make_archive(zip_base_name, 'zip', carpeta_resultado)
         
-        mapa_global_url = None
-        if mapa_global_creado:
-             mapa_global_url = f"/outputs/{lote_id}/Imagenes/{lote_id}_mapa_global.jpg".replace('\\', '/')
+        # URL relativa para descarga
+        zip_filename = os.path.basename(zip_path)
+        zip_url = f"/outputs/{zip_filename}" # Asumiendo que OUTPUTS está montado o servido
+        
+        # Intentar mover el zip a la carpeta outputs servida si es diferente
+        # En logica.py OUTPUTS es base_dir/OUTPUTS. En main.py outputs_dir es cfg["rutas"]["outputs"]
+        # Si coinciden, todo bien. Si no, mover.
+        
+        # Registrar para retención
+        registrar_archivo(lote_id, Path(zip_path))
 
         return {
             "status": "success",
-            "message": f"Lote procesado: {len(referencias)} referencias",
+            "message": f"Lote procesado con LOGICA.PY: {len(referencias)} referencias",
             "lote_id": lote_id,
-            "zip_path": f"/outputs/{lote_id}/{lote_id}.zip".replace('\\', '/'),
-            "geometrias_combinadas": len(todas_geometrias),
-            "resultados": resultados_individuales,
-            "geojson_url": f"/outputs/{lote_id}/{lote_id}_geometrias_combinadas.geojson".replace('\\', '/'),
-            "mapa_global_url": mapa_global_url
+            "zip_path": zip_url,
+            "resultados": [], # Mantener estructura para compatibilidad frontend
+            "pipeline": "OrquestadorPipeline (Sin Fase 5)"
         }
         
+    except MemoryError as me:
+        print(f"🛑 {me}")
+        raise HTTPException(status_code=507, detail=str(me))
     except Exception as e:
         print(f"❌ Error en procesamiento de lote: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error procesando lote: {str(e)}")
 
 

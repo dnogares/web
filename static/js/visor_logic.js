@@ -34,10 +34,8 @@ function initVisor() {
     const mapDiv = document.getElementById('map');
     if (mapDiv) {
         mapDiv.style.position = 'relative';
-        if (!mapDiv.style.height || mapDiv.clientHeight === 0) {
-            mapDiv.style.height = '100%';
-            mapDiv.style.minHeight = '600px';
-        }
+        mapDiv.style.height = '100vh';
+        mapDiv.style.minHeight = '100%';
     }
 
     // Crear mapa
@@ -121,6 +119,15 @@ function initVisor() {
 
     // Inyectar botón de exportación rápida HTML
     injectExportButton();
+
+    // Inyectar botón de ficha catastral
+    injectFichaButton();
+
+    // Inyectar botón de vista híbrida (Ortofoto + Catastro)
+    injectHybridButton();
+
+    // Inyectar botón para alternar panel lateral
+    injectSidebarToggle();
 
     // --- LÓGICA DEL INDICADOR DE CARGA (BARRA DE PROGRESO) ---
     const loadingIndicator = L.control({ position: 'topright' });
@@ -515,23 +522,40 @@ function getWMSGetFeatureInfoUrl(layer, latlng) {
 function handleFileUpload(input) {
     var files = input.files;
     if (!files || files.length === 0) return;
-    for (var i = 0; i < files.length; i++) {
-        var reader = new FileReader();
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const reader = new FileReader();
         reader.onload = function (e) {
             try {
                 var content = e.target.result;
-                if (input.value.toLowerCase().endsWith('.kml')) {
+                var name = file.name.toLowerCase();
+                
+                if (name.endsWith('.kml')) {
                     omnivore.kml.parse(content).setStyle(redStyle).addTo(loadedLayer);
-                } else if (input.value.toLowerCase().endsWith('.gml')) {
+                } else if (name.endsWith('.gml')) {
                     var geojson = parseGML(content);
                     if (geojson) L.geoJSON(geojson, { style: redStyle }).addTo(loadedLayer);
+                } else if (name.endsWith('.txt')) {
+                    // Buscar referencia catastral en el texto (14 o 20 caracteres)
+                    const refMatch = content.match(/[0-9A-Z]{14,20}/i);
+                    if (refMatch) {
+                        const ref = refMatch[0].toUpperCase();
+                        fetch(`/api/v1/referencia/${ref}/geojson`)
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data.status === 'error') throw new Error(data.error);
+                                L.geoJSON(data, { style: redStyle }).addTo(loadedLayer);
+                                map.fitBounds(loadedLayer.getBounds());
+                            })
+                            .catch(err => console.error(`Error cargando referencia del TXT: ${err.message}`));
+                    }
                 } else {
                     L.geoJSON(JSON.parse(content), { style: redStyle }).addTo(loadedLayer);
                 }
                 setTimeout(() => { if (loadedLayer.getLayers().length > 0) map.fitBounds(loadedLayer.getBounds()); }, 500);
             } catch (err) { console.error(err); }
         };
-        reader.readAsText(files[i]);
+        reader.readAsText(file);
     }
 }
 
@@ -1135,6 +1159,95 @@ async function generarInformeHTML() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+}
+
+function injectFichaButton() {
+    if (document.getElementById('btn-ficha-catastral')) return;
+    const btn = document.createElement('button');
+    btn.id = 'btn-ficha-catastral';
+    btn.innerHTML = '<i class="fa-solid fa-file-pdf"></i>';
+    btn.title = "Descargar Ficha Catastral Oficial";
+    btn.style.cssText = 'position:fixed; top:180px; right:10px; z-index:1000; width:34px; height:34px; background:white; border-radius:4px; border:2px solid rgba(0,0,0,0.2); cursor:pointer; display:flex; align-items:center; justify-content:center; color:#d32f2f; box-shadow:0 1px 5px rgba(0,0,0,0.4);';
+    btn.onmouseover = () => btn.style.background = '#f4f4f4';
+    btn.onmouseout = () => btn.style.background = 'white';
+    btn.onclick = descargarFichaCatastral;
+    document.body.appendChild(btn);
+}
+
+async function descargarFichaCatastral() {
+    const ref = getCurrentRef();
+    if (!ref) return alert("Por favor, busca una referencia catastral primero.");
+
+    const btn = document.getElementById('btn-ficha-catastral');
+    const originalContent = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    btn.disabled = true;
+
+    try {
+        const res = await fetch('/api/v1/procesar-completo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ referencia: ref })
+        });
+        
+        const data = await res.json();
+        
+        if (data.status === 'success') {
+            const pdfUrl = `/outputs/${ref}/${ref}_consulta_oficial.pdf`;
+            window.open(pdfUrl, '_blank');
+        } else {
+            alert("No se pudo obtener la ficha catastral: " + (data.message || "Error desconocido"));
+        }
+    } catch (e) {
+        alert("Error de conexión: " + e.message);
+    } finally {
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+    }
+}
+
+function injectHybridButton() {
+    if (document.getElementById('btn-hybrid')) return;
+    const btn = document.createElement('button');
+    btn.id = 'btn-hybrid';
+    btn.innerHTML = '<i class="fa-solid fa-layer-group"></i>';
+    btn.title = "Vista Híbrida (Ortofoto + Catastro)";
+    btn.style.cssText = 'position:fixed; top:220px; right:10px; z-index:1000; width:34px; height:34px; background:white; border-radius:4px; border:2px solid rgba(0,0,0,0.2); cursor:pointer; display:flex; align-items:center; justify-content:center; color:#2c3e50; box-shadow:0 1px 5px rgba(0,0,0,0.4);';
+    btn.onmouseover = () => btn.style.background = '#f4f4f4';
+    btn.onmouseout = () => btn.style.background = 'white';
+    btn.onclick = () => {
+        if (map.hasLayer(layers.pnoa)) {
+            map.removeLayer(layers.pnoa);
+            if (!map.hasLayer(osm)) map.addLayer(osm);
+        } else {
+            if (map.hasLayer(osm)) map.removeLayer(osm);
+            if (map.hasLayer(satelite)) map.removeLayer(satelite);
+            map.addLayer(layers.pnoa);
+            if (!map.hasLayer(layers.catastro)) map.addLayer(layers.catastro);
+            layers.catastro.bringToFront();
+        }
+    };
+    document.body.appendChild(btn);
+}
+
+function injectSidebarToggle() {
+    if (document.getElementById('btn-toggle-sidebar')) return;
+    const btn = document.createElement('button');
+    btn.id = 'btn-toggle-sidebar';
+    btn.innerHTML = '<i class="fa-solid fa-bars"></i>';
+    btn.title = "Alternar Panel Lateral";
+    btn.style.cssText = 'position:absolute; top:10px; left:10px; z-index:1000; width:34px; height:34px; background:white; border-radius:4px; border:2px solid rgba(0,0,0,0.2); cursor:pointer; display:flex; align-items:center; justify-content:center; color:#333; box-shadow:0 1px 5px rgba(0,0,0,0.4);';
+    btn.onmouseover = () => btn.style.background = '#f4f4f4';
+    btn.onmouseout = () => btn.style.background = 'white';
+    btn.onclick = () => {
+        const sidebar = document.querySelector('.sidebar') || document.getElementById('sidebar') || document.querySelector('aside') || document.querySelector('.left-panel');
+        if (sidebar) {
+            sidebar.style.display = sidebar.style.display === 'none' ? '' : 'none';
+            setTimeout(() => { if (map) map.invalidateSize(); }, 300);
+        }
+    };
+    const mapDiv = document.getElementById('map');
+    if (mapDiv) mapDiv.appendChild(btn);
 }
 
 async function verLogsServidor() {
